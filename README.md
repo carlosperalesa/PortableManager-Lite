@@ -13,7 +13,7 @@
 
 ## 2. Compilación Reproducible
 
-El proyecto no requiere instalar Visual Studio ni modificar variables de entorno globales de Windows. El script [`build.ps1`](file:///d:/Data/build.ps1) detecta automáticamente la raíz del proyecto y utiliza el compilador portable en `tools/toolchains/llvm-mingw/bin/clang++.exe`:
+El proyecto no requiere instalar Visual Studio ni modificar variables de entorno globales de Windows. El script [`build.ps1`](build.ps1) detecta automáticamente la raíz del proyecto y utiliza el compilador portable en `tools/toolchains/llvm-mingw/bin/clang++.exe`:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "d:\Data\build.ps1"
@@ -25,7 +25,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "d:\Data\build.ps1"
 - `-static` (enlaza estáticamente `libc++`, `libunwind` y `libwinpthread`; importa las DLLs del sistema operativo Windows y los API sets `api-ms-win-crt-*.dll` de `ucrtbase.dll` nativo de Windows 10/11).
 - `"-Wl,-Xlink=-swaprun:cd"` (activa `IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP = 0x0400` en la cabecera PE como protección secundaria junto con la copia a `%TEMP%`).
 
-Para entornos con CMake, se incluye [`CMakeLists.txt`](file:///d:/Data/CMakeLists.txt) y el archivo de toolchain [`cmake/llvm-mingw-toolchain.cmake`](file:///d:/Data/cmake/llvm-mingw-toolchain.cmake).
+Para entornos con CMake, se incluye [`CMakeLists.txt`](CMakeLists.txt) y el archivo de toolchain [`cmake/llvm-mingw-toolchain.cmake`](cmake/llvm-mingw-toolchain.cmake).
 
 ---
 
@@ -69,13 +69,13 @@ d:\Data\
 
 ## 4. Documentación Principal
 
-- [IMPLEMENTACION_PM_LITE.md](file:///d:/Data/IMPLEMENTACION_PM_LITE.md) — Estado global de implementación por fases.
-- [IMPLEMENTACION_FASE_0.md](file:///d:/Data/IMPLEMENTACION_FASE_0.md) — Informe de Fase 0 y Fase 0B (`passed`).
-- [fase02/README_FASE02.md](file:///d:/Data/fase02/README_FASE02.md) — Documentación consolidada, ejemplos e informe de auditoría de Fase 2.
-- [fase02/INFORME_DE_AUDITORIA.md](file:///d:/Data/fase02/INFORME_DE_AUDITORIA.md) — Informe de Auditoría Final de Fase 2.
-- [EVALUACION_TOOLCHAIN_PORTABLE.md](file:///d:/Data/EVALUACION_TOOLCHAIN_PORTABLE.md) — Evaluación técnica de LLVM-MinGW.
-- [DECISIONES_TECNICAS.md](file:///d:/Data/DECISIONES_TECNICAS.md) — Decisiones arquitectónicas y precedencia normativa.
-- [ARQUITECTURA_NATIVE.md](file:///d:/Data/ARQUITECTURA_NATIVE.md) — Diseño modular C++20 / Win32.
-- [PLAN_DE_PRUEBAS.md](file:///d:/Data/PLAN_DE_PRUEBAS.md) — Matriz de pruebas por fase.
-- [RESULTADOS_RECONSTRUCCION.md](file:///d:/Data/RESULTADOS_RECONSTRUCCION.md) — Estado consolidado de las fases de reconstrucción.
-- [docs/README_COMPILACION.md](file:///d:/Data/docs/README_COMPILACION.md) — Detalles del proceso de compilación e inspección PE.
+- [IMPLEMENTACION_PM_LITE.md](IMPLEMENTACION_PM_LITE.md) — Estado global de implementación por fases.
+- [IMPLEMENTACION_FASE_0.md](IMPLEMENTACION_FASE_0.md) — Informe de Fase 0 y Fase 0B (`passed`).
+- [fase02/README_FASE02.md](fase02/README_FASE02.md) — Documentación consolidada, ejemplos e informe de auditoría de Fase 2.
+- [fase02/INFORME_DE_AUDITORIA.md](fase02/INFORME_DE_AUDITORIA.md) — Informe de Auditoría Final de Fase 2.
+- [EVALUACION_TOOLCHAIN_PORTABLE.md](EVALUACION_TOOLCHAIN_PORTABLE.md) — Evaluación técnica de LLVM-MinGW.
+- [DECISIONES_TECNICAS.md](DECISIONES_TECNICAS.md) — Decisiones arquitectónicas y precedencia normativa.
+- [ARQUITECTURA_NATIVE.md](ARQUITECTURA_NATIVE.md) — Diseño modular C++20 / Win32.
+- [PLAN_DE_PRUEBAS.md](PLAN_DE_PRUEBAS.md) — Matriz de pruebas por fase.
+- [RESULTADOS_RECONSTRUCCION.md](RESULTADOS_RECONSTRUCCION.md) — Estado consolidado de las fases de reconstrucción.
+- [docs/README_COMPILACION.md](docs/README_COMPILACION.md) — Detalles del proceso de compilación e inspección PE.
