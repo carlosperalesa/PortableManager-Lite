@@ -1,0 +1,87 @@
+{
+  "task": "Limpieza, Organización y Publicación en GitHub — PortableManager Lite",
+  "migration_date_utc": "2026-11-11T19:24:19Z",
+  "repository": {
+    "url": "https://github.com/carlosperalesa/PortableManager-Lite",
+    "remote_name": "origin",
+    "branch": "main",
+    "private": true,
+    "visibility": "private",
+    "write_permissions_verified": true
+  },
+  "initial_commit_published": {
+    "hash": "283a86073060ee8cdb397976ce5bbed1f18a6388",
+    "message": "Initial import - PortableManager Lite",
+    "files_count": 144,
+    "insertions": 14720
+  },
+  "git_local_identity": {
+    "scope": "local (.git/config only, global config untouched)",
+    "user_name": "Carlos Perales Ayala",
+    "user_email": "carlosperalesa@gmail.com"
+  },
+  "local_backup": {
+    "path": "C:\\Users\\cperales\\PortableManager_Lite_Backup_20261111",
+    "outside_working_dir": true,
+    "preserved_after_push": true
+  },
+  "phase_documentation_structure": {
+    "convention": "Two-digit directories in project root (fase01/ .. fase08/)",
+    "legacy_fase2_migrated_to_fase02": true,
+    "root_agents_md_present": true,
+    "directories": [
+      "fase01/",
+      "fase02/",
+      "fase03/",
+      "fase04/",
+      "fase05/",
+      "fase06/",
+      "fase07/",
+      "fase08/"
+    ]
+  },
+  "preserved_categories": [
+    "AGENTS.md y docs/AGENTS.md",
+    "Código fuente C++20 nativo (src/core, src/guard, src/runtime, cabeceras de módulos)",
+    "Antecedentes C# preservados como referencia histórica",
+    "Suites de prueba C++20 (tests/test_phase0_smoke.cpp, tests/test_phase1_core.cpp, tests/test_phase2_runtime.cpp)",
+    "Sonda de compatibilidad de toolchain (tools/toolchain_probe/probe.cpp)",
+    "Scripts y configuración de compilación (build.ps1, build_msvc.ps1, CMakeLists.txt, cmake/llvm-mingw-toolchain.cmake)",
+    "Documentación general vigente en la raíz y PMDocs/",
+    "Carpetas consolidadas de fase (fase01/ a fase08/)",
+    "Informes JSON de PoCs, aplicaciones reales, Fase 0B, Fase 1 y Fase 2 (reports/*.json, fase01/*.json, fase02/*.json, PM_Lite_FinalValidation/reports/*.json)"
+  ],
+  "excluded_via_gitignore_preserved_locally": [
+    "build/ (pm.exe, test_phase0_smoke.exe, test_phase1_core.exe, test_phase2_runtime.exe)",
+    "tools/toolchain_probe/probe.exe",
+    "tools/toolchains/llvm-mingw/ (toolchain portable descargado)",
+    "FirefoxPortable_160.0_English.paf.exe",
+    "putty.zip",
+    "VSCode-win32-x64-1.146.0.zip",
+    "Notas personales en la raíz (1 firefox busqueda.txt, 2 firefox purga.txt, vscode other.txt, vscode PS Mover local a portable y purgar datos locales.txt)",
+    "Imagen local (Windows-FY27-CONS-C2-Wallpaper-EverydayProductivity.png)",
+    "Cachés Python (__pycache__/, *.pyc) y archivos .signal",
+    "Volcados masivos de inventario de archivos del perfil local/USB (d1_host_before.json, d1_host_after.json, d3_host_before_metadata.json, d3_host_after_metadata.json, usb_final_inventory.json)"
+  ],
+  "security_audit": {
+    "secrets_or_tokens_found": 0,
+    "private_keys_found": 0,
+    "env_files_found": 0,
+    "personal_host_file_trees_excluded": true,
+    "status": "passed"
+  },
+  "github_verification_after_push": {
+    "remote_head_matches_local": true,
+    "agents_md_in_root": true,
+    "gitignore_in_root": true,
+    "fase01_present": true,
+    "fase02_present": true,
+    "excluded_artifacts_leaked": 0,
+    "status": "passed"
+  },
+  "issues_encountered_and_resolved": [
+    "Existían dos cuentas de GitHub en Windows Credential Manager (102628412 y carlosperalesa), lo que impedía que Git Credential Manager seleccionara automáticamente la credencial en modo no interactivo; se resolvió configurando localmente credential.https://github.com.username=carlosperalesa en .git/config.",
+    "Los archivos d3_host_before_metadata.json y d3_host_after_metadata.json (~46.4 MB cada uno) contenían el listado completo de rutas del perfil de usuario local; se excluyeron en .gitignore conservando sus copias locales e incluyendo todos los informes JSON de resultados y diffs."
+  ],
+  "status": "passed"
+}
