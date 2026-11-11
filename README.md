@@ -16,7 +16,7 @@
 El proyecto no requiere instalar Visual Studio ni modificar variables de entorno globales de Windows. El script [`build.ps1`](build.ps1) detecta automáticamente la raíz del proyecto y utiliza el compilador portable en `tools/toolchains/llvm-mingw/bin/clang++.exe`:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "d:\Data\build.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "./build.ps1"
 ```
 
 ### Parámetros de compilación C++20 aplicados
@@ -34,7 +34,7 @@ Para entornos con CMake, se incluye [`CMakeLists.txt`](CMakeLists.txt) y el arch
 Siguiendo la directiva permanente de organización documental, cada fase dispone de su carpeta propia de dos dígitos en la raíz (`fase01/` a `fase08/`):
 
 ```text
-d:\Data\
+ .\
 ├── build.ps1                         # Script reproducible de compilación y prueba C++20
 ├── CMakeLists.txt                    # Configuración CMake (Clang/LLVM-MinGW y MSVC)
 ├── cmake\
