@@ -8,7 +8,15 @@ ASSET="$(jq -r .codex_cloud_linux.asset "$LOCK")"
 EXPECTED="$(jq -r .codex_cloud_linux.sha256 "$LOCK")"
 REPO="$(jq -r .repository "$LOCK")"
 TAG="$(jq -r .release_tag "$LOCK")"
-for cmd in curl jq tar xz sha256sum cmake ninja; do command -v "$cmd" >/dev/null || { echo "Missing prerequisite: $cmd" >&2; exit 1; }; done
+missing=()
+for cmd in curl jq tar xz sha256sum cmake ninja; do command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd"); done
+if ((${#missing[@]})); then
+  if [[ "$(id -u)" == "0" ]]; then APT=(apt-get);
+  elif command -v sudo >/dev/null 2>&1; then APT=(sudo apt-get);
+  else echo "Missing prerequisites (${missing[*]}) and no root/sudo apt access." >&2; exit 1; fi
+  "${APT[@]}" update
+  "${APT[@]}" install -y --no-install-recommends curl jq tar xz-utils coreutils cmake ninja-build
+fi
 API="$(mktemp)"
 TMP="$(mktemp -d)"
 trap 'rm -f "$API"; rm -rf "$TMP"' EXIT
