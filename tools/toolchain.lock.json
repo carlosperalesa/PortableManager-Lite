@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "repository": "mstorsjo/llvm-mingw",
+  "release_tag": "20261104",
+  "llvm_version": "23.1.5",
+  "target": "x86_64-w64-windows-gnu",
+  "runtime": "UCRT",
+  "windows": {
+    "asset": "llvm-mingw-20261104-ucrt-x86_64.zip",
+    "sha256": "552191b5754c49a5a20723276a6fc56541ea1922c4c50b7b669022333fc1b40f"
+  },
+  "codex_cloud_linux": {
+    "asset": "llvm-mingw-20261104-ucrt-ubuntu-22.04-x86_64.tar.xz",
+    "sha256": "919380403de87dca3c581c2053230cd298af5e891286628ba0613b7fed370926",
+    "host": "Ubuntu 22.04 x86_64"
+  }
+}
