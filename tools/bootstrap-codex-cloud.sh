@@ -29,12 +29,30 @@ test "$DIGEST" = "sha256:$EXPECTED"
 curl --fail --location --retry 3 --show-error "$URL" -o "$TMP/$ASSET"
 echo "$EXPECTED  $TMP/$ASSET" | sha256sum --check -
 tar -xJf "$TMP/$ASSET" -C "$TMP"
-COMPILER="$(find "$TMP" -type f -path "*/bin/clang++" -print -quit)"
-test -n "$COMPILER"
+# clang++ may be a symlink to clang in the official Linux archive; do not restrict find to regular files.
+COMPILER="$(find "$TMP" -path "*/bin/clang++" -print -quit)"
+if [[ -z "$COMPILER" || ! -x "$COMPILER" ]]; then
+  echo "The verified archive does not contain an executable bin/clang++ (including symlinks)." >&2
+  find "$TMP" -maxdepth 4 \( -type f -o -type l \) | head -n 80 >&2
+  exit 1
+fi
 EXTRACTED="$(dirname "$(dirname "$COMPILER")")"
-test -x "$EXTRACTED/bin/llvm-readobj"
-test -d "$EXTRACTED/x86_64-w64-mingw32"
-"$COMPILER" --version | grep -F "clang version $VERSION"
+if [[ ! -x "$EXTRACTED/bin/llvm-readobj" ]]; then
+  echo "The extracted toolchain is missing executable bin/llvm-readobj: $EXTRACTED" >&2
+  exit 1
+fi
+if [[ ! -d "$EXTRACTED/x86_64-w64-mingw32" || ! -f "$EXTRACTED/x86_64-w64-mingw32/include/windows.h" ]]; then
+  echo "The extracted toolchain is missing the x86_64-w64-mingw32 Windows sysroot." >&2
+  find "$EXTRACTED" -maxdepth 2 -type d >&2
+  exit 1
+fi
+VERSION_LINE="$("$COMPILER" --version | head -n 1)"
+if [[ "$VERSION_LINE" != *"clang version $VERSION"* ]]; then
+  echo "Unexpected Clang version: $VERSION_LINE (expected $VERSION)." >&2
+  exit 1
+fi
+echo "Validated compiler: $VERSION_LINE"
+echo "Validated sysroot: $EXTRACTED/x86_64-w64-mingw32"
 mkdir -p "$(dirname "$TARGET")"
 if [[ -e "$TARGET" ]]; then mv "$TARGET" "$TARGET.previous.$(date -u +%Y%m%dT%H%M%SZ)"; fi
 mv "$EXTRACTED" "$TARGET"
