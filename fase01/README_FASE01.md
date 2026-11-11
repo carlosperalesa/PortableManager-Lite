@@ -7,8 +7,8 @@
 
 ## Contenido de la Carpeta `fase01/`
 
-- [`README_FASE01.md`](fase01/README_FASE01.md) — Índice de la Fase 1.
-- [`rebuild_core.json`](fase01/rebuild_core.json) — Evidencia JSON de validación de Fase 1 ([`reports/rebuild_core.json`](../reports/rebuild_core.json)).
+- [`README_FASE01.md`](README_FASE01.md) — Índice de la Fase 1.
+- [`rebuild_core.json`](rebuild_core.json) — Evidencia JSON de validación de Fase 1 ([`reports/rebuild_core.json`](../reports/rebuild_core.json)).
 - Módulos implementados en [`src/core/`](../src/core):
   - [`path_resolver.h`](../src/core/path_resolver.h) y [`path_resolver.cpp`](../src/core/path_resolver.cpp)
   - [`atomic_file.h`](../src/core/atomic_file.h) y [`atomic_file.cpp`](../src/core/atomic_file.cpp)
