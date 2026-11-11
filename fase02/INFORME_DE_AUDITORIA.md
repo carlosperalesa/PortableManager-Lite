@@ -2,7 +2,7 @@
 
 **Fecha:** 11 de noviembre de 2026  
 **Alcance:** Revisión y corrección de coherencia arquitectónica, código, manifiesto, ejemplos y pruebas de la Fase 2 antes de autorizar el inicio de la Fase 3 (`JobObjects` y `PMGuard`).  
-**Estado Final:** `passed` (`23/23` escenarios en [`tests/test_phase2_runtime.cpp`](../tests/test_phase2_runtime.cpp) + compilación y ejecución limpia de [`fase02/ejemplo_uso_runtime.cpp`](fase02/ejemplo_uso_runtime.cpp)).
+**Estado Final:** `passed` (`23/23` escenarios en [`tests/test_phase2_runtime.cpp`](../tests/test_phase2_runtime.cpp) + compilación y ejecución limpia de [`fase02/ejemplo_uso_runtime.cpp`](ejemplo_uso_runtime.cpp)).
 
 ---
 
@@ -60,7 +60,7 @@ La validación previa de `RESTORE_REG` asumía únicamente claves hermanas `.pmb
 ## 4. Manifiesto `session.ini` sin Dependencia del USB (Sección 4)
 
 ### Corrección implementada
-- Se eliminó `PmRootDir` / `PmRootPath` y cualquier referencia al destino en el USB (`PortableTargetRef` / `SourcePath`) tanto de [`ManifestManager::SaveToDisk`](../src/runtime/manifest_manager.cpp#L350-L386) como de [`fase02/ejemplo_session_manifest.ini`](fase02/ejemplo_session_manifest.ini).
+- Se eliminó `PmRootDir` / `PmRootPath` y cualquier referencia al destino en el USB (`PortableTargetRef` / `SourcePath`) tanto de [`ManifestManager::SaveToDisk`](../src/runtime/manifest_manager.cpp#L350-L386) como de [`fase02/ejemplo_session_manifest.ini`](ejemplo_session_manifest.ini).
 - PMGuard no necesita acceder al USB para restaurar el anfitrión:
   - `REMOVE_JUNCTION` utiliza únicamente `TargetPath` en el anfitrión (`RemoveDirectoryW` elimina el reparse point NTFS local sin acceder al volumen de destino).
   - `RESTORE_BKP` utiliza `TargetPath` y `BackupPath` (`<TargetPath>.pmbkp`) en el anfitrión.
@@ -84,7 +84,7 @@ La sesión solo puede pasar a `CLEANED` cuando **todas** las operaciones han alc
 
 ## 6. Corrección del Ejemplo C++ (Sección 6)
 
-El archivo [`fase02/ejemplo_uso_runtime.cpp`](fase02/ejemplo_uso_runtime.cpp) fue actualizado y compilado con `clang++.exe -std=c++20 -O2 -Wall -Wextra -Werror`:
+El archivo [`fase02/ejemplo_uso_runtime.cpp`](ejemplo_uso_runtime.cpp) fue actualizado y compilado con `clang++.exe -std=c++20 -O2 -Wall -Wextra -Werror`:
 - Utiliza la API real de `SessionManager` y `ManifestManager`.
 - Comprueba todos los resultados (`InitializeNewSession`, `RecordOperationIntent`, `fs::rename`, `UpdateOperationState`, `TransitionState`, `ExecutePendingRollbacks`, `FinalizeSessionAndCleanupOwnFiles`).
 - Comprueba `rollbackSummary.failed_count == 0` y no ejecuta `fs::remove_all()` si existen operaciones fallidas o respaldos pendientes.
@@ -95,4 +95,4 @@ El archivo [`fase02/ejemplo_uso_runtime.cpp`](fase02/ejemplo_uso_runtime.cpp) fu
 
 - Se migró el contenido de `fase2/` a [`fase02/`](fase02) y se eliminó la carpeta antigua `fase2/`.
 - Se creó [`fase01/`](fase01) para mantener la convención de dos dígitos (`fase01/` .. `fase08/`) en todo el proyecto.
-- Se conservó intacto el informe histórico [`fase02/rebuild_runtime.json`](fase02/rebuild_runtime.json) (y [`reports/rebuild_runtime.json`](../reports/rebuild_runtime.json)) y se generó el nuevo informe de auditoría [`fase02/rebuild_runtime_audit.json`](fase02/rebuild_runtime_audit.json) (y [`reports/rebuild_runtime_audit.json`](../reports/rebuild_runtime_audit.json)).
+- Se conservó intacto el informe histórico [`fase02/rebuild_runtime.json`](rebuild_runtime.json) (y [`reports/rebuild_runtime.json`](../reports/rebuild_runtime.json)) y se generó el nuevo informe de auditoría [`fase02/rebuild_runtime_audit.json`](rebuild_runtime_audit.json) (y [`reports/rebuild_runtime_audit.json`](../reports/rebuild_runtime_audit.json)).
