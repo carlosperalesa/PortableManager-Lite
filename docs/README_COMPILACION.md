@@ -38,13 +38,13 @@ Desde la raíz del repositorio en PowerShell (primero descarga y verifica el too
 ```
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "d:\Data\build.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "./build.ps1"
 ```
 
 También puede utilizarse CMake (si está disponible) con el archivo de toolchain incluido:
 
 ```powershell
-cmake -S d:\Data -B d:\Data\build -G "MinGW Makefiles" -DCMAKE_TOOLCHAIN_FILE="d:\Data\cmake\llvm-mingw-toolchain.cmake"
+cmake -S  . -B build -G "MinGW Makefiles" -DCMAKE_TOOLCHAIN_FILE="cmake/llvm-mingw-toolchain.cmake"
 ```
 
 
