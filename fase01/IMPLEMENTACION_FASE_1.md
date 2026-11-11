@@ -28,4 +28,4 @@
 ## 2. Evidencia de Pruebas
 
 - Suite de pruebas: [`tests/test_phase1_core.cpp`](../tests/test_phase1_core.cpp).
-- Informe JSON: [`fase01/rebuild_core.json`](fase01/rebuild_core.json) y [`reports/rebuild_core.json`](../reports/rebuild_core.json).
+- Informe JSON: [`fase01/rebuild_core.json`](rebuild_core.json) y [`reports/rebuild_core.json`](../reports/rebuild_core.json).
