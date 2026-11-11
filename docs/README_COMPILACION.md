@@ -29,9 +29,13 @@ No requiere instalar Visual Studio, ni modificar el registro de Windows, ni alte
 
 ---
 
-## 3. Ejecución del Build Reproducible
+## 3. Preparación y Ejecución del Build Reproducible
 
-Desde cualquier directorio de trabajo en PowerShell:
+Desde la raíz del repositorio en PowerShell (primero descarga y verifica el toolchain si aún no existe):
+
+```powershell
+./tools/bootstrap-toolchain.ps1
+```
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "d:\Data\build.ps1"
@@ -42,3 +46,8 @@ También puede utilizarse CMake (si está disponible) con el archivo de toolchai
 ```powershell
 cmake -S d:\Data -B d:\Data\build -G "MinGW Makefiles" -DCMAKE_TOOLCHAIN_FILE="d:\Data\cmake\llvm-mingw-toolchain.cmake"
 ```
+
+
+## 4. Entorno Codex Cloud y CI
+
+Para preparar el compilador Linux portable y compilar de forma cruzada Windows x64, consulta [CODEX_CLOUD.md](CODEX_CLOUD.md). Las pruebas de ejecución de los binarios Win32 se realizan en el runner Windows de GitHub Actions, no en Linux.
