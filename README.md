@@ -79,3 +79,13 @@ d:\Data\
 - [PLAN_DE_PRUEBAS.md](PLAN_DE_PRUEBAS.md) — Matriz de pruebas por fase.
 - [RESULTADOS_RECONSTRUCCION.md](RESULTADOS_RECONSTRUCCION.md) — Estado consolidado de las fases de reconstrucción.
 - [docs/README_COMPILACION.md](docs/README_COMPILACION.md) — Detalles del proceso de compilación e inspección PE.
+- [docs/CODEX_CLOUD.md](docs/CODEX_CLOUD.md) — Preparación de Codex Cloud y CI en Windows.
+- [tools/toolchain.lock.json](tools/toolchain.lock.json) — Versión y hashes SHA-256 fijados del toolchain.
+
+### Preparación automática del toolchain portable
+
+En Windows: `./tools/bootstrap-toolchain.ps1`.
+
+En Codex Cloud (Ubuntu 22.04): `bash tools/bootstrap-codex-cloud.sh` y luego `bash tools/build-codex-cloud.sh`.
+
+La compilación cruzada Linux verifica el PE, pero las pruebas de ejecución Win32 se ejecutan exclusivamente en el runner Windows de GitHub Actions.
