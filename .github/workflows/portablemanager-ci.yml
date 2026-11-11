@@ -1,7 +1,7 @@
 name: PortableManager Lite CI
 on:
   push:
-    branches: [main, 'chore/**', 'fase**']
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
