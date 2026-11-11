@@ -1,0 +1,42 @@
+name: PortableManager Lite CI
+on:
+  push:
+    branches: [main, 'chore/**', 'fase**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cross-compile-linux:
+    name: Cross-compile Windows x64 on Ubuntu
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Bootstrap pinned LLVM-MinGW
+        run: bash tools/bootstrap-codex-cloud.sh
+      - name: Cross-compile and inspect PE
+        run: bash tools/build-codex-cloud.sh
+  native-windows-tests:
+    name: Native Windows build and runtime tests
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Bootstrap pinned portable LLVM-MinGW
+        shell: pwsh
+        run: ./tools/bootstrap-toolchain.ps1
+      - name: Build and run phase 0B, 1 and 2 regression suites
+        shell: pwsh
+        run: ./build.ps1 -ReportJsonPath reports/ci_windows_native.json
+      - name: Upload CI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pm-windows-ci-evidence
+          path: |
+            reports/ci_windows_native.json
+            build/
+          if-no-files-found: warn
+          retention-days: 14
