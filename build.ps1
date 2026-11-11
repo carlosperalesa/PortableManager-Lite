@@ -175,7 +175,12 @@ foreach ($testBin in @($SmokeTestExe, $Phase1TestExe, $Phase2TestExe)) {
     $proc = [System.Diagnostics.Process]::Start($psi)
     $tOut = $proc.StandardOutput.ReadToEnd().Trim()
     $tErr = $proc.StandardError.ReadToEnd().Trim()
-    $proc.WaitForExit(20000) | Out-Null
+    $completed = $proc.WaitForExit(120000)
+
+    if (-not $completed) {
+        try { $proc.Kill() } catch { }
+        throw "$(Split-Path -Leaf $testBin) excedió el tiempo máximo de 120 segundos."
+    }
 
     if ($proc.ExitCode -ne 0) {
         throw "$(Split-Path -Leaf $testBin) falló (ExitCode=$($proc.ExitCode)): $tOut $tErr"

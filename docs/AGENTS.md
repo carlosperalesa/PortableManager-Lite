@@ -189,8 +189,13 @@ seguro.
 -   No implementar recuperación automática de sesiones huérfanas en
     futuros arranques.
 
-Estados de operación acordados: - `INTENT_RECORDED` - `APPLIED` -
-`ROLLED_BACK` - `FAILED` - `SKIPPED`
+Estados de operación acordados:
+
+- `INTENT_RECORDED`
+- `APPLIED`
+- `ROLLED_BACK`
+- `FAILED`
+- `SKIPPED`
 
 `CLEANED` solo se declara cuando todas las operaciones necesarias han
 terminado correctamente o en un estado terminal expresamente aceptado
@@ -263,21 +268,24 @@ priorice expresamente.
 
 ## 6. Tecnología y compilación
 
-Toolchain oficial de desarrollo: - LLVM-MinGW portable. - Clang. -
-C++20. - Windows x64. - UCRT.
+Toolchain oficial de desarrollo:
 
-Directivas: - Utilizar Win32 API para las funciones nativas de
-Windows. - No utilizar C# para el ejecutable final. - No incorporar
-Python al runtime final. Los scripts Python existentes pueden mantenerse
-como herramientas auxiliares de auditoría. - Mantener el toolchain
-dentro de `tools/toolchains/`; no incluirlo en la distribución final de
-PM. - Mantener compilación reproducible y sin dependencias
-innecesarias. - Conservar las opciones de compilación aprobadas en la
-Fase 0B (`-static`, `-municode` y `/SWAPRUN:CD` mediante LLD, además de
-las advertencias configuradas). - No afirmar que LLVM-MinGW `-static` es
-idéntico a MSVC `/MT`. - Verificar arquitectura PE, imports y
-características del ejecutable; no confiar solo en que el linker acepte
-una opción.
+- LLVM-MinGW portable.
+- Clang.
+- C++20.
+- Windows x64.
+- UCRT.
+
+Directivas:
+
+- Utilizar Win32 API para las funciones nativas de Windows.
+- No utilizar C# para el ejecutable final.
+- No incorporar Python al runtime final. Los scripts Python existentes pueden mantenerse como herramientas auxiliares de auditoría.
+- Mantener el toolchain dentro de `tools/toolchains/`; no incluirlo en la distribución final de PM.
+- Mantener compilación reproducible y sin dependencias innecesarias.
+- Conservar las opciones de compilación aprobadas en la Fase 0B (`-static`, `-municode` y `/SWAPRUN:CD` mediante LLD, además de las advertencias configuradas).
+- No afirmar que LLVM-MinGW `-static` es idéntico a MSVC `/MT`.
+- Verificar arquitectura PE, imports y características del ejecutable; no confiar solo en que el linker acepte una opción.
 
 No cambiar el toolchain ni las opciones base sin justificarlo y pedir
 aprobación.
@@ -303,8 +311,12 @@ reversibles.
 -   No afirmar que una simulación equivale a una prueba física real.
 -   Separar evidencia histórica de la nueva evidencia de implementación.
 
-Estados de prueba permitidos: - `passed` - `failed` - `blocked` -
-`not_run`
+Estados de prueba permitidos:
+
+- `passed`
+- `failed`
+- `blocked`
+- `not_run`
 
 No cambiar los criterios de aceptación para conseguir un resultado
 positivo. No marcar una fase como aprobada solo porque compile.
@@ -322,19 +334,17 @@ La estructura documental obligatoria utiliza carpetas con dos dígitos:
 -   `fase07/`
 -   `fase08/`
 
-Reglas: - No crear carpetas paralelas como `fase2/` cuando corresponde
-`fase02/`. - Antes de mover o renombrar una carpeta existente,
-inspeccionar su contenido y preservar todos los archivos. - El código
-fuente permanece en `src/`; no duplicar código dentro de las carpetas de
-fase. - Cada carpeta de fase conserva su README, alcance, decisiones
-específicas, informes JSON, evidencias, resultados y ejemplos
-relevantes. - Los informes JSON históricos deben preservarse intactos.
-Las nuevas ejecuciones generan archivos nuevos. - Los documentos
-generales de la raíz describen el estado vigente del proyecto. - Al
-cerrar una fase, actualizar los documentos generales y consolidar los
-resultados de esa fase en su carpeta. - No mantener copias divergentes
-del mismo documento sin indicar cuál es la fuente vigente. - Registrar
-claramente qué está aprobado, pendiente, bloqueado o no probado.
+Reglas:
+
+- No crear carpetas paralelas como `fase2/` cuando corresponde `fase02/`.
+- Antes de mover o renombrar una carpeta existente, inspeccionar su contenido y preservar todos los archivos.
+- El código fuente permanece en `src/`; no duplicar código dentro de las carpetas de fase.
+- Cada carpeta de fase conserva su README, alcance, decisiones específicas, informes JSON, evidencias, resultados y ejemplos relevantes.
+- Los informes JSON históricos deben preservarse intactos. Las nuevas ejecuciones generan archivos nuevos.
+- Los documentos generales de la raíz describen el estado vigente del proyecto.
+- Al cerrar una fase, actualizar los documentos generales y consolidar los resultados de esa fase en su carpeta.
+- No mantener copias divergentes del mismo documento sin indicar cuál es la fuente vigente.
+- Registrar claramente qué está aprobado, pendiente, bloqueado o no probado.
 
 Estructura técnica habitual: - `src/` - `tests/` - `reports/` -
 `tools/` - `PMDocs/` - `fase01/` ... `fase08/`
