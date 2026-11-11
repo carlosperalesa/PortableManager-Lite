@@ -10,7 +10,7 @@
 Esta carpeta consolida toda la documentación técnica, evidencias JSON y ejemplos verificables de la **Fase 2 (Runtime y Manifiesto)** siguiendo la convención de dos dígitos (`fase01/` .. `fase08/`):
 
 1. [`README_FASE02.md`](fase02/README_FASE02.md) — Índice descriptivo de la carpeta `fase02/`.
-2. [`IMPLEMENTACION_FASE_2.md`](fase02/IMPLEMENTACION_FASE_2.md) — Especificación e implementación detallada de [`SessionManager`](src/runtime/session_manager.h) y [`ManifestManager`](src/runtime/manifest_manager.h).
+2. [`IMPLEMENTACION_FASE_2.md`](fase02/IMPLEMENTACION_FASE_2.md) — Especificación e implementación detallada de [`SessionManager`](../src/runtime/session_manager.h) y [`ManifestManager`](../src/runtime/manifest_manager.h).
 3. [`INFORME_DE_AUDITORIA.md`](fase02/INFORME_DE_AUDITORIA.md) — Informe detallado de la Auditoría Final de Fase 2 (orden de `KILL_JOB`, estrategia `.reg`, sesiones huérfanas, manifiesto sin dependencia del USB, estados unificados y pruebas adicionales).
 4. [`rebuild_runtime.json`](fase02/rebuild_runtime.json) — Copia histórica intacta del primer informe JSON de Fase 2 (16 escenarios).
 5. [`rebuild_runtime_audit.json`](fase02/rebuild_runtime_audit.json) — Informe JSON resultante de la Auditoría Final de Fase 2 (23 escenarios).
