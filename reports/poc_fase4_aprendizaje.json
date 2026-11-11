@@ -1,0 +1,64 @@
+{
+  "poc": "Fase 4 — PoC Aprendizaje Ligero",
+  "objective": "Implementar y validar el mecanismo mínimo de aprendizaje: identificar nombre y fabricante PE, buscar ubicaciones candidatas acotadas, registrar baseline, respaldar ubicaciones exclusivas (.pmbkp), ejecutar aplicación, comparar al cerrar, crear receta con rutas relativas y restaurar el anfitrión sin borrar cambios ambiguos/no atribuibles.",
+  "timestamp_utc": "2026-11-11T17:03:59.097113+00:00",
+  "environment": {
+    "usb_root": "E:\\",
+    "isolated_build_dir": "C:\\Users\\cperales\\AppData\\Local\\Temp\\PM_PoC_Fase4_Build"
+  },
+  "initial_state": {
+    "candidate_locations_clean_or_backed_up": true
+  },
+  "procedure": [
+    "1. Extraer CompanyName, ProductName, FileDescription y FileVersion de los recursos PE del ejecutable de prueba mediante version.dll (GetFileVersionInfoW / VerQueryValueW).",
+    "2. Construir ubicaciones candidatas acotadas en %APPDATA%\\<Publisher>\\<App>, %LOCALAPPDATA%\\<App> y HKCU\\Software\\<Publisher>\\<App>.",
+    "3. Registrar baseline inicial de cada ubicación candidata y preparar además una carpeta ajena con cambio concurrente no atribuible.",
+    "4. Respaldar mediante .pmbkp la carpeta exclusiva en %APPDATA% que contenía datos previos del anfitrión.",
+    "5. Ejecutar la aplicación sintética y esperar su cierre normal.",
+    "6. Comparar el estado posterior contra el baseline e identificar las escrituras atribuibles.",
+    "7. Cosechar los datos portables atribuibles hacia Data/apps/<id>/ en el USB y generar la receta en Data/recipes/<id>.ini utilizando exclusivamente rutas relativas al ejecutable pm.exe y variables tokenizadas (%APPDATA%, %LOCALAPPDATA%).",
+    "8. Limpiar los cambios de la sesión, restaurar el respaldo .pmbkp del anfitrión y verificar que los cambios concurrentes no atribuibles NO fueron eliminados."
+  ],
+  "pe_metadata_extracted": {
+    "CompanyName": "PmSynthVendorLabs",
+    "ProductName": "PmSynthLearnedApp",
+    "FileDescription": "PmSynthLearnedApp",
+    "FileVersion": "1.4.2.0"
+  },
+  "candidate_locations": {
+    "roaming": "%APPDATA%\\PmSynthVendorLabs_89f03fad\\PmSynthLearnedApp_89f03fad",
+    "local": "%LOCALAPPDATA%\\PmSynthLearnedApp_89f03fad",
+    "registry": "HKCU\\Software\\PmSynthVendorLabs_89f03fad\\PmSynthLearnedApp_89f03fad"
+  },
+  "learning_results": {
+    "learned_roaming_dir": true,
+    "learned_local_dir": true,
+    "learned_registry_key": true,
+    "portable_files_harvested_to_usb": [
+      "App/PmSynthLearnedApp/PmSynthLearnedApp.exe",
+      "Data/apps/pmsynthlearnedapp/local/cache_index.dat",
+      "Data/apps/pmsynthlearnedapp/registry/reg_snapshot.json",
+      "Data/apps/pmsynthlearnedapp/roaming/user_config.ini",
+      "Data/recipes/pmsynthlearnedapp.ini"
+    ],
+    "recipe_generated": "[App.pmsynthlearnedapp]\nName=PmSynthLearnedApp\nPublisher=PmSynthVendorLabs\nExecutable=App/PmSynthLearnedApp/PmSynthLearnedApp.exe\nPortableDataDir=Data/apps/pmsynthlearnedapp\n\n[Recipe.Filesystem]\nRoamingDir=%APPDATA%/PmSynthVendorLabs_89f03fad/PmSynthLearnedApp_89f03fad\nLocalDir=%LOCALAPPDATA%/PmSynthLearnedApp_89f03fad\nStrategy=Priority3_DirectoryJunction\n\n[Recipe.Registry]\nHkcuKey=Software\\PmSynthVendorLabs_89f03fad\\PmSynthLearnedApp_89f03fad\nCleanupParentIfEmpty=Software\\PmSynthVendorLabs_89f03fad\n",
+    "no_absolute_paths_in_recipe_rule11": true,
+    "unattributable_concurrent_changes_preserved": true
+  },
+  "restoration_verification": {
+    "preexisting_roaming_restored_exact_match": true,
+    "preexisting_roaming_hash_before": "AEC273F045A33759327AC5F389D51F0B595FE76AA81D5E1ECFB1F3525EED0EC4",
+    "local_app_dir_cleaned_to_absent": true,
+    "registry_key_cleaned_to_absent": true
+  },
+  "final_state": {
+    "all_test_fixtures_cleaned": true
+  },
+  "usb_state": "Conectado en E:\\, limpio de directorios temporales de la PoC Fase 4.",
+  "limitations": [
+    "El aprendizaje ligero se limita a ubicaciones candidatas derivadas de metadatos PE, nombre de ejecutable y alias; si una aplicación escribe en rutas arbitrarias fuera de sus candidatos, no se descubre automáticamente y requiere edición manual de la receta o permanece blanca/gris.",
+    "Los cambios en ubicaciones compartidas o sin atribución cierta se conservan intactos por seguridad."
+  ],
+  "status": "passed",
+  "decision": "continue_to_phase_5"
+}

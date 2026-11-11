@@ -1,0 +1,41 @@
+{
+  "timestamp_utc": "2026-11-11T12:34:26.443211+00:00",
+  "packages": {
+    "FirefoxPortable_160.0_English.paf.exe": {
+      "path": "D:\\Data\\FirefoxPortable_160.0_English.paf.exe",
+      "sha256": "99D406A460EF79B1815980A66649D294ABBB82C103F2013192E81B829A88B7DA",
+      "expected_sha256": "99D406A460EF79B1815980A66649D294ABBB82C103F2013192E81B829A88B7DA",
+      "matches": true,
+      "authenticode": {
+        "status": "Valid",
+        "StatusMessage": "Firma verificada.",
+        "signer": "E=contact@rareideas.com, CN=\"RARE IDEAS, LLC\", O=\"RARE IDEAS, LLC\", L=New York, S=New York, C=US",
+        "thumbprint": "DF99B68F457C981B0FDF83731DE299A26B64CCF7"
+      }
+    },
+    "putty.zip": {
+      "path": "D:\\Data\\putty.zip",
+      "sha256": "E0B36E5381ECC78DD06A291BAB25FB9D95BC991D0D864CF2741A5BDE82816668",
+      "expected_sha256": "E0B36E5381ECC78DD06A291BAB25FB9D95BC991D0D864CF2741A5BDE82816668",
+      "matches": true,
+      "zip_crc_valid": true,
+      "bad_member": null,
+      "executable_members": [
+        "PUTTY.EXE"
+      ],
+      "versions": [
+        {
+          "member": "PUTTY.EXE",
+          "metadata": {
+            "FileVersion": "Release 0.85 (with embedded help)",
+            "ProductVersion": "Release 0.85",
+            "ProductName": "PuTTY suite"
+          },
+          "sha256": "d01fdb5aae8f112526040a39b0bfb9e27d813003178645e65f8d1cfdb2a26c87"
+        }
+      ]
+    }
+  },
+  "applications_executed": false,
+  "ready_for_guided_tests": true
+}

@@ -1,0 +1,89 @@
+# ==============================================================================
+# PortableManager Lite (PM Lite) — .gitignore
+# ==============================================================================
+# Excluye artefactos compilados, toolchains descargados, instaladores de prueba,
+# cachés y archivos personales locales, CONSERVANDO intactos en el repositorio:
+# - Código fuente C++20 y antecedentes C# (src/, tests/, tools/toolchain_probe/*.cpp)
+# - CMakeLists.txt, cmake/ y scripts reproducibles (build.ps1, build_msvc.ps1)
+# - Documentación general, PMDocs/ y carpetas de fase (fase01/ .. fase08/)
+# - Informes JSON de resultados y evidencias (reports/*.json, fase01/*.json, fase02/*.json)
+# - AGENTS.md y decisiones técnicas.
+# ==============================================================================
+
+# 1. Directorios de compilación y salida
+/build/
+/out/
+/bin/
+/obj/
+/cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# 2. Ejecutables, bibliotecas y símbolos de depuración generados
+*.exe
+*.dll
+*.obj
+*.o
+*.a
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.so
+*.dylib
+
+# 3. Toolchains portables descargados localmente
+/tools/toolchains/
+
+# 4. Instaladores y paquetes comprimidos de aplicaciones de prueba
+/FirefoxPortable_*.paf.exe
+/putty.zip
+/VSCode-*.zip
+*.paf.exe
+
+# 5. Cachés de Python, editores y sistema operativo
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.vscode/
+.vs/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# 6. Archivos temporales operativos, respaldos de sesión y logs locales
+*.tmp
+*.pmtmp.*
+*.pmbkp/
+*.signal
+pmlog
+/Data/logs/
+*.log
+
+# 7. Secretos, credenciales y certificados locales
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+
+# 8. Notas personales y archivos locales ajenos al repositorio en la raíz
+/1 firefox busqueda.txt
+/2 firefox purga.txt
+/vscode other.txt
+/vscode PS Mover local a portable y purgar datos locales.txt
+/Windows-FY27-CONS-C2-Wallpaper-EverydayProductivity.png
+
+# 9. Volcados masivos de inventario completo del sistema anfitrión/USB local
+# (Se conservan todos los informes JSON de resultados, diffs y PoCs)
+/PM_Lite_FinalValidation/reports/d1_host_before.json
+/PM_Lite_FinalValidation/reports/d1_host_after.json
+/PM_Lite_FinalValidation/reports/d3_host_before_metadata.json
+/PM_Lite_FinalValidation/reports/d3_host_after_metadata.json
+/PM_Lite_FinalValidation/reports/usb_final_inventory.json

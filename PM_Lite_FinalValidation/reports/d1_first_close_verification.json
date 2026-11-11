@@ -1,0 +1,20 @@
+{
+  "timestamp_utc": "2026-11-11T12:22:42.876510+00:00",
+  "profile": "E:\\PM_POC\\App\\FirefoxPortable\\Data\\profile",
+  "sqlite_access": "read-only mode=ro; SELECT only",
+  "bookmark_matches": [],
+  "preference": {
+    "name": "browser.ctrlTab.sortByRecentlyUsed",
+    "persisted_value": "true",
+    "user_reported_before": false,
+    "user_reported_after": true
+  },
+  "firefox_processes_after_close": [],
+  "writes_to_profile_by_verifier": false,
+  "related_test_bookmarks": [
+    {
+      "title": "PM_POC_TEST.",
+      "url": "file:///E:/PM_POC/Data/PM_POC_TEST.html"
+    }
+  ]
+}

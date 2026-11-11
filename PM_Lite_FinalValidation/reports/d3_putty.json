@@ -1,0 +1,69 @@
+{
+  "test": "d3_putty",
+  "status": "amarillo",
+  "executed_in_rebuilt_environment": true,
+  "reason": "Persistencia y restauracion de registro verificadas; Windows creo un archivo Recent atribuible a la ruta USB",
+  "historical_context": {
+    "source": "Resultados comunicados previamente por el usuario; informes originales no disponibles ni verificables en el workspace actual",
+    "results": {
+      "3A": "aprobada comunicada",
+      "3B": "aprobada comunicada",
+      "3B.6": "aprobada comunicada",
+      "A": "aprobada comunicada",
+      "B": "aprobada comunicada",
+      "C": "aprobada comunicada; no repetir desconexión física",
+      "D1": "amarillo comunicado",
+      "D2": "verde comunicado",
+      "D3": "verde individual comunicado"
+    }
+  },
+  "usb_identity": {
+    "root": "E:\\",
+    "guid": "\\\\?\\Volume{aec5fbfe-d7ae-11f1-a523-00090faa0001}\\",
+    "serial": "048CCF2C",
+    "marker_sha256": "ce73d9d4da5464e6cb809145b737dc9ec4a6229c5a44aa805525ba2a7f2f2af0"
+  },
+  "host_before": "reports/d3_host_before_metadata.json",
+  "host_after": "reports/d3_host_after_metadata.json",
+  "persistence_verified": true,
+  "residues": {
+    "recent_file": "C:\\Users\\cperales\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\CustomDestinations\\9390ee5b658e96e.customDestinations-ms",
+    "attribution_evidence": "reports/d3_recent_file_attribution.json",
+    "attribution": "Archivo nuevo respecto al baseline; contiene ruta E:\\PM_POC\\App\\PuTTY",
+    "cleanup_executed": false,
+    "unknown_preserved": "HKCU\\Software\\SimonTatham vacia; presencia original no capturada. No eliminada.",
+    "concurrent_changes": "Otros cuatro archivos nuevos de cache Edge y 40 modificados de aplicaciones anfitrionas; conservados, atribucion no demostrada por metadatos"
+  },
+  "production_ready": false,
+  "phase": "finalizada con residuos conservados",
+  "original_key_absent": true,
+  "ram_snapshot_active": false,
+  "installation": "E:\\PM_POC\\App\\PuTTY",
+  "acl_restoration_claimed": false,
+  "updated_utc": "2026-11-11T12:37:56.145661+00:00",
+  "active_process_id": null,
+  "waiting_for": null,
+  "control_signal": null,
+  "temp_before": "reports/d3_temp_before.json",
+  "keeper_exec_session": 47773,
+  "baseline_scope": "Metadata de USERPROFILE completo (incluye AppData/LocalAppData) y TEMP; SHA256 de archivos TEMP legibles",
+  "baseline_limitations": "Sin hashes del contenido de todo USERPROFILE; tres temporales bloqueados; actividad concurrente no atribuible solo por diferencias",
+  "first_close_evidence": {
+    "session": "PM_POC_TEST",
+    "host": "127.0.0.1",
+    "persisted": true,
+    "processes": []
+  },
+  "second_close_evidence": {
+    "session": "PM_POC_TEST",
+    "host": "127.0.0.1",
+    "persisted": true,
+    "processes": []
+  },
+  "restored_key_absent": true,
+  "host_diff": "reports/d3_host_diff.json",
+  "user_second_session_confirmation": "ok: confirmacion de Load, host 127.0.0.1 y cierre; no conexion comunicada",
+  "registry_transaction_result": "verde: ausencia original restaurada por mecanismo generico y verificada",
+  "host_original_state_proven": false,
+  "final_scoped_checks": "reports/final_scoped_checks.json"
+}

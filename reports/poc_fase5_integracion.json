@@ -1,0 +1,75 @@
+{
+  "poc": "Fase 5 — Integración (PM Core + PMGuard + Manifiesto + Job Objects + Junctions + Registro + 3 Cierres + pmlog)",
+  "objective": "Integrar todos los componentes aprobados (PM Core, PMGuard, Manifiesto TEMP, Job Objects, Directory Junctions, Registro Win32, Aprendizaje y Rutinas de limpieza) y validar los tres modos de cierre (Normal, Rápido y Crítico), así como la creación de %TEMP%\\pmlog (sin extensión) manteniendo los respaldos intactos ante errores de restauración.",
+  "timestamp_utc": "2026-11-11T17:06:59.276260+00:00",
+  "environment": {
+    "usb_root": "E:\\",
+    "isolated_build_dir": "C:\\Users\\cperales\\AppData\\Local\\Temp\\PM_PoC_Fase5_Build"
+  },
+  "binary": {
+    "path": "C:\\Users\\cperales\\AppData\\Local\\Temp\\PM_PoC_Fase5_Build\\pm_integrated_poc.exe",
+    "sha256": "52C741A0404FFE3FBD3074D3F4A7EF9839708AE5683D88D63CC136712F87ED10",
+    "size_bytes": 17920
+  },
+  "initial_state": {
+    "no_prior_session_manifests": true,
+    "no_prior_pmlog": true
+  },
+  "procedure": [
+    "Subprueba 1 (Cierre Normal): Ejecutar desde el USB (E:\\), liberar CWD hacia %TEMP%, respaldar carpeta de %APPDATA% (.pmbkp) y crear Directory Junction hacia el USB, respaldar clave HKCU (_pmbkp) con RegCopyTreeW, lanzar aplicación en Job Object y lanzar PMGuard (--guard). Enviar señal cooperativa, esperar cierre limpio, persistir registro portable al USB, desmontar Junction (RemoveDirectoryW), restaurar .pmbkp y registro original, y verificar estado.",
+    "Subprueba 2 (Cierre Rápido): Con una aplicación que no responde al cierre cooperativo, esperar el plazo reducido (200 ms), forzar terminación mediante TerminateJobObject, desmontar Junction y restaurar íntegramente el anfitrión en 438 ms totales.",
+    "Subprueba 3 (Cierre Crítico / Caída abrupta de PM): Provocar caída abrupta de PM (Environment.FailFast); verificar que PMGuard despierta de WaitForSingleObject, adquiere el Mutex, abre el Job Object nombrado, mata inmediatamente el proceso controlado sin intentar guardar datos volátiles al USB, desmonta la Junction y restaura .pmbkp y el registro original.",
+    "Subprueba 4 (Fallo de restauración y creación de %TEMP%\\pmlog): Simular bloqueo/error durante la restauración en cierre crítico; comprobar que los respaldos (.pmbkp y clave de respaldo) se mantienen intactos, se crea el archivo %TEMP%\\pmlog sin extensión conteniendo únicamente rutas y errores, y terminan PM y PMGuard."
+  ],
+  "subtests": {
+    "1_normal_cooperative_shutdown": {
+      "mode_tag": "NORMAL",
+      "cooperative_data_saved_to_usb": true,
+      "portable_registry_saved_to_usb": true,
+      "host_folder_restored": true,
+      "host_registry_restored": true,
+      "passed": true
+    },
+    "2_fast_accelerated_shutdown": {
+      "mode_tag": "FAST",
+      "elapsed_ms": 438.0,
+      "unresponsive_app_terminated_after_short_timeout": true,
+      "host_folder_restored": true,
+      "host_registry_restored": true,
+      "passed": true
+    },
+    "3_critical_emergency_shutdown_on_pm_crash": {
+      "mode_tag": "PMG_CRITICAL",
+      "controlled_app_killed_immediately": true,
+      "skipped_usb_volatile_save_as_required": true,
+      "host_folder_restored": true,
+      "host_registry_restored": true,
+      "passed": true
+    },
+    "4_unrestorable_residue_creates_extensionless_pmlog_and_keeps_backups": {
+      "mode_tag": "CRITICAL_WITH_PMLOG",
+      "pmlog_path": "C:\\Users\\cperales\\AppData\\Local\\Temp\\pmlog",
+      "pmlog_created_without_extension": true,
+      "pmlog_lines_only_paths_and_errors": [
+        "C:\\Users\\cperales\\AppData\\Roaming\\PM_PoC_Fase5_cc0846f0_pmlog | C:\\Users\\cperales\\AppData\\Roaming\\PM_PoC_Fase5_cc0846f0_pmlog.pmbkp | ERR_RESTORE_LOCKED_OR_FAILED",
+        "HKCU\\Software\\PM_PoC_Fase5_cc0846f0\\pmlog | HKCU\\Software\\PM_PoC_Fase5_cc0846f0\\pmlog_pmbkp | ERR_REG_RESTORE_BLOCKED"
+      ],
+      "backups_kept_intact_on_failure": true,
+      "processes_terminated_cleanly": true,
+      "passed": true
+    }
+  },
+  "final_state": {
+    "test_registry_root_absent": true,
+    "usb_test_dir_cleaned": true,
+    "temp_session_dir_cleaned": true,
+    "temp_pmlog_cleaned_after_verification": true
+  },
+  "usb_state": "Conectado en E:\\ (NTFS, Healthy/OK), sin archivos temporales de Fase 5 pendientes.",
+  "limitations": [
+    "No se garantiza integridad de datos internos de las aplicaciones tras un cierre forzado (Rápido con timeout vencido o Crítico).",
+    "No se implementa recuperación automática posterior de sesiones anteriores si quedan respaldos registrados en %TEMP%\\pmlog."
+  ],
+  "status": "passed",
+  "decision": "all_pocs_completed"
+}

@@ -1,0 +1,14 @@
+{
+  "timestamp_utc": "2026-11-11T12:24:09.753014+00:00",
+  "bookmark_matches": [
+    {
+      "title": "PM_POC_TEST",
+      "url": "file:///E:/PM_POC/Data/PM_POC_TEST.html"
+    }
+  ],
+  "preference_true": true,
+  "firefox_processes": [],
+  "profile_on_usb": "E:\\PM_POC\\App\\FirefoxPortable\\Data\\profile",
+  "read_only": true,
+  "user_second_session_confirmation": "ok: interpretado como confirmacion de renombrado, preferencia y cierre"
+}

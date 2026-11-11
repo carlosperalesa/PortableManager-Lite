@@ -1,0 +1,140 @@
+[
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\DllPrefetchExperiment",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\Launcher",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Blocklist",
+    "type": 1,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\Launcher",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Telemetry",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\Launcher",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Image",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\Launcher",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Browser",
+    "type": 11,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\Launcher",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Launcher",
+    "type": 11,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\Default Browser Agent",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64|SetDefaultBrowserUserChoice",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\Default Browser Agent",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64|DisableTelemetry",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\Default Browser Agent",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64|AppLastRunTime",
+    "type": 11,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\Default Browser Agent",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64|DisableDefaultBrowserAgent",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|UrlbarCSSSpan",
+    "type": 3,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Maximized",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|CssToDevPixelScaling",
+    "type": 3,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Enabled",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Progress",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|SearchbarCSSSpan",
+    "type": 3,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|ScreenX",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Width",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Height",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Flags",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|SpringsCSSSpan",
+    "type": 3,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|ScreenY",
+    "type": 4,
+    "attribution": "USB path in value name"
+  },
+  {
+    "path": "HKCU\\Software\\Mozilla\\Firefox\\PreXULSkeletonUISettings",
+    "new_value": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe|Theme",
+    "type": 4,
+    "attribution": "USB path in value name"
+  }
+]

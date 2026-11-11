@@ -1,0 +1,77 @@
+{
+  "phase": "Fase 2 — Runtime y Manifiesto (SessionManager + ManifestManager)",
+  "timestamp_utc": "2026-11-11T18:40:08.8229579Z",
+  "toolchain": {
+    "name": "llvm-mingw 20261104 (UCRT x86_64)",
+    "compiler_version": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+    "relative_path": "tools/toolchains/llvm-mingw/bin/clang++.exe",
+    "compile_flags": [
+      "-std=c++20",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-municode",
+      "-static",
+      "-Wl,-Xlink=-swaprun:cd"
+    ]
+  },
+  "binaries": {
+    "pm_exe": {
+      "size_bytes": 859136,
+      "sha256": "0495B99064B0273C38296F25648C15018EEB3BA4A5D30B91418ADEAE6E6134F6",
+      "machine": "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+      "characteristics": "0x422 (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP)",
+      "swaprun_cd_0x400": true,
+      "imported_dlls": [
+        "KERNEL32.dll",
+        "ole32.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll"
+      ],
+      "external_toolchain_dlls": []
+    },
+    "test_phase2_runtime_exe": {
+      "size_bytes": 915968,
+      "sha256": "FFFDED388CFCA5AFA122C2771D75EB2A76AE6B28A196E645C26B9C9CB8232620"
+    }
+  },
+  "modules_implemented": [
+    "src/runtime/session_manager.h",
+    "src/runtime/session_manager.cpp",
+    "src/runtime/manifest_manager.h",
+    "src/runtime/manifest_manager.cpp",
+    "src/runtime/runtime_module.h",
+    "src/core/main.cpp",
+    "tests/test_phase2_runtime.cpp"
+  ],
+  "scenarios_verified": {
+    "1_session_creation": true,
+    "2_guid_generation_unique": true,
+    "3_manifest_creation_in_temp": true,
+    "4_operation_registration": true,
+    "5_write_ahead_persistence_before_modify": true,
+    "6_operation_and_session_state_transitions": true,
+    "7_read_and_reconstruct_after_process_restart": true,
+    "8_real_process_crash_before_modify": true,
+    "9_real_process_crash_after_intent_before_rename": true,
+    "10_real_process_crash_after_rename_before_state": true,
+    "11_real_process_crash_after_simulated_junction": true,
+    "12_real_process_crash_after_simulated_registry": true,
+    "13_partial_restoration_and_retry_recovery": true,
+    "14_idempotent_repeated_rollback_execution": true,
+    "15_corrupt_truncated_and_forged_manifest_reject": true,
+    "16_backup_preservation_on_error_and_preexisting": true,
+    "foreign_temp_files_preserved": true,
+    "phase0_and_phase1_regression_passed": true
+  },
+  "status": "passed"
+}

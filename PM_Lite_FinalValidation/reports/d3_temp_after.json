@@ -1,0 +1,36 @@
+{
+  "files": {
+    "D:\\App\\VScode\\data\\tmp\\c7a9e230-85fe-42d6-a1cd-22cf01e4a344.zip": {
+      "size": 3869401,
+      "mtime_ns": 1794331313109858400,
+      "ctime_ns": 1794331313107351500,
+      "sha256": "287b560ff3eec30a563bf365083cf818b2d257882da6891784610ec6dbec2a40"
+    },
+    "D:\\App\\VScode\\data\\tmp\\exthost-34da7e.cpuprofile": {
+      "size": 138296,
+      "mtime_ns": 1794328805943541400,
+      "ctime_ns": 1794328805943541400,
+      "sha256": "d5efb6273995a05235c68cf7691e292889d571a9ecc9606b96d909295e6a3b72"
+    },
+    "D:\\App\\VScode\\data\\tmp\\exthost-71253c.cpuprofile": {
+      "size": 59638,
+      "mtime_ns": 1794328810465954300,
+      "ctime_ns": 1794328810465954300,
+      "sha256": "54800fab80d177fa872824c8ef476d5d0b299b07ce07ed0f105c30b41f9a4e0e"
+    },
+    "D:\\App\\VScode\\data\\tmp\\exthost-cab409.cpuprofile": {
+      "size": 230897,
+      "mtime_ns": 1794398164673038300,
+      "ctime_ns": 1794398164673038300,
+      "sha256": "420a61a6b378f458ddd400b5e1a3c2cf5f9e8a6932747259eebfd93e1f8aa4cc"
+    }
+  },
+  "errors": [
+    "[Errno 13] Permission denied: 'D:\\\\App\\\\VScode\\\\data\\\\tmp\\\\3ad47cf9-0376-4621-9a3c-a0562d223f32.tmp'",
+    "[Errno 13] Permission denied: 'D:\\\\App\\\\VScode\\\\data\\\\tmp\\\\79a5de71-19ff-479f-998f-c69546753421.tmp'",
+    "[Errno 13] Permission denied: 'D:\\\\App\\\\VScode\\\\data\\\\tmp\\\\96abcac4-37ad-4766-99b3-dc2aae018c22.tmp'"
+  ],
+  "roots": {
+    "D:\\App\\VScode\\data\\tmp": true
+  }
+}

@@ -1,0 +1,86 @@
+{
+    "phase":  "Fase 2 — Runtime y Manifiesto (SessionManager + ManifestManager)",
+    "timestamp_utc":  "2026-11-11T19:04:28.2233349Z",
+    "toolchain":  {
+                      "name":  "llvm-mingw 20261104 (UCRT x86_64)",
+                      "compiler_version":  "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+                      "relative_path":  "tools/toolchains/llvm-mingw/bin/clang++.exe",
+                      "compile_flags":  [
+                                            "-std=c++20",
+                                            "-O2",
+                                            "-Wall",
+                                            "-Wextra",
+                                            "-Werror",
+                                            "-municode",
+                                            "-static",
+                                            "-Wl,-Xlink=-swaprun:cd"
+                                        ]
+                  },
+    "binaries":  {
+                     "pm_exe":  {
+                                    "size_bytes":  873472,
+                                    "sha256":  "79623AC5E1FB4E4A14817DEC55BB2BE9571B09723139842237FABC94BC53A417",
+                                    "machine":  "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+                                    "characteristics":  "0x422 (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP)",
+                                    "swaprun_cd_0x400":  true,
+                                    "imported_dlls":  [
+                                                          "KERNEL32.dll",
+                                                          "ole32.dll",
+                                                          "api-ms-win-crt-stdio-l1-1-0.dll",
+                                                          "api-ms-win-crt-string-l1-1-0.dll",
+                                                          "api-ms-win-crt-runtime-l1-1-0.dll",
+                                                          "api-ms-win-crt-locale-l1-1-0.dll",
+                                                          "api-ms-win-crt-heap-l1-1-0.dll",
+                                                          "api-ms-win-crt-private-l1-1-0.dll",
+                                                          "api-ms-win-crt-convert-l1-1-0.dll",
+                                                          "api-ms-win-crt-math-l1-1-0.dll",
+                                                          "api-ms-win-crt-environment-l1-1-0.dll",
+                                                          "api-ms-win-crt-filesystem-l1-1-0.dll"
+                                                      ],
+                                    "external_toolchain_dlls":  [
+
+                                                                ]
+                                },
+                     "test_phase2_runtime_exe":  {
+                                                     "size_bytes":  974336,
+                                                     "sha256":  "AF084F0BE2FC1A756613DF390C59DE6A906593D447CBC1099A826EA1BCA518F2"
+                                                 }
+                 },
+    "modules_implemented":  [
+                                "src/runtime/session_manager.h",
+                                "src/runtime/session_manager.cpp",
+                                "src/runtime/manifest_manager.h",
+                                "src/runtime/manifest_manager.cpp",
+                                "src/runtime/runtime_module.h",
+                                "src/core/main.cpp",
+                                "tests/test_phase2_runtime.cpp"
+                            ],
+    "scenarios_verified":  {
+                               "1_session_creation":  true,
+                               "2_guid_generation_unique":  true,
+                               "3_manifest_creation_in_temp":  true,
+                               "4_operation_registration":  true,
+                               "5_write_ahead_persistence_before_modify":  true,
+                               "6_operation_and_session_state_transitions":  true,
+                               "7_read_and_reconstruct_after_process_restart":  true,
+                               "8_real_process_crash_before_modify":  true,
+                               "9_real_process_crash_after_intent_before_rename_skipped":  true,
+                               "10_real_process_crash_after_rename_before_state":  true,
+                               "11_real_process_crash_after_simulated_junction":  true,
+                               "12_real_process_crash_after_simulated_registry":  true,
+                               "13_partial_restoration_and_retry_recovery":  true,
+                               "14_idempotent_repeated_rollback_execution":  true,
+                               "15_corrupt_truncated_and_forged_manifest_reject":  true,
+                               "16_backup_preservation_on_error_and_preexisting":  true,
+                               "17_audit_kill_job_effective_first_order_lifo":  true,
+                               "18_audit_reg_file_backup_manifest_and_synthetic_hkcu":  true,
+                               "19_audit_preserve_reg_backup_on_restore_failure":  true,
+                               "20_audit_pmg_open_active_session_without_usb":  true,
+                               "21_audit_no_automatic_orphan_recovery_on_pm_start":  true,
+                               "22_audit_preserve_all_backups_on_errors":  true,
+                               "23_audit_reject_session_deletion_with_pending_ops":  true,
+                               "foreign_temp_files_preserved":  true,
+                               "phase0_and_phase1_regression_passed":  true
+                           },
+    "status":  "passed"
+}

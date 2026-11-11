@@ -1,0 +1,86 @@
+[
+  {
+    "ProcessId": 18400,
+    "ParentProcessId": 5340,
+    "Name": "FirefoxPortable.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\FirefoxPortable.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\FirefoxPortable.exe\" file:///E:/PM_POC/Data/PM_POC_TEST.html"
+  },
+  {
+    "ProcessId": 13668,
+    "ParentProcessId": 11012,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe -profile E:\\PM_POC\\App\\FirefoxPortable\\Data\\profile file:///E:/PM_POC/Data/PM_POC_TEST.html"
+  },
+  {
+    "ProcessId": 10316,
+    "ParentProcessId": 13668,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe\" -contentproc -parentBuildID 20261104181552 -prefsHandle 2416:26590 -prefMapHandle 2420:310544 -ipcHandle 2436 -initialChannelId {541a693d-7b36-45ad-bd7b-be03e08a5d13} -parentPid 13668 -crashHelperPid 0 -crashHelper 2456 -crashReporter \"\\\\.\\pipe\\gecko-crash-server-pipe.13668\" -appDir \"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\browser\" - 1 gpu"
+  },
+  {
+    "ProcessId": 7924,
+    "ParentProcessId": 13668,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe\" -contentproc -parentBuildID 20261104181552 -prefsHandle 2584:26590 -prefMapHandle 2588:310544 -ipcHandle 2608 -initialChannelId {1f0e0da9-1c40-4db0-b9c2-35ad5e5cf3d7} -parentPid 13668 -crashHelperPid 0 -crashHelper 2696 -crashReporter \"\\\\.\\pipe\\gecko-crash-server-pipe.13668\" -win32kLockedDown -appDir \"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\browser\" - 2 socket"
+  },
+  {
+    "ProcessId": 9052,
+    "ParentProcessId": 13668,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe\" -contentproc -parentBuildID 20261104181552 -prefsHandle 3444:27781 -prefMapHandle 3628:310544 -ipcHandle 3656 -initialChannelId {a53e7577-badf-4648-a56f-81e3804f21a1} -parentPid 13668 -crashHelperPid 0 -crashHelper 3648 -crashReporter \"\\\\.\\pipe\\gecko-crash-server-pipe.13668\" -appDir \"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\browser\" - 4 rdd"
+  },
+  {
+    "ProcessId": 1628,
+    "ParentProcessId": 13668,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe\" -contentproc -isForBrowser -prefsHandle 4036:28007 -prefMapHandle 4040:310544 -jsInitHandle 4044:161360 -parentBuildID 20261104181552 -ipcHandle 4048 -initialChannelId {ae585e52-d9fc-439f-9e72-eab66e9fde52} -parentPid 13668 -crashHelperPid 0 -crashHelper 4056 -crashReporter \"\\\\.\\pipe\\gecko-crash-server-pipe.13668\" -win32kLockedDown -appDir \"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\browser\" - 5 tab"
+  },
+  {
+    "ProcessId": 9304,
+    "ParentProcessId": 13668,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe\" -contentproc -isForBrowser -prefsHandle 4704:28131 -prefMapHandle 4708:310544 -jsInitHandle 4712:161360 -parentBuildID 20261104181552 -ipcHandle 4572 -initialChannelId {60f6a6e2-94e7-412c-9b77-422a4f52d5c1} -parentPid 13668 -crashHelperPid 0 -crashHelper 4720 -crashReporter \"\\\\.\\pipe\\gecko-crash-server-pipe.13668\" -win32kLockedDown -appDir \"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\browser\" - 6 tab"
+  },
+  {
+    "ProcessId": 3636,
+    "ParentProcessId": 13668,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe\" -contentproc -parentBuildID 20261104181552 -sandboxingKind 0 -prefsHandle 5580:31473 -prefMapHandle 5488:310544 -ipcHandle 5552 -initialChannelId {48a81a8e-56e8-4604-8822-826cb8761e0f} -parentPid 13668 -crashHelperPid 0 -crashHelper 5616 -crashReporter \"\\\\.\\pipe\\gecko-crash-server-pipe.13668\" -win32kLockedDown -appDir \"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\browser\" - 7 utility"
+  },
+  {
+    "ProcessId": 17960,
+    "ParentProcessId": 13668,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe\" -contentproc -isForBrowser -prefsHandle 5556:29443 -prefMapHandle 5032:310544 -jsInitHandle 4276:161360 -parentBuildID 20261104181552 -ipcHandle 5496 -initialChannelId {831b771d-c1b7-4405-887b-f8634efb2a3b} -parentPid 13668 -crashHelperPid 0 -crashHelper 5772 -crashReporter \"\\\\.\\pipe\\gecko-crash-server-pipe.13668\" -win32kLockedDown -appDir \"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\browser\" - 8 tab"
+  },
+  {
+    "ProcessId": 10600,
+    "ParentProcessId": 13668,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe\" -contentproc -isForBrowser -prefsHandle 5600:29443 -prefMapHandle 5624:310544 -jsInitHandle 5632:161360 -parentBuildID 20261104181552 -ipcHandle 5640 -initialChannelId {e9923540-39df-41fe-9e82-5380ddcef4a9} -parentPid 13668 -crashHelperPid 0 -crashHelper 5852 -crashReporter \"\\\\.\\pipe\\gecko-crash-server-pipe.13668\" -win32kLockedDown -appDir \"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\browser\" - 9 tab"
+  },
+  {
+    "ProcessId": 13980,
+    "ParentProcessId": 13668,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe\" -contentproc -isForBrowser -prefsHandle 5972:29577 -prefMapHandle 5976:310544 -jsInitHandle 5980:161360 -parentBuildID 20261104181552 -ipcHandle 5592 -initialChannelId {ec330e13-bc51-4e01-84e3-87f22bbc4de9} -parentPid 13668 -crashHelperPid 0 -crashHelper 6072 -crashReporter \"\\\\.\\pipe\\gecko-crash-server-pipe.13668\" -win32kLockedDown -appDir \"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\browser\" - 10 tab"
+  },
+  {
+    "ProcessId": 16480,
+    "ParentProcessId": 13668,
+    "Name": "firefox.exe",
+    "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe",
+    "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\firefox.exe\" -contentproc -isForBrowser -prefsHandle 6080:31633 -prefMapHandle 5624:310544 -jsInitHandle 5632:161360 -parentBuildID 20261104181552 -ipcHandle 6096 -initialChannelId {d30cca63-653a-464a-9a69-0dc24c7139fb} -parentPid 13668 -crashHelperPid 0 -crashHelper 6264 -crashReporter \"\\\\.\\pipe\\gecko-crash-server-pipe.13668\" -win32kLockedDown -appDir \"E:\\PM_POC\\App\\FirefoxPortable\\App\\Firefox64\\browser\" - 11 tab"
+  }
+]

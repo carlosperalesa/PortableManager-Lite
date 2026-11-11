@@ -1,0 +1,19 @@
+{
+  "pmbk_files": [],
+  "PM_POC_TestApp_paths": [],
+  "runtime_candidate_paths": [],
+  "scope": "Metadata USERPROFILE and TEMP plus final hashed PM_POC inventory; not a full scan of all internal drives",
+  "putty_key_absent": true,
+  "synthetic_test_key_absent": true,
+  "firefox_bookmark_present": true,
+  "firefox_preference_true": true,
+  "usb_inventory_files": 2126,
+  "usb_inventory_errors": [],
+  "SimonTatham_parent": {
+    "exists": true,
+    "subkeys_count": 0,
+    "values_count": 0,
+    "original_presence_not_captured": true,
+    "removed": false
+  }
+}

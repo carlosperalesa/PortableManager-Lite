@@ -1,0 +1,91 @@
+{
+  "poc": "Fase 1 — PoC Runtime y PMGuard",
+  "objective": "Comprobar que un único ejecutable (con modo normal y modo --guard) permite a PMGuard ejecutar el cierre de emergencia aunque desaparezca el directorio de origen/USB, sin consumir CPU por polling, sin limpiar mientras PM sigue activo y evitando duplicación de acciones mediante exclusión mutua.",
+  "timestamp_utc": "2026-11-11T16:51:29.207007+00:00",
+  "environment": {
+    "os": "nt",
+    "platform": "Microsoft Windows [Versión 10.0.26300.9818]",
+    "compiler": "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe",
+    "isolated_root": "C:\\Users\\cperales\\AppData\\Local\\Temp\\PM_PoC_Fase1_Build"
+  },
+  "initial_state": {
+    "existing_sessions_in_temp": [],
+    "workspace_clean": true
+  },
+  "procedure": [
+    "Compilar un único ejecutable autónomo (pm_poc.exe) con soporte de modo normal y modo --guard y fijar IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP (0x0400 / /SWAPRUN:CD) en la cabecera PE.",
+    "Subprueba 1 (Ciclo normal + espera bloqueante): Iniciar PM desde carpeta de origen simulando USB, verificar liberación inmediata del CWD hacia %TEMP% (SetCurrentDirectoryW), copia del runtime a %TEMP%, creación de Job Object y manifiesto atómico (MoveFileExW), medir consumo de CPU de PMGuard durante 1.2s de espera bloqueante (WaitForSingleObject), comprobar que PMG no limpia mientras PM está vivo y verificar que al cerrar PM normalmente solo PM limpia (CleanupCount=1) y PMG detecta State=CLEANED bajo el Mutex.",
+    "Subprueba 2 (Caída de PM y pérdida de origen): Iniciar PM con carpeta preexistente respaldada en .pmbkp y proceso hijo asignado al Job Object; renombrar/eliminar la carpeta de origen simulando pérdida de USB y terminar abruptamente el proceso PM; verificar que PMG despierta de WaitForSingleObject, adquiere el Mutex, abre el Job Object nombrado, termina el proceso hijo, elimina la carpeta de trabajo, restaura .pmbkp y finaliza sin requerir el directorio de origen.",
+    "Subprueba 3 (Ausencia original tras caída de PM): Iniciar PM sobre una ruta que originalmente no existía en el anfitrión, terminar abruptamente PM y comprobar que PMG elimina la carpeta de trabajo dejando la ruta ausente como al inicio."
+  ],
+  "binary": {
+    "path": "C:\\Users\\cperales\\AppData\\Local\\Temp\\PM_PoC_Fase1_Build\\workspace\\pm_poc.exe",
+    "size_bytes": 13824,
+    "sha256": "EEEDA8E73D0F0247AE676CBF6798A49C1ABACC819CA9F76E78620E775C99EDFF",
+    "pe_swaprun_cd": {
+      "e_lfanew": "0x80",
+      "characteristics_before": "0x102",
+      "characteristics_after": "0x502",
+      "swaprun_cd_flag_set": true
+    }
+  },
+  "subtests": {
+    "1_normal_lifecycle_and_blocking_wait": {
+      "while_alive": {
+        "pm_alive": true,
+        "guard_alive": true,
+        "child_alive": true,
+        "pm_released_usb_cwd": true,
+        "pm_current_cwd": "C:\\Users\\cperales\\AppData\\Local\\Temp\\PortableManager\\Session\\poc1_s1_e29a35f4",
+        "guard_cpu_delta_ms_over_1200ms": 0.0,
+        "zero_polling_cpu_verified": true,
+        "backup_intact_while_pm_active": true,
+        "session_work_active_while_pm_active": true
+      },
+      "after_normal_close": {
+        "pm_exited": true,
+        "guard_exited": true,
+        "child_exited": true,
+        "cleaned_by": "PM_NORMAL",
+        "cleanup_count": 1,
+        "guard_observed_already_cleaned": true,
+        "host_original_restored": true,
+        "temp_session_file_removed": true,
+        "backup_removed_after_restore": true
+      },
+      "passed": true
+    },
+    "2_pm_crash_and_usb_unavailable_recovery_by_pmg": {
+      "pm_killed_abruptly": true,
+      "usb_directory_rename_while_alive": true,
+      "usb_directory_deleted_immediately": true,
+      "guard_exited_cleanly": true,
+      "child_terminated_by_guard_job": true,
+      "cleaned_by": "PMG_EMERGENCY",
+      "cleanup_count": 1,
+      "host_target_restored_to_original": true,
+      "passed": true
+    },
+    "3_originally_absent_folder_cleaned_on_pm_crash": {
+      "originally_absent": true,
+      "finally_absent": true,
+      "cleaned_by": "PMG_EMERGENCY",
+      "cleanup_count": 1,
+      "child_terminated": true,
+      "passed": true
+    }
+  },
+  "final_state": {
+    "existing_sessions_in_temp": [],
+    "no_new_temp_residues": true,
+    "no_orphan_processes": true,
+    "test_workspace_removed": true
+  },
+  "usb_state": "No conectado ni requerido en Fase 1 (prueba aislada en disco local).",
+  "limitations": [
+    "/SWAPRUN:CD (IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP = 0x0400) es ignorado por el kernel de Windows cuando un dispositivo USB se reporta como unidad fija (DRIVE_FIXED, frecuente en unidades USB modernas/UASP) y no libera el handle del directorio de trabajo (CWD).",
+    "Por tanto, /SWAPRUN:CD solo debe usarse como defensa secundaria en el binario; la supervivencia real de PMGuard depende de copiar el ejecutable a %TEMP% y cambiar el CWD a %TEMP% con SetCurrentDirectoryW antes de iniciar la espera bloqueante."
+  ],
+  "status": "passed",
+  "decision": "continue_to_phase_2"
+}

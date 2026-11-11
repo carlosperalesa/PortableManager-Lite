@@ -1,0 +1,11 @@
+{
+  "timestamp_utc": "2026-11-11T12:36:27.119115+00:00",
+  "reason": "Final regression after adding metadata audit mode",
+  "tests_run": 9,
+  "failures": 0,
+  "errors": 0,
+  "successful": true,
+  "synthetic_parent_restored": true,
+  "synthetic_parent_finally_absent": true,
+  "output": "test_broad_metadata_has_no_content (test_audit.AuditTests.test_broad_metadata_has_no_content) ... ok\ntest_changes (test_audit.AuditTests.test_changes) ... ok\ntest_errors_preclude_clean (test_audit.AuditTests.test_errors_preclude_clean) ... ok\ntest_absent_restoration (test_registry_transaction.RegistryTests.test_absent_restoration) ... ok\ntest_existing_restoration (test_registry_transaction.RegistryTests.test_existing_restoration) ... ok\ntest_guards (test_registry_transaction.RegistryTests.test_guards) ... ok\ntest_identity_not_drive_letter (test_volume.VolumeTests.test_identity_not_drive_letter) ... ok\ntest_missing_identity_rejected (test_volume.VolumeTests.test_missing_identity_rejected) ... ok\ntest_missing_marker_rejected_without_creation (test_volume.VolumeTests.test_missing_marker_rejected_without_creation) ... ok\n\n----------------------------------------------------------------------\nRan 9 tests in 0.011s\n\nOK\n"
+}

@@ -1,0 +1,7 @@
+{
+  "ProcessId": 10496,
+  "ParentProcessId": 17832,
+  "Name": "FirefoxPortable.exe",
+  "ExecutablePath": "E:\\PM_POC\\App\\FirefoxPortable\\FirefoxPortable.exe",
+  "CommandLine": "\"E:\\PM_POC\\App\\FirefoxPortable\\FirefoxPortable.exe\" file:///E:/PM_POC/Data/PM_POC_TEST.html"
+}

@@ -1,0 +1,53 @@
+{
+  "phase": "Fase 0B — Adopcion de LLVM-MinGW y Ejecutable Nativo C++20",
+  "timestamp_utc": "2026-11-11T18:11:32.1659275Z",
+  "toolchain": {
+    "name": "llvm-mingw 20261104 (UCRT x86_64)",
+    "compiler_version": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+    "relative_path": "tools/toolchains/llvm-mingw/bin/clang++.exe",
+    "archive_sha256": "552191b5754c49a5a20723276a6fc56541ea1922c4c50b7b669022333fc1b40f",
+    "compile_flags": [
+      "-std=c++20",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-municode",
+      "-static",
+      "-Wl,-Xlink=-swaprun:cd"
+    ]
+  },
+  "binary": {
+    "name": "pm.exe",
+    "size_bytes": 736768,
+    "sha256": "EB0A5160DF10D47B8EA0C940F584595DCBE6EBD1589D59139B14C2299637BBAF",
+    "machine": "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+    "characteristics": "0x422 (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP)",
+    "swaprun_cd_0x400": true,
+    "imported_dlls": [
+      "KERNEL32.dll",
+      "api-ms-win-crt-stdio-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-locale-l1-1-0.dll",
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-private-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "api-ms-win-crt-convert-l1-1-0.dll",
+      "api-ms-win-crt-math-l1-1-0.dll",
+      "api-ms-win-crt-environment-l1-1-0.dll",
+      "api-ms-win-crt-filesystem-l1-1-0.dll"
+    ],
+    "external_toolchain_dlls": [],
+    "ucrt_note": "Enlaza estaticamente libc++, libunwind y libwinpthread (-static); enlaza dinamicamente contra los API sets api-ms-win-crt-*.dll (ucrtbase.dll del sistema operativo Windows 10/11). No equivale a MSVC /MT (que incrusta libucrt.lib)."
+  },
+  "tests": {
+    "clean_build_succeeded": true,
+    "normal_start_and_exit_code_0": true,
+    "execution_from_different_cwd_temp": true,
+    "root_resolved_via_GetModuleFileNameW": true,
+    "guard_mode_invocation_code_0": true,
+    "guard_mode_missing_session_rejected": true,
+    "pe_and_imports_verified_by_readobj": true
+  },
+  "status": "passed"
+}

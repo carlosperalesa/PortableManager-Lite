@@ -1,0 +1,21 @@
+{
+  "phase": "Fase 0 — Preparacion del Proyecto y Smoke Test",
+  "timestamp_utc": "2026-11-11T17:52:52.2067384Z",
+  "compiler": "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe (x64 + Win32 P/Invoke)",
+  "binary": {
+    "path": "C:\\Users\\cperales\\AppData\\Local\\Temp\\PM_Rebuild_Phase0_Build\\pm.exe",
+    "size_bytes": 6144,
+    "sha256": "1A51221812A19671FC19E84D34D08DAA7CA3C7A09689DA2C38E160F4F83C3B45",
+    "machine": "0x8664",
+    "pe_characteristics": "0x0422",
+    "is_x64": true,
+    "swaprun_cd_enabled": true
+  },
+  "checks": {
+    "smoke_test_from_different_cwd": true,
+    "resolved_root_via_GetModuleFileNameW": "C:\\Users\\cperales\\AppData\\Local\\Temp\\PM_Rebuild_Phase0_Build",
+    "guard_mode_invocation_ok": true,
+    "guard_mode_empty_session_rejected": true
+  },
+  "status": "passed"
+}

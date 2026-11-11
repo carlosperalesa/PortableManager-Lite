@@ -1,0 +1,98 @@
+{
+  "phase": "Fase 1 — Core y Rutas (PathResolver + AtomicFile + ConfigManager)",
+  "timestamp_utc": "2026-11-11T18:24:25.2946709Z",
+  "toolchain": {
+    "name": "llvm-mingw 20261104 (UCRT x86_64)",
+    "compiler_version": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+    "relative_path": "tools/toolchains/llvm-mingw/bin/clang++.exe",
+    "compile_flags": [
+      "-std=c++20",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-municode",
+      "-static",
+      "-Wl,-Xlink=-swaprun:cd"
+    ]
+  },
+  "binaries": {
+    "pm_exe": {
+      "size_bytes": 801792,
+      "sha256": "348902A71397B7E9107BD4EA44004AB123E1C72EA6095F35D7B21CFAF168A89A",
+      "machine": "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+      "characteristics": "0x422 (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP)",
+      "swaprun_cd_0x400": true,
+      "imported_dlls": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll"
+      ],
+      "external_toolchain_dlls": []
+    },
+    "test_phase1_core_exe": {
+      "size_bytes": 830976,
+      "sha256": "EE8CB8E31259196BFD0F0E87B979C71708C540A31259FE5E5B38E77107E94125"
+    }
+  },
+  "modules_implemented": [
+    "src/core/path_resolver.h",
+    "src/core/path_resolver.cpp",
+    "src/core/atomic_file.h",
+    "src/core/atomic_file.cpp",
+    "src/core/config_manager.h",
+    "src/core/config_manager.cpp",
+    "src/core/main.cpp",
+    "tests/test_phase1_core.cpp"
+  ],
+  "subtests": {
+    "path_resolver": {
+      "root_from_GetModuleFileNameW": true,
+      "execution_from_different_cwd": true,
+      "relative_path_resolution": true,
+      "separator_and_dot_normalization": true,
+      "dotdot_escape_rejected": true,
+      "drive_letter_and_unc_rejected": true,
+      "appdata_token_resolved": true,
+      "localappdata_token_resolved": true,
+      "persistent_vs_external_paths_isolated": true,
+      "passed": true
+    },
+    "atomic_file": {
+      "new_file_created": true,
+      "existing_file_replaced_atomically": true,
+      "interrupted_write_preserves_original": true,
+      "access_error_preserves_original": true,
+      "own_temp_files_cleaned_up": true,
+      "foreign_temp_files_untouched": true,
+      "passed": true
+    },
+    "config_manager": {
+      "new_ini_created": true,
+      "existing_ini_loaded": true,
+      "utf8_spanish_characters_verified": true,
+      "comments_and_order_preserved": true,
+      "unknown_keys_and_sections_preserved": true,
+      "single_key_updated_cleanly": true,
+      "no_disk_write_when_unmodified": true,
+      "persisted_across_restart": true,
+      "no_absolute_paths_or_drive_letters": true,
+      "passed": true
+    },
+    "integration": {
+      "pm_exe_runs_from_multiple_locations": true,
+      "configs_identical_without_drive_letters": true,
+      "phase0_smoke_regression_passed": true,
+      "passed": true
+    }
+  },
+  "status": "passed"
+}

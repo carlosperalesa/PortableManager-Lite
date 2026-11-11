@@ -1,0 +1,21 @@
+{
+  "new": [],
+  "deleted": [],
+  "modified": [],
+  "roots_changed": true,
+  "complete": false,
+  "errors": [
+    "[WinError 3] El sistema no puede encontrar la ruta especificada: 'C:\\\\Users\\\\cperales\\\\.mozilla'",
+    "[Errno 13] Permission denied: 'D:\\\\App\\\\VScode\\\\data\\\\tmp\\\\3ad47cf9-0376-4621-9a3c-a0562d223f32.tmp'",
+    "[Errno 13] Permission denied: 'D:\\\\App\\\\VScode\\\\data\\\\tmp\\\\79a5de71-19ff-479f-998f-c69546753421.tmp'",
+    "[Errno 13] Permission denied: 'D:\\\\App\\\\VScode\\\\data\\\\tmp\\\\96abcac4-37ad-4766-99b3-dc2aae018c22.tmp'",
+    "[WinError 3] El sistema no puede encontrar la ruta especificada: 'C:\\\\Users\\\\cperales\\\\AppData\\\\Local\\\\Mozilla'",
+    "[WinError 3] El sistema no puede encontrar la ruta especificada: 'C:\\\\Users\\\\cperales\\\\.mozilla'",
+    "[Errno 13] Permission denied: 'D:\\\\App\\\\VScode\\\\data\\\\tmp\\\\3ad47cf9-0376-4621-9a3c-a0562d223f32.tmp'",
+    "[Errno 13] Permission denied: 'D:\\\\App\\\\VScode\\\\data\\\\tmp\\\\79a5de71-19ff-479f-998f-c69546753421.tmp'",
+    "[Errno 13] Permission denied: 'D:\\\\App\\\\VScode\\\\data\\\\tmp\\\\96abcac4-37ad-4766-99b3-dc2aae018c22.tmp'"
+  ],
+  "registry_changed": [
+    "Software\\Mozilla\\Firefox"
+  ]
+}

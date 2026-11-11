@@ -1,0 +1,64 @@
+{
+  "poc": "Fase 3 — PoC Registro de Windows (RegCopyTreeW y RegDeleteTreeW)",
+  "objective": "Probar el respaldo y restauración de claves HKCU exclusivamente de prueba mediante RegCopyTreeW, RegDeleteTreeW y APIs de consulta/enumeración, cubriendo clave inexistente, clave existente con valores y subclaves, cierre normal, caída de PM y error durante la restauración.",
+  "timestamp_utc": "2026-11-11T17:02:05.280914+00:00",
+  "environment": {
+    "test_root_hive": "HKEY_CURRENT_USER",
+    "test_root_path": "Software\\PM_PoC_Fase3_e6d2dd69",
+    "real_app_keys_touched": false
+  },
+  "binary": {
+    "path": "C:\\Users\\cperales\\AppData\\Local\\Temp\\PM_PoC_Fase3_Build\\pm_reg_poc.exe",
+    "sha256": "934C9E54A3495BAEA43F0CB9AA6A5C42A62EEE5D0963D0888DDB7E8F8B57387D",
+    "size_bytes": 7168
+  },
+  "initial_state": {
+    "base_root_absent_before": true
+  },
+  "procedure": [
+    "Compilar ejecutable nativo pm_reg_poc.exe invocando RegOpenKeyExW, RegCreateKeyExW, RegCopyTreeW y RegDeleteTreeW en advapi32.dll.",
+    "Subprueba 1 (Clave originalmente inexistente): Registrar ausencia inicial, poblar clave con valores (REG_SZ, REG_DWORD, REG_BINARY, REG_MULTI_SZ) y subclaves anidadas, restaurar mediante RegDeleteTreeW y verificar que vuelve a quedar ausente.",
+    "Subprueba 2 (Clave existente con valores y subclaves en cierre normal): Crear clave original, respaldar en clave hermana .pmbkp con RegCopyTreeW (abriendo el destino con KEY_ALL_ACCESS / WRITE_DAC), modificar valores, borrar una subclave e inyectar nuevos valores/subclaves; restaurar ejecutando primero RegDeleteTreeW sobre la clave sucia y luego RegCopyTreeW desde .pmbkp; verificar coincidencia exacta de valores, tipos y subclaves antes de eliminar el respaldo .pmbkp.",
+    "Subprueba 3 (Restauración tras caída de PM): Un primer proceso crea el respaldo .pmbkp en HKCU y modifica la clave antes de terminar sin restaurar; un segundo proceso independiente (simulando PMGuard) restaura desde .pmbkp y verifica el estado original.",
+    "Subprueba 4 (Error durante la restauración): Provocar fallo durante la restauración y comprobar que el respaldo .pmbkp permanece intacto y no se elimina antes de verificar la restauración; posteriormente ejecutar la recuperación limpia y eliminar las claves de prueba."
+  ],
+  "subtests": {
+    "1_originally_nonexistent_key": {
+      "originally_absent": true,
+      "populated_during_session": true,
+      "restored_to_absent": true,
+      "passed": true
+    },
+    "2_existing_key_with_values_and_subkeys_normal_close": {
+      "backup_matched_original": true,
+      "modified_during_session": true,
+      "backup_preserved_until_verified": true,
+      "restored_state_exact_match": true,
+      "backup_removed_after_verification": true,
+      "passed": true
+    },
+    "3_restoration_after_pm_crash_by_guard": {
+      "survived_process_termination_via_hkcu_backup": true,
+      "restored_state_exact_match": true,
+      "backup_removed_after_verification": true,
+      "passed": true
+    },
+    "4_error_during_restoration_preserves_backup": {
+      "restore_error_detected": true,
+      "backup_preserved_intact_when_restore_failed": true,
+      "subsequent_recovery_from_preserved_backup_succeeded": true,
+      "passed": true
+    }
+  },
+  "final_state": {
+    "base_root_finally_absent": true,
+    "no_residual_test_keys": true
+  },
+  "usb_state": "Conectado en E:\\ (no modificado en Fase 3).",
+  "limitations": [
+    "Hallazgo técnico verificado: RegCopyTreeW copia también el descriptor de seguridad de la clave origen, por lo que si el handle de la clave destino se abre solo con KEY_READ | KEY_WRITE (0x2001F, que no incluye WRITE_DAC 0x00040000), RegCopyTreeW falla con ERROR_ACCESS_DENIED (5). Es obligatorio abrir la clave destino con KEY_ALL_ACCESS (o incluir WRITE_DAC).",
+    "RegCopyTreeW realiza una fusión (merge) sobre el destino sin eliminar valores nuevos; por ello es obligatorio ejecutar RegDeleteTreeW sobre la clave modificada antes de restaurar con RegCopyTreeW desde el respaldo, habiendo comprobado previamente que el respaldo existe."
+  ],
+  "status": "passed",
+  "decision": "continue_to_phase_4"
+}

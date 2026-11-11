@@ -1,0 +1,73 @@
+{
+  "test": "d1_firefoxportable",
+  "status": "amarillo",
+  "executed_in_rebuilt_environment": true,
+  "reason": "Persistencia correcta; nuevos valores HKCU atribuibles al ejecutable USB y auditoria incompleta",
+  "historical_context": {
+    "source": "Resultados comunicados previamente por el usuario; informes originales no disponibles ni verificables en el workspace actual",
+    "results": {
+      "3A": "aprobada comunicada",
+      "3B": "aprobada comunicada",
+      "3B.6": "aprobada comunicada",
+      "A": "aprobada comunicada",
+      "B": "aprobada comunicada",
+      "C": "aprobada comunicada; no repetir desconexión física",
+      "D1": "amarillo comunicado",
+      "D2": "verde comunicado",
+      "D3": "verde individual comunicado"
+    }
+  },
+  "usb_identity": {
+    "root": "E:\\",
+    "guid": "\\\\?\\Volume{aec5fbfe-d7ae-11f1-a523-00090faa0001}\\",
+    "serial": "048CCF2C",
+    "marker_sha256": "ce73d9d4da5464e6cb809145b737dc9ec4a6229c5a44aa805525ba2a7f2f2af0"
+  },
+  "host_before": "reports/d1_host_before.json",
+  "host_after": "reports/d1_host_after.json",
+  "persistence_verified": true,
+  "residues": {
+    "registry_evidence": "reports/d1_registry_diff.json",
+    "new_registry_values": 23,
+    "files_new_modified_deleted": [
+      0,
+      0,
+      0
+    ],
+    "root_existence_changes": [
+      {
+        "path": "C:\\Users\\cperales\\AppData\\Local\\Mozilla",
+        "before": true,
+        "after": false
+      }
+    ],
+    "cleanup_executed": false,
+    "coverage_limitations": "Inventario de registro conserva nombres/tipos, no valores originales; no prueba restauracion de valores existentes. Temporales bloqueados; directorios vacios no inventariados salvo raices."
+  },
+  "production_ready": false,
+  "phase": "D1 funcional verificado; residuos conservados sin limpieza",
+  "local_test_page": "E:\\PM_POC\\Data\\PM_POC_TEST.html",
+  "baseline_files": 14461,
+  "baseline_limitations": [
+    ".mozilla no existe; registrado como ausencia y también como error por os.walk",
+    "Tres temporales preexistentes de VSCode bloqueados: contenido no inventariado; no se podrá afirmar auditoría completa de TEMP"
+  ],
+  "installation": "E:\\PM_POC\\App\\FirefoxPortable",
+  "installed_version": "160.0",
+  "installed_by": "usuario mediante instalador oficial",
+  "first_launch_requested_utc": "2026-11-11T12:20:16.175295+00:00",
+  "expected_profile": "E:\\PM_POC\\App\\FirefoxPortable\\Data\\profile",
+  "first_close_evidence": "reports/d1_first_close_verification.json",
+  "first_session_user_confirmation": "Marcador creado; opcion cycle through desmarcada y activada; cierre normal comunicado",
+  "first_close_processes_verified": true,
+  "first_close_bookmark_persisted": true,
+  "first_close_bookmark_title": "PM_POC_TEST.",
+  "first_close_preference_persisted": true,
+  "second_close_evidence": "reports/d1_second_close_verification.json",
+  "second_close_processes_verified": true,
+  "host_diff": "reports/d1_host_diff.json",
+  "host_original_state_proven": false,
+  "final_scoped_checks": "reports/final_scoped_checks.json",
+  "final_usb_state": "reports/usb_final_state.json",
+  "completed_utc": "2026-11-11T12:37:56.155058+00:00"
+}

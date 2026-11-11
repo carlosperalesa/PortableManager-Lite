@@ -1,0 +1,95 @@
+{
+  "poc": "Fase 2 — PoC Directory Junction (Prioridad 3 ZIP)",
+  "objective": "Implementar y validar la estrategia de Prioridad 3 para aplicaciones ZIP mediante Directory Junctions (IO_REPARSE_TAG_MOUNT_POINT) en lugar de copiar perfiles físicamente al anfitrión, probando carpeta original existente e inexistente en cuenta estándar sobre el USB.",
+  "timestamp_utc": "2026-11-11T16:58:02.394062+00:00",
+  "environment": {
+    "is_standard_user_not_elevated": true,
+    "host_appdata_filesystem": "NTFS",
+    "usb_identity": {
+      "root": "E:\\",
+      "guid": "\\\\?\\Volume{aec5fbfe-d7ae-11f1-a523-00090faa0001}\\",
+      "serial": "048CCF2C",
+      "filesystem": "NTFS",
+      "marker_sha256": "ce73d9d4da5464e6cb809145b737dc9ec4a6229c5a44aa805525ba2a7f2f2af0"
+    },
+    "exfat_usb_available": false
+  },
+  "binary": {
+    "path": "C:\\Users\\cperales\\AppData\\Local\\Temp\\PM_PoC_Fase2_Build\\pm_junction_poc.exe",
+    "sha256": "146FB47C419AAAF8DA7FD22C15272FEF0CCBDB7FB1ECA9A465F8DA26E73364EB",
+    "size_bytes": 10240
+  },
+  "initial_state": {
+    "host_existing_dir_path": "C:\\Users\\cperales\\AppData\\Roaming\\PM_PoC_Junction_Existing_338d22f3",
+    "host_absent_dir_path": "C:\\Users\\cperales\\AppData\\Roaming\\PM_PoC_Junction_Absent_338d22f3",
+    "usb_test_root": "E:\\PM_POC\\Data\\JunctionPoC_338d22f3",
+    "no_prior_test_dirs": true
+  },
+  "procedure": [
+    "Revalidar identidad del USB (GUID, serial 048CCF2C y SHA-256 del marcador PM_POC_VOLUME_MARKER.txt) y comprobar privilegios de usuario estándar (sin elevación).",
+    "Subprueba 1 (Carpeta original existente en %APPDATA%): Crear carpeta exclusiva con archivo original (hash SHA-256 registrado), renombrar a .pmbkp con MoveFileExW, crear Directory Junction (FSCTL_SET_REPARSE_POINT / 0xA0000003) apuntando a E:\\PM_POC\\Data\\..., verificar destino con FSCTL_GET_REPARSE_POINT, ejecutar aplicación de prueba que lee y escribe a través de %APPDATA%, eliminar únicamente la Junction con RemoveDirectoryW (previa comprobación de FILE_ATTRIBUTE_REPARSE_POINT), restaurar .pmbkp y comprobar hash exacto del archivo original del anfitrión y persistencia en el USB.",
+    "Subprueba 2 (Carpeta original inexistente en %APPDATA%): Verificar ausencia inicial, crear Junction apuntando al USB, ejecutar aplicación de prueba, eliminar únicamente la Junction y comprobar que los datos persisten en el USB mientras %APPDATA% vuelve a quedar sin esa carpeta.",
+    "Subprueba 3 (Destino inaccesible / Junction huérfana): Crear Junction hacia destino en USB, eliminar el destino para dejar la Junction huérfana y comprobar que RemoveDirectoryW abre el punto de reanálisis (FILE_OPEN_REPARSE_POINT) y lo elimina limpiamente permitiendo restaurar .pmbkp."
+  ],
+  "subtests": {
+    "1_existing_host_folder_on_usb_ntfs": {
+      "sequence_result": {
+        "orig_existed": true,
+        "renamed_to_pmbkp": true,
+        "junction_created_is_reparse": true,
+        "reparse_tag": "0xA0000003",
+        "substitute_target": "\\??\\E:\\PM_POC\\Data\\JunctionPoC_338d22f3\\app_a_data",
+        "app_wrote_to_usb_via_junction": true,
+        "junction_removed_cleanly": true,
+        "usb_data_intact_after_remove": true,
+        "host_restored_ok": true
+      },
+      "host_profile_hash_before": "96AEBD877373F1C0C6CE0CD6FE6887DB5C9020A44487DC234DD83E1F28C02EC5",
+      "host_profile_hash_after": "96AEBD877373F1C0C6CE0CD6FE6887DB5C9020A44487DC234DD83E1F28C02EC5",
+      "host_files_after_restore": [
+        "host_user_profile.txt"
+      ],
+      "no_portable_files_leaked_to_host": true,
+      "usb_settings_content_after_session": "PREV=INITIAL_USB_SETTING=1;WRITTEN_BY_TEST_APP=OK",
+      "usb_persisted_changes": true,
+      "passed": true
+    },
+    "2_nonexistent_host_folder_on_usb_ntfs": {
+      "sequence_result": {
+        "orig_existed": false,
+        "renamed_to_pmbkp": false,
+        "junction_created_is_reparse": true,
+        "reparse_tag": "0xA0000003",
+        "substitute_target": "\\??\\E:\\PM_POC\\Data\\JunctionPoC_338d22f3\\app_b_data",
+        "app_wrote_to_usb_via_junction": true,
+        "junction_removed_cleanly": true,
+        "usb_data_intact_after_remove": true,
+        "host_restored_ok": true
+      },
+      "host_dir_absent_after_restore": true,
+      "usb_settings_content_after_session": "PREV=NONE;WRITTEN_BY_TEST_APP=OK",
+      "usb_persisted_changes": true,
+      "passed": true
+    },
+    "3_unreachable_target_orphaned_junction_cleanup": {
+      "junction_remained_reparse_point_when_target_vanished": true,
+      "remove_directory_w_succeeded_without_target": true,
+      "backup_restored_cleanly": true,
+      "passed": true
+    }
+  },
+  "final_state": {
+    "host_existing_test_dir_removed": true,
+    "host_absent_test_dir_absent": true,
+    "host_orphan_test_dir_removed": true,
+    "usb_test_root_cleaned": true
+  },
+  "usb_state": "Conectado en E:\\ (NTFS, Healthy/OK), sin archivos temporales de la PoC Fase 2 pendientes.",
+  "limitations": [
+    "El volumen donde se crea la Junction (el anfitrión, p. ej. %APPDATA% en C:\\) debe soportar puntos de reanálisis (NTFS/ReFS).",
+    "El volumen destino en el USB no requiere ser NTFS por imposición del mecanismo de Junctions (el I/O Manager resuelve STATUS_REPARSE hacia fastfat.sys o exfat.sys), aunque en esta sesión solo había conectado un USB NTFS (exfat_usb_available=false).",
+    "No se repitió desconexión física del USB para respetar la regla 3 ('No repetir pruebas aprobadas', dado que la prueba física C ya estaba aprobada); la eliminación de una Junction cuyo destino ya no existe se verificó en la subprueba 3."
+  ],
+  "status": "passed",
+  "decision": "continue_to_phase_3"
+}
