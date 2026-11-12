@@ -1,0 +1,233 @@
+{
+  "phase": 3,
+  "timestamp_utc": "2026-11-12T00:18:29.842308+00:00",
+  "branch": "feat/fase03-jobobjects-pmguard",
+  "base_commit": "c3620e324f406eadfea5bb9c2178ab7dd67f259a",
+  "source_state": "uncommitted_worktree",
+  "source_sha256": {
+    ".github/workflows/portablemanager-ci.yml": "68e7663eef24700456a8e5a4b3b866c0611d4e0d162c38990c98c579128c1952",
+    "CMakeLists.txt": "2d2fa4c2b81a3af9b1e84b8d0fb7a0d49c8a01ab4b10abf008ae9d8630ba9184",
+    "build.ps1": "e90d883a80cf048f44f05b5b64cb24a3b230b909b1714bc557a7233a50dc4ba1",
+    "build_msvc.ps1": "6335038534d6e57787a625064156e2c65749f5d658765757972b36ee89b37b4a",
+    "src/core/main.cpp": "3c6ccb23fb7689064065ac92cd276be5ba27efabc83cae87488bfee843db6b7e",
+    "src/guard/guard_entry.cpp": "77a79404d4f7fe900771e9e4765662c1742f472ee9136768d1a37986a98cd60c",
+    "src/guard/guard_entry.h": "6ae2f65bb70d47a806196f57b817ebbf4734057c7a0a4f49de350f91da609f5a",
+    "src/jobs/jobs_module.h": "d05559f43db117a1ed9923282b64f6b8c1918dbf174e8981c27fe6344da434db",
+    "src/runtime/manifest_manager.cpp": "1483e22558e2112d70d4ec92b9d150f6ac12543df73b2d316d80cd26523b7592",
+    "tests/test_phase0_smoke.cpp": "89a58c82e2f7d706de5131e0c60463f5aeaca1cd0a5277e29ba21b8801df4d3c",
+    "src/guard/guard_process.cpp": "0da3925f9a73696c958e51fdbad1bd9eddca0e77d08d1f4df5b1812a9a63b9fe",
+    "src/guard/guard_process.h": "37a4ba3020f7dd018cf68a86eb5f650dc79f8438c49a801a22d11186a6224794",
+    "src/jobs/job_manager.cpp": "bb435f9c2a39bd7989b82b3be5f0413ad7bbbdd9f1f3a553193aa44ee18eda6d",
+    "src/jobs/job_manager.h": "1d09ba481bba19455103f83b35fb874776ec1a9fc0c1baac383c472ffb49ad42",
+    "src/runtime/session_lock.h": "121635c59eb26b10bf5272434dab92d668906728e9e1c18238dbbb12c55f1b8a",
+    "tests/test_phase3_guard.cpp": "832163e28ceb4ad3f9aeaefc1f1fbf73511d38a36f2866cee181b053fe226299"
+  },
+  "status": "blocked",
+  "reason": "Linux host: native Win32 runtime suites require Windows. Compilation and PE inspection passed; no phase approval claimed.",
+  "host": "Linux",
+  "toolchain": {
+    "release": "LLVM-MinGW 20261104",
+    "compiler": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+    "target": "x86_64-w64-windows-gnu",
+    "runtime": "UCRT"
+  },
+  "cross_compile": {
+    "status": "passed",
+    "command": "export PATH=/workspace/.pm-cloud-tools/bin:$PATH; bash tools/build-codex-cloud.sh",
+    "exit_code": 0,
+    "result_marker": "CROSS_COMPILE_PASSED",
+    "cxx_standard": 20,
+    "warnings": [
+      "-Wall",
+      "-Wextra",
+      "-Werror"
+    ],
+    "link_flags": [
+      "-municode",
+      "-static",
+      "-Wl,-Xlink=-swaprun:cd"
+    ]
+  },
+  "artifacts": {
+    "pm.exe": {
+      "size_bytes": 898560,
+      "sha256": "b816c2a82ccbb886c4968102c44662feb912ac96241b1195f4e8a14d411c1069",
+      "machine": "AMD64",
+      "swaprun_cd": true,
+      "imported_dlls": [
+        "KERNEL32.dll",
+        "ole32.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll"
+      ],
+      "external_toolchain_dlls": [],
+      "pe_inspection_status": "passed"
+    },
+    "test_phase0_smoke.exe": {
+      "size_bytes": 741888,
+      "sha256": "461b193e9448c0799f9402cab3395a886372377f0da02e78501dc245fecf5b94",
+      "machine": "AMD64",
+      "swaprun_cd": true,
+      "imported_dlls": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll"
+      ],
+      "external_toolchain_dlls": [],
+      "pe_inspection_status": "passed"
+    },
+    "test_phase1_core.exe": {
+      "size_bytes": 831488,
+      "sha256": "16bc3dd736899a6813af5472391f1cfbad58bc437449b48210edaa9fb66a3f36",
+      "machine": "AMD64",
+      "swaprun_cd": true,
+      "imported_dlls": [
+        "KERNEL32.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll"
+      ],
+      "external_toolchain_dlls": [],
+      "pe_inspection_status": "passed"
+    },
+    "test_phase2_runtime.exe": {
+      "size_bytes": 978944,
+      "sha256": "97566a020f4e889413bb1835f752ecee490c4bb3f23890c61d2501eb259a9a95",
+      "machine": "AMD64",
+      "swaprun_cd": true,
+      "imported_dlls": [
+        "KERNEL32.dll",
+        "ADVAPI32.dll",
+        "ole32.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll"
+      ],
+      "external_toolchain_dlls": [],
+      "pe_inspection_status": "passed"
+    },
+    "test_phase3_guard.exe": {
+      "size_bytes": 929792,
+      "sha256": "21661cad87112be683c7ce46eaf3a22ceeec59c04084ec8cd0e758d527f52990",
+      "machine": "AMD64",
+      "swaprun_cd": true,
+      "imported_dlls": [
+        "KERNEL32.dll",
+        "ole32.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll"
+      ],
+      "external_toolchain_dlls": [],
+      "pe_inspection_status": "passed"
+    }
+  },
+  "windows_scenarios": [
+    {
+      "name": "normal_once_active_guard_blocked_cpu_children_foreign",
+      "status": "blocked",
+      "reason": "Native Windows execution unavailable in this Linux session."
+    },
+    {
+      "name": "abrupt_pm_death_children_terminated",
+      "status": "blocked",
+      "reason": "Native Windows execution unavailable in this Linux session."
+    },
+    {
+      "name": "guard_death_pm_still_responsible",
+      "status": "blocked",
+      "reason": "Native Windows execution unavailable in this Linux session."
+    },
+    {
+      "name": "source_folder_loss_then_pm_crash",
+      "status": "blocked",
+      "reason": "Native Windows execution unavailable in this Linux session."
+    },
+    {
+      "name": "simultaneous_children_exit",
+      "status": "blocked",
+      "reason": "Native Windows execution unavailable in this Linux session."
+    },
+    {
+      "name": "kill_on_last_job_handle_close",
+      "status": "blocked",
+      "reason": "Native Windows execution unavailable in this Linux session."
+    },
+    {
+      "name": "kill_failure_stops_restoration",
+      "status": "blocked",
+      "reason": "Native Windows execution unavailable in this Linux session."
+    },
+    {
+      "name": "launch_after_cleanup_rejected",
+      "status": "blocked",
+      "reason": "Native Windows execution unavailable in this Linux session."
+    },
+    {
+      "name": "invalid_id_duplicate_job_missing_executable",
+      "status": "blocked",
+      "reason": "Native Windows execution unavailable in this Linux session."
+    }
+  ],
+  "regression": {
+    "compiled": [
+      "Phase0_SmokeTest",
+      "Phase1_CoreTest",
+      "Phase2_RuntimeTest"
+    ],
+    "runtime_status": "blocked",
+    "historical_evidence_unchanged": true
+  },
+  "ctest_registration": {
+    "status": "passed",
+    "command": "ctest --test-dir build/codex-cloud -N",
+    "registered_tests": 4,
+    "runtime_tests_executed": false
+  },
+  "diff_check": "passed",
+  "next_phase_started": false,
+  "limitations": [
+    "No physical USB removal tested.",
+    "No runtime or CPU assertions executed in Linux.",
+    "Phase-3 TEMP shadow and manifest are retained; final cleanup and pmlog belong to later CleanupEngine scope.",
+    "PowerShell execution and Windows CI were not run in this session."
+  ],
+  "windows_validation_command": "./build.ps1 -ReportJsonPath reports/rebuild_guard_windows_20261112_run01.json"
+}

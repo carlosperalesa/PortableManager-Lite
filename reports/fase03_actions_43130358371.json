@@ -1,0 +1,375 @@
+{
+  "run_id": 43130358371,
+  "url": "https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130358371",
+  "head_sha": "46ab7b90257d485de1e93aa85140f5e1451e8529",
+  "artifact_id": 13905376318,
+  "artifact_archive_sha256": "07fc9f0f5b4efafbeb4c55104c19f8c09548c77c5a162d43da4643c8e838cdd0",
+  "status": "passed",
+  "phase_approved": false,
+  "cross_compile": "passed",
+  "native_aggregate": {
+    "phase": "Fase 3 \u2014 JobObjects y PMGuard; regresion 0B, 1 y 2",
+    "timestamp_utc": "2026-11-12T00:52:57.7164102Z",
+    "toolchain": {
+      "name": "llvm-mingw 20261104 (UCRT x86_64)",
+      "compiler_version": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+      "relative_path": "tools/toolchains/llvm-mingw/bin/clang++.exe",
+      "compile_flags": [
+        "-std=c++20",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-municode",
+        "-static",
+        "-Wl,-Xlink=-swaprun:cd"
+      ]
+    },
+    "binaries": {
+      "pm_exe": {
+        "size_bytes": 900096,
+        "sha256": "7C9AB2889118C54D5DC7F08187B995EC6D91EF52B532FDD645921B38C1B90800",
+        "machine": "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+        "characteristics": "0x422 (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP)",
+        "swaprun_cd_0x400": true,
+        "imported_dlls": [
+          "KERNEL32.dll",
+          "ole32.dll",
+          "api-ms-win-crt-stdio-l1-1-0.dll",
+          "api-ms-win-crt-string-l1-1-0.dll",
+          "api-ms-win-crt-runtime-l1-1-0.dll",
+          "api-ms-win-crt-locale-l1-1-0.dll",
+          "api-ms-win-crt-heap-l1-1-0.dll",
+          "api-ms-win-crt-private-l1-1-0.dll",
+          "api-ms-win-crt-convert-l1-1-0.dll",
+          "api-ms-win-crt-math-l1-1-0.dll",
+          "api-ms-win-crt-environment-l1-1-0.dll",
+          "api-ms-win-crt-filesystem-l1-1-0.dll"
+        ],
+        "external_toolchain_dlls": []
+      },
+      "test_phase2_runtime_exe": {
+        "size_bytes": 974848,
+        "sha256": "40A0838BFEBD5134E1983596B1EC6F3B963F00B7A3C52E11A462EA8849D16D14"
+      }
+    },
+    "phase3_runtime": {
+      "phase": 3,
+      "platform": "native_windows",
+      "scenarios": [
+        {
+          "name": "normal_once_active_guard_blocked_cpu_children_foreign",
+          "status": "passed"
+        },
+        {
+          "name": "abrupt_pm_death_children_terminated",
+          "status": "passed"
+        },
+        {
+          "name": "guard_death_pm_still_responsible",
+          "status": "passed"
+        },
+        {
+          "name": "source_folder_loss_then_pm_crash",
+          "status": "passed"
+        },
+        {
+          "name": "simultaneous_children_exit",
+          "status": "passed"
+        },
+        {
+          "name": "kill_on_last_job_handle_close",
+          "status": "passed"
+        },
+        {
+          "name": "kill_failure_stops_restoration",
+          "status": "passed"
+        },
+        {
+          "name": "launch_after_cleanup_rejected",
+          "status": "passed"
+        },
+        {
+          "name": "invalid_id_duplicate_job_missing_executable",
+          "status": "passed"
+        }
+      ],
+      "status": "passed"
+    },
+    "phase3_evidence_path": "D:\\a\\PortableManager-Lite\\PortableManager-Lite\\build\\phase3_windows_20261112T005221004.json",
+    "regression_suites": [
+      "test_phase0_smoke",
+      "test_phase1_core",
+      "test_phase2_runtime"
+    ],
+    "regression_status": "passed",
+    "status": "passed"
+  },
+  "native_phase3": {
+    "phase": 3,
+    "platform": "native_windows",
+    "scenarios": [
+      {
+        "name": "normal_once_active_guard_blocked_cpu_children_foreign",
+        "status": "passed"
+      },
+      {
+        "name": "abrupt_pm_death_children_terminated",
+        "status": "passed"
+      },
+      {
+        "name": "guard_death_pm_still_responsible",
+        "status": "passed"
+      },
+      {
+        "name": "source_folder_loss_then_pm_crash",
+        "status": "passed"
+      },
+      {
+        "name": "simultaneous_children_exit",
+        "status": "passed"
+      },
+      {
+        "name": "kill_on_last_job_handle_close",
+        "status": "passed"
+      },
+      {
+        "name": "kill_failure_stops_restoration",
+        "status": "passed"
+      },
+      {
+        "name": "launch_after_cleanup_rejected",
+        "status": "passed"
+      },
+      {
+        "name": "invalid_id_duplicate_job_missing_executable",
+        "status": "passed"
+      }
+    ],
+    "status": "passed"
+  },
+  "harness_diagnostics": [
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=create_events status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=spawn_outsider status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=spawn_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=owner_ready status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=read_pids status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=open_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=open_worker status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=open_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=query_active_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=query_job_pid_list status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=job_member_test_phase3_guard.exe status=passed actual=2756 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=job_member_test_phase3_guard.exe status=passed actual=5520 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=active_processes_before status=passed actual=2 expected=2 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=blocked_guard_cpu_1200ms status=passed actual=0 expected=200000 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=guard_alive status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=worker_alive status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=open_active_manifest status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=active_session_state status=passed actual=1 expected=1 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=release_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=wait_process_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=get_process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=wait_process_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=get_process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=worker_terminated status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=query_drained_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=active_processes_after status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=open_final_manifest status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=final_session_state status=passed actual=3 expected=3 last_error=0",
+    "[CHECK] normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=outsider_survives status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=create_events status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=spawn_outsider status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=spawn_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=owner_ready status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=read_pids status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=open_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=open_worker status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=open_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=query_active_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=query_job_pid_list status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=job_member_test_phase3_guard.exe status=passed actual=7212 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=job_member_test_phase3_guard.exe status=passed actual=7908 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=active_processes_before status=passed actual=2 expected=2 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=blocked_guard_cpu_1200ms status=passed actual=0 expected=200000 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=guard_alive status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=worker_alive status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=open_active_manifest status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=active_session_state status=passed actual=1 expected=1 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=release_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=wait_process_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=get_process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=process_exit_code status=passed actual=77 expected=77 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=wait_process_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=get_process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=worker_terminated status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=query_drained_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=active_processes_after status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=open_final_manifest status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=final_session_state status=passed actual=3 expected=3 last_error=0",
+    "[CHECK] crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=outsider_survives status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=create_events status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=spawn_outsider status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=spawn_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=owner_ready status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=read_pids status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=open_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=open_worker status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=open_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=query_active_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=query_job_pid_list status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=job_member_test_phase3_guard.exe status=passed actual=7760 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=job_member_test_phase3_guard.exe status=passed actual=4440 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=active_processes_before status=passed actual=2 expected=2 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=blocked_guard_cpu_1200ms status=passed actual=0 expected=200000 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=guard_alive status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=worker_alive status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=open_active_manifest status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=active_session_state status=passed actual=1 expected=1 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=terminate_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=wait_process_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=get_process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=process_exit_code status=passed actual=88 expected=88 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=release_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=wait_process_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=get_process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=worker_terminated status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=query_drained_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=active_processes_after status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=open_final_manifest status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=final_session_state status=passed actual=3 expected=3 last_error=0",
+    "[CHECK] guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=outsider_survives status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=create_events status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=spawn_outsider status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=spawn_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=owner_ready status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=read_pids status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=open_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=open_worker status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=open_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=query_active_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=query_job_pid_list status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=job_member_test_phase3_guard.exe status=passed actual=1848 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=job_member_test_phase3_guard.exe status=passed actual=1620 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=active_processes_before status=passed actual=2 expected=2 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=blocked_guard_cpu_1200ms status=passed actual=0 expected=200000 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=guard_alive status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=worker_alive status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=open_active_manifest status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=active_session_state status=passed actual=1 expected=1 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=remove_source_executable status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=remove_source_directory status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=release_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=wait_process_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=get_process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=process_exit_code status=passed actual=77 expected=77 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=wait_process_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=get_process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=worker_terminated status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=query_drained_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=active_processes_after status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=open_final_manifest status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=final_session_state status=passed actual=3 expected=3 last_error=0",
+    "[CHECK] crash_source_loss_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=outsider_survives status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=create_events status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=spawn_outsider status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=spawn_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=owner_ready status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=read_pids status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=open_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=open_worker status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=open_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=query_active_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=query_job_pid_list status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=job_member_test_phase3_guard.exe status=passed actual=6324 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=job_member_test_phase3_guard.exe status=passed actual=7244 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=active_processes_before status=passed actual=2 expected=2 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=blocked_guard_cpu_1200ms status=passed actual=0 expected=200000 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=guard_alive status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=worker_alive status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=open_active_manifest status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=active_session_state status=passed actual=1 expected=1 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=terminate_children status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=children_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=owner_survives_children status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=guard_survives_children status=passed actual=258 expected=258 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=release_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=wait_process_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=get_process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=wait_process_exit status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=get_process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=process_exit_code status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=worker_terminated status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=query_drained_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=active_processes_after status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=open_final_manifest status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=final_session_state status=passed actual=3 expected=3 last_error=0",
+    "[CHECK] children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=outsider_survives status=passed actual=258 expected=258 last_error=0"
+  ],
+  "controller_diagnostics": {
+    "build/phase3_3bb105c5-68b1-4e05-be3e-c20475c86e01_controller.txt": [
+      "[CHECK] controller_crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=initialize_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=create_job status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=start_guard status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=launch_tree status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=tree_ready status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=activate_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_3bb105c5-68b1-4e05-be3e-c20475c86e01 step=publish_pids status=passed actual=0 expected=0 last_error=0"
+    ],
+    "build/phase3_40cd8ebc-65ff-4174-bddb-19176a8204a0_controller.txt": [
+      "[CHECK] controller_crash_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=initialize_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=create_job status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=start_guard status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=launch_tree status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=tree_ready status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=activate_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_40cd8ebc-65ff-4174-bddb-19176a8204a0 step=publish_pids status=passed actual=0 expected=0 last_error=0"
+    ],
+    "build/phase3_96ad3a71-d45f-4dc6-9b62-06f94be9e302_controller.txt": [
+      "[CHECK] controller_children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=initialize_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=create_job status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=start_guard status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=launch_tree status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=tree_ready status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=activate_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=publish_pids status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=cleanup_first status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_96ad3a71-d45f-4dc6-9b62-06f94be9e302 step=cleanup_repeat status=passed actual=0 expected=0 last_error=0"
+    ],
+    "build/phase3_ca56fb42-3be8-4a75-913b-b7a9ce6be661_controller.txt": [
+      "[CHECK] controller_normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=initialize_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=create_job status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=start_guard status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=launch_tree status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=tree_ready status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=activate_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=publish_pids status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=cleanup_first status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_ca56fb42-3be8-4a75-913b-b7a9ce6be661 step=cleanup_repeat status=passed actual=0 expected=0 last_error=0"
+    ],
+    "build/phase3_f6478918-cf5f-4a45-b2bc-f7774850c6bc_controller.txt": [
+      "[CHECK] controller_guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=initialize_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=create_job status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=start_guard status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=launch_tree status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=tree_ready status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=activate_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=publish_pids status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=cleanup_first status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_f6478918-cf5f-4a45-b2bc-f7774850c6bc step=cleanup_repeat status=passed actual=0 expected=0 last_error=0"
+    ]
+  },
+  "source_sha256": {
+    "AGENTS.md": "3a3db51ca20ce0581a6737294e333601348c904d34d19c90a2ece677e8dcf7eb",
+    "src/jobs/job_manager.cpp": "caea52c8f855fd19982a33c851addf061d0ba19b9689ff38b0fdda3b5815ff85",
+    "src/jobs/job_manager.h": "95ee7719d4e40967e674896588f6004296f8e20ee60091e9dceb8f78244851a0",
+    "tests/test_phase3_guard.cpp": "d56f2daf23cad3b6d9b8a01bb30ae9d40933ec298f6752427a2e705498baba75"
+  },
+  "next_phase_started": false
+}

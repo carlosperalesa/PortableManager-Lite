@@ -1,0 +1,109 @@
+{
+    "phase":  "Fase 3 — JobObjects y PMGuard; regresion 0B, 1 y 2",
+    "timestamp_utc":  "2026-11-12T02:38:55.6794127Z",
+    "toolchain":  {
+                      "name":  "llvm-mingw 20261104 (UCRT x86_64)",
+                      "compiler_version":  "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+                      "relative_path":  "tools/toolchains/llvm-mingw/bin/clang++.exe",
+                      "compile_flags":  [
+                                            "-std=c++20",
+                                            "-O2",
+                                            "-Wall",
+                                            "-Wextra",
+                                            "-Werror",
+                                            "-municode",
+                                            "-static",
+                                            "-Wl,-Xlink=-swaprun:cd"
+                                        ]
+                  },
+    "binaries":  {
+                     "pm_exe":  {
+                                    "size_bytes":  903168,
+                                    "sha256":  "EDDDB8491CF7B6A4D9E9D3F761A5E5CFAA95CAFA7F1182BD296072EE6772A3DB",
+                                    "machine":  "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+                                    "characteristics":  "0x422 (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP)",
+                                    "swaprun_cd_0x400":  true,
+                                    "imported_dlls":  [
+                                                          "KERNEL32.dll",
+                                                          "USER32.dll",
+                                                          "ole32.dll",
+                                                          "api-ms-win-crt-stdio-l1-1-0.dll",
+                                                          "api-ms-win-crt-string-l1-1-0.dll",
+                                                          "api-ms-win-crt-runtime-l1-1-0.dll",
+                                                          "api-ms-win-crt-locale-l1-1-0.dll",
+                                                          "api-ms-win-crt-heap-l1-1-0.dll",
+                                                          "api-ms-win-crt-private-l1-1-0.dll",
+                                                          "api-ms-win-crt-convert-l1-1-0.dll",
+                                                          "api-ms-win-crt-math-l1-1-0.dll",
+                                                          "api-ms-win-crt-environment-l1-1-0.dll",
+                                                          "api-ms-win-crt-filesystem-l1-1-0.dll"
+                                                      ],
+                                    "external_toolchain_dlls":  [
+
+                                                                ]
+                                },
+                     "test_phase2_runtime_exe":  {
+                                                     "size_bytes":  974848,
+                                                     "sha256":  "E2C494B8D3869E3C40A6239E1BC6C7C20DC239FBC74FAD971AE05ADB94A18601"
+                                                 }
+                 },
+    "phase3_runtime":  {
+                           "phase":  3,
+                           "platform":  "native_windows",
+                           "scenarios":  [
+                                             {
+                                                 "name":  "normal_once_active_guard_blocked_cpu_children_foreign",
+                                                 "status":  "passed"
+                                             },
+                                             {
+                                                 "name":  "abrupt_pm_death_children_terminated",
+                                                 "status":  "passed"
+                                             },
+                                             {
+                                                 "name":  "guard_death_pm_still_responsible",
+                                                 "status":  "passed"
+                                             },
+                                             {
+                                                 "name":  "source_folder_loss_then_pm_crash",
+                                                 "status":  "passed"
+                                             },
+                                             {
+                                                 "name":  "origin_loss_while_pm_alive_triggers_critical_cleanup",
+                                                 "status":  "passed"
+                                             },
+                                             {
+                                                 "name":  "pm_crash_during_critical_cleanup_guard_recovers",
+                                                 "status":  "passed"
+                                             },
+                                             {
+                                                 "name":  "simultaneous_children_exit",
+                                                 "status":  "passed"
+                                             },
+                                             {
+                                                 "name":  "kill_on_last_job_handle_close",
+                                                 "status":  "passed"
+                                             },
+                                             {
+                                                 "name":  "kill_failure_stops_restoration",
+                                                 "status":  "passed"
+                                             },
+                                             {
+                                                 "name":  "launch_after_cleanup_rejected",
+                                                 "status":  "passed"
+                                             },
+                                             {
+                                                 "name":  "invalid_id_duplicate_job_missing_executable",
+                                                 "status":  "passed"
+                                             }
+                                         ],
+                           "status":  "passed"
+                       },
+    "phase3_evidence_path":  "D:\\OneDrive\\GitHub\\PML\\PortableManager-Lite\\build\\phase3_windows_20261111T233619604.json",
+    "regression_suites":  [
+                              "test_phase0_smoke",
+                              "test_phase1_core",
+                              "test_phase2_runtime"
+                          ],
+    "regression_status":  "passed",
+    "status":  "passed"
+}

@@ -5,7 +5,7 @@
 .DESCRIPTION
     Resuelve todas las rutas respecto a la ubicación del script (independiente del CWD),
     no modifica el PATH global ni el registro de Windows, compila pm.exe y las suites de prueba
-    (Fase 0B, Fase 1 y Fase 2) con tools/toolchains/llvm-mingw/bin/clang++.exe, verifica las cabeceras PE
+    (Fases 0B, 1, 2 y 3) con tools/toolchains/llvm-mingw/bin/clang++.exe, verifica las cabeceras PE
     y DLL importadas con llvm-readobj.exe, y genera el informe JSON de validación.
 #>
 
@@ -19,6 +19,10 @@ $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $OutputDir = Join-Path $ProjectRoot "build"
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ReportJsonPath) -and (Test-Path -LiteralPath $ReportJsonPath)) {
+    throw "El informe ya existe; usa una ruta nueva para preservar la evidencia histórica: $ReportJsonPath"
 }
 
 $ToolchainBin = Join-Path $ProjectRoot "tools\toolchains\llvm-mingw\bin"
@@ -40,10 +44,12 @@ $PmExe         = Join-Path $OutputDir "pm.exe"
 $SmokeTestExe  = Join-Path $OutputDir "test_phase0_smoke.exe"
 $Phase1TestExe = Join-Path $OutputDir "test_phase1_core.exe"
 $Phase2TestExe = Join-Path $OutputDir "test_phase2_runtime.exe"
+$Phase3TestExe = Join-Path $OutputDir "test_phase3_guard.exe"
+$Phase3Report = Join-Path $OutputDir ("phase3_windows_" + (Get-Date -Format "yyyyMMddTHHmmssfff") + ".json")
 $IncludeDir    = Join-Path $ProjectRoot "src"
 
 # 1. Compilación limpia
-foreach ($bin in @($PmExe, $SmokeTestExe, $Phase1TestExe, $Phase2TestExe)) {
+foreach ($bin in @($PmExe, $SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe)) {
     if (Test-Path $bin) { Remove-Item $bin -Force }
 }
 
@@ -62,7 +68,7 @@ Write-Host "=== [1/6] Compilando pm.exe (C++20, Windows x64, Unicode, -static, /
 $pmSources = @(
     (Join-Path $ProjectRoot "src\core\main.cpp"),
     (Join-Path $ProjectRoot "src\guard\guard_entry.cpp")
-) + $coreSources + $runtimeSources
+) + $coreSources + $runtimeSources + @((Join-Path $ProjectRoot "src\jobs\job_manager.cpp"), (Join-Path $ProjectRoot "src\guard\guard_process.cpp"))
 
 & $ClangPP `
     -std=c++20 -O2 -Wall -Wextra -Werror `
@@ -126,6 +132,20 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Phase2TestExe)) {
     throw "Fallo al compilar test_phase2_runtime.exe (ExitCode=$LASTEXITCODE)"
 }
 
+Write-Host "=== Compilando test_phase3_guard.exe (C++20) ==="
+$test3Sources = @(
+    (Join-Path $ProjectRoot "tests\test_phase3_guard.cpp"),
+    (Join-Path $ProjectRoot "src\jobs\job_manager.cpp"),
+    (Join-Path $ProjectRoot "src\guard\guard_process.cpp")
+) + $coreSources + $runtimeSources
+& $ClangPP -std=c++20 -O2 -Wall -Wextra -Werror `
+    -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNOMINMAX `
+    -municode -static "-Wl,-Xlink=-swaprun:cd" "-I$IncludeDir" $test3Sources -o $Phase3TestExe `
+    -lkernel32 -luser32 -ladvapi32 -lole32
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Phase3TestExe)) {
+    throw "Fallo al compilar test_phase3_guard.exe (ExitCode=$LASTEXITCODE)"
+}
+
 Write-Host "=== [5/6] Inspeccionando cabecera PE e importaciones COFF con llvm-readobj.exe ==="
 $peHeadersRaw = (& $ReadObj --file-headers $PmExe) -join "`n"
 $coffImportsRaw = (& $ReadObj --coff-imports $PmExe) -join "`n"
@@ -162,10 +182,11 @@ Write-Host "Ausencia de DLLs externas del toolchain -> OK (0 detectadas)"
 Write-Host "=== [6/6] Ejecutando suites de prueba desde directorio de trabajo externo (%TEMP%) ==="
 $tempWorkDir = [System.IO.Path]::GetTempPath().TrimEnd('\')
 
-foreach ($testBin in @($SmokeTestExe, $Phase1TestExe, $Phase2TestExe)) {
+foreach ($testBin in @($SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe)) {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $testBin
     $psi.Arguments = "`"$PmExe`""
+    if ($testBin -eq $Phase3TestExe) { $psi.Arguments += " `"$Phase3Report`"" }
     $psi.WorkingDirectory = $tempWorkDir
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
@@ -173,8 +194,8 @@ foreach ($testBin in @($SmokeTestExe, $Phase1TestExe, $Phase2TestExe)) {
     $psi.CreateNoWindow = $true
 
     $proc = [System.Diagnostics.Process]::Start($psi)
-    $tOut = $proc.StandardOutput.ReadToEnd().Trim()
-    $tErr = $proc.StandardError.ReadToEnd().Trim()
+    $outTask = $proc.StandardOutput.ReadToEndAsync()
+    $errTask = $proc.StandardError.ReadToEndAsync()
     $completed = $proc.WaitForExit(120000)
 
     if (-not $completed) {
@@ -182,6 +203,8 @@ foreach ($testBin in @($SmokeTestExe, $Phase1TestExe, $Phase2TestExe)) {
         throw "$(Split-Path -Leaf $testBin) excedió el tiempo máximo de 120 segundos."
     }
 
+    $tOut = $outTask.GetAwaiter().GetResult().Trim()
+    $tErr = $errTask.GetAwaiter().GetResult().Trim()
     if ($proc.ExitCode -ne 0) {
         throw "$(Split-Path -Leaf $testBin) falló (ExitCode=$($proc.ExitCode)): $tOut $tErr"
     }
@@ -196,7 +219,7 @@ $clangVer    = ((& $ClangPP --version) | Select-Object -First 1).Trim()
 
 if (-not [string]::IsNullOrWhiteSpace($ReportJsonPath)) {
     $reportObj = [ordered]@{
-        phase         = "Fase 2 — Runtime y Manifiesto (SessionManager + ManifestManager)"
+        phase         = "Fase 3 $([char]0x2014) JobObjects y PMGuard; regresion 0B, 1 y 2"
         timestamp_utc = (Get-Date).ToUniversalTime().ToString("o")
         toolchain     = [ordered]@{
             name             = "llvm-mingw 20261104 (UCRT x86_64)"
@@ -219,42 +242,10 @@ if (-not [string]::IsNullOrWhiteSpace($ReportJsonPath)) {
                 sha256     = $test2Sha256
             }
         }
-        modules_implemented = @(
-            "src/runtime/session_manager.h",
-            "src/runtime/session_manager.cpp",
-            "src/runtime/manifest_manager.h",
-            "src/runtime/manifest_manager.cpp",
-            "src/runtime/runtime_module.h",
-            "src/core/main.cpp",
-            "tests/test_phase2_runtime.cpp"
-        )
-        scenarios_verified = [ordered]@{
-            "1_session_creation"                                      = $true
-            "2_guid_generation_unique"                                = $true
-            "3_manifest_creation_in_temp"                             = $true
-            "4_operation_registration"                                = $true
-            "5_write_ahead_persistence_before_modify"                 = $true
-            "6_operation_and_session_state_transitions"               = $true
-            "7_read_and_reconstruct_after_process_restart"            = $true
-            "8_real_process_crash_before_modify"                      = $true
-            "9_real_process_crash_after_intent_before_rename_skipped" = $true
-            "10_real_process_crash_after_rename_before_state"         = $true
-            "11_real_process_crash_after_simulated_junction"          = $true
-            "12_real_process_crash_after_simulated_registry"          = $true
-            "13_partial_restoration_and_retry_recovery"               = $true
-            "14_idempotent_repeated_rollback_execution"               = $true
-            "15_corrupt_truncated_and_forged_manifest_reject"         = $true
-            "16_backup_preservation_on_error_and_preexisting"         = $true
-            "17_audit_kill_job_effective_first_order_lifo"            = $true
-            "18_audit_reg_file_backup_manifest_and_synthetic_hkcu"    = $true
-            "19_audit_preserve_reg_backup_on_restore_failure"         = $true
-            "20_audit_pmg_open_active_session_without_usb"            = $true
-            "21_audit_no_automatic_orphan_recovery_on_pm_start"       = $true
-            "22_audit_preserve_all_backups_on_errors"                 = $true
-            "23_audit_reject_session_deletion_with_pending_ops"       = $true
-            "foreign_temp_files_preserved"                            = $true
-            "phase0_and_phase1_regression_passed"                     = $true
-        }
+        phase3_runtime = (Get-Content -LiteralPath $Phase3Report -Raw | ConvertFrom-Json)
+        phase3_evidence_path = $Phase3Report
+        regression_suites = @("test_phase0_smoke", "test_phase1_core", "test_phase2_runtime")
+        regression_status = "passed"
         status        = "passed"
     }
 

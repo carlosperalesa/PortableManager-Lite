@@ -1,0 +1,52 @@
+{
+  "run_id": 43126954771,
+  "url": "https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43126954771",
+  "head_sha": "34b665ebd12bed73bdf52b52af1cc1b9e5f3b774",
+  "artifact_id": 13903760891,
+  "artifact_archive_sha256": "496bd1cce0f957bb2b07ac8ecc877df151d3f79528c8ad5783498baf25866a73",
+  "artifact_member": "build/phase3_windows_20261112T002430740.json",
+  "original_payload": {
+    "phase": 3,
+    "platform": "native_windows",
+    "scenarios": [
+      {
+        "name": "normal_once_active_guard_blocked_cpu_children_foreign",
+        "status": "failed"
+      },
+      {
+        "name": "abrupt_pm_death_children_terminated",
+        "status": "failed"
+      },
+      {
+        "name": "guard_death_pm_still_responsible",
+        "status": "failed"
+      },
+      {
+        "name": "source_folder_loss_then_pm_crash",
+        "status": "failed"
+      },
+      {
+        "name": "simultaneous_children_exit",
+        "status": "failed"
+      },
+      {
+        "name": "kill_on_last_job_handle_close",
+        "status": "passed"
+      },
+      {
+        "name": "kill_failure_stops_restoration",
+        "status": "passed"
+      },
+      {
+        "name": "launch_after_cleanup_rejected",
+        "status": "passed"
+      },
+      {
+        "name": "invalid_id_duplicate_job_missing_executable",
+        "status": "passed"
+      }
+    ],
+    "status": "failed"
+  },
+  "diagnosis": "Original logs report zero guard CPU for all five failing lifecycle groups but no per-step failure diagnostics. Root cause not yet established by that report alone."
+}

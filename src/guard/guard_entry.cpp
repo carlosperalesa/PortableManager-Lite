@@ -1,24 +1,41 @@
 #include "guard/guard_entry.h"
-
+#include "guard/guard_process.h"
+#include "runtime/session_manager.h"
 #include <windows.h>
-#include <cstdio>
+#include <limits>
 
 namespace pm::guard {
-
-int RunGuardMode(std::wstring_view session_id, std::wstring_view pm_handle_arg) noexcept {
-    if (session_id.empty()) {
-        std::fwprintf(stderr, L"[PMGuard] Error: SessionID vacio en modo --guard.\n");
-        return 2;
+namespace {
+HANDLE ParseHandle(std::wstring_view text) {
+    if (text.empty()) return nullptr;
+    ULONG_PTR number = 0;
+    for (wchar_t c : text) {
+        if (c < L'0' || c > L'9' || number > (std::numeric_limits<ULONG_PTR>::max() - (c - L'0')) / 10)
+            return nullptr;
+        number = number * 10 + (c - L'0');
     }
-
-    // Fase 0: Verificación de arranque e invocación del modo --guard.
-    // La lógica completa de espera bloqueante (WaitForSingleObject), Mutex y limpieza crítica
-    // se integra en las Fases 2 y 3.
-    std::wprintf(L"[PMGuard] Fase 0 OK | SessionID=%.*s | HandleArg=%.*s\n",
-                 static_cast<int>(session_id.size()), session_id.data(),
-                 static_cast<int>(pm_handle_arg.size()),
-                 pm_handle_arg.empty() ? L"NONE" : pm_handle_arg.data());
-    return 0;
+    return reinterpret_cast<HANDLE>(number);
 }
-
-} // namespace pm::guard
+}
+int RunGuardMode(std::wstring_view session_id, std::wstring_view pm_handle_arg,
+                 std::wstring_view ready_handle_arg) {
+    if (!pm::runtime::SessionManager::IsValidSessionId(session_id)) return 2;
+    HANDLE parent = ParseHandle(pm_handle_arg);
+    HANDLE ready = ParseHandle(ready_handle_arg);
+    if (!parent || !ready || parent == ready) return 2;
+    const DWORD parent_id = ::GetProcessId(parent);
+    if (!parent_id || parent_id == ::GetCurrentProcessId()) return 2;
+    pm::runtime::SessionManager session;
+    if (!session.OpenExistingSession(session_id).ok) return 3;
+    const std::wstring temp = pm::runtime::SessionManager::QuerySystemTempDir();
+    if (temp.empty() || !::SetCurrentDirectoryW(temp.c_str())) return 4;
+    // Never scan for old sessions. Only open the active session supplied by PM.
+    if (!::SetEvent(ready)) return 5;
+    ::CloseHandle(ready);
+    const DWORD waited = ::WaitForSingleObject(parent, INFINITE);
+    ::CloseHandle(parent);
+    if (waited != WAIT_OBJECT_0) return 6;
+    DWORD error = ERROR_SUCCESS;
+    return CleanupSession(session, error) ? 0 : 7;
+}
+}

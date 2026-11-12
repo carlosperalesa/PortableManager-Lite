@@ -1,7 +1,7 @@
 # Estado de Implementación Nativa (C++20) — PortableManager Lite
 
-**Fecha:** 11 de noviembre de 2026  
-**Fase actual:** Fase 2 (`SessionManager` y `ManifestManager`) auditada y aprobada (`passed`, 23/23 escenarios). Esperando autorización para iniciar la **Fase 3 — JobObjects y PMGuard**.
+**Fecha:** 12 de noviembre de 2026
+**Fase actual:** Fase 2 (`SessionManager` y `ManifestManager`) auditada y aprobada (`passed`, 23/23 escenarios). **Fase 3 autorizada e implementada; compilación cruzada y suites Windows `passed` (Fase 3: 9/9 grupos, regresiones 0B/1/2), aprobación humana pendiente.**
 
 ---
 
@@ -19,7 +19,7 @@
     - [`src/runtime/manifest_manager.h`](src/runtime/manifest_manager.h) y [`src/runtime/manifest_manager.cpp`](src/runtime/manifest_manager.cpp) (`ManifestManager`: protocolo *write-ahead* con estados unificados `INTENT_RECORDED`, `APPLIED`, `ROLLED_BACK`, `FAILED`, `SKIPPED`; registro de `KILL_JOB` como última operación de preparación y primera operación efectiva en rollback LIFO; soporte de respaldo del registro mediante archivos `.reg` validados dentro de la sesión en `%TEMP%`; manifiesto sin `PmRootPath` ni dependencia del USB; e integridad verificada con `FormatSignature=PM_SESSION_MANIFEST_V1` y `EndMarker=EOF_OK`).
     - Suite ampliada a **23 escenarios** (16 base + 7 de auditoría final) con caídas reales de procesos hijos (`TerminateProcess`) y claves sintéticas en `HKCU` en [`tests/test_phase2_runtime.cpp`](tests/test_phase2_runtime.cpp).
   - Evidencia registrada en [reports/rebuild_runtime.json](reports/rebuild_runtime.json) (histórico), [reports/rebuild_runtime_audit.json](reports/rebuild_runtime_audit.json) (auditoría) y consolidada en [`fase02/`](fase02).
-- [ ] **Fase 3:** JobObjects y PMGuard (`JobManager`, `PMGuard`, carpeta `fase03/`).
+- [ ] **Fase 3:** implementación de JobManager, GuardProcess, espera bloqueante y limpieza serializada realizada; validación Windows 9/9 y regresiones 0B/1/2 `passed`; aprobación humana pendiente. Véase `fase03/IMPLEMENTACION_FASE_3.md` y `reports/fase03_actions_43130358371.json`. No se inició Fase 4.
 - [ ] **Fase 4:** Directory Junctions (`JunctionManager`, carpeta `fase04/`).
 - [ ] **Fase 5:** Registro Win32 (`RegistryManager`, carpeta `fase05/`).
 - [ ] **Fase 6:** Aprendizaje Ligero (`LearningEngine`, carpeta `fase06/`).

@@ -1,0 +1,337 @@
+{
+  "schema_version": 1,
+  "audit_type": "Fase 3 — Auditoria fisica USB y validacion nativa en Windows",
+  "timestamp_local": "2026-11-11T22:58:00-03:00",
+  "timestamp_utc": "2026-11-12T01:58:00Z",
+  "repository": {
+    "branch": "feat/fase03-jobobjects-pmguard",
+    "base_commit_validated": "b4be9de6b8ef342ddee4243af5ca89fa5b8d53c3",
+    "code_commit": "46ab7b90257d485de1e93aa85140f5e1451e8529",
+    "pr_number": 2
+  },
+  "toolchain": {
+    "name": "llvm-mingw 20261104 (UCRT x86_64)",
+    "compiler_version": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+    "target": "x86_64-w64-windows-gnu",
+    "relative_path": "tools/toolchains/llvm-mingw/bin/clang++.exe",
+    "compile_flags": [
+      "-std=c++20",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-DUNICODE",
+      "-D_UNICODE",
+      "-DWIN32_LEAN_AND_MEAN",
+      "-DNOMINMAX",
+      "-municode",
+      "-static",
+      "-Wl,-Xlink=-swaprun:cd"
+    ]
+  },
+  "usb_device": {
+    "drive_letter": "E:",
+    "drive_type": "Removable (2)",
+    "bus_type": "USB",
+    "friendly_name": "Generic Flash Disk",
+    "file_system": "NTFS",
+    "size_bytes": 8052011008,
+    "free_space_bytes": 8023564288,
+    "initial_user_files_count": 0,
+    "test_directory": "E:\\PM_Lite_Fase03_Test"
+  },
+  "pe_verification": {
+    "pm_exe": {
+      "size_bytes": 900096,
+      "sha256": "20A9FF76826746664BD1F068813EC24B4752BA83D4C4EFC6C0876E94EA8FEA5C",
+      "machine": "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+      "characteristics": "0x422 (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP)",
+      "swaprun_cd_0x400": true,
+      "external_toolchain_dlls": [],
+      "imported_dlls": [
+        "KERNEL32.dll",
+        "ole32.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll"
+      ]
+    },
+    "test_phase3_guard_exe": {
+      "size_bytes": 945664,
+      "sha256": "FC62532585C0A4A16FB36C2C88D8F9BF759CC0268A7A4B55A5E0B3540FC63E12",
+      "swaprun_cd_0x400": true
+    }
+  },
+  "section_6a_local_build_and_regressions": {
+    "status": "passed",
+    "report_path": "reports/fase03_windows_local_20261111.json",
+    "phase3_raw_report_path": "build/phase3_windows_20261111T224916582.json",
+    "suites": {
+      "test_phase0_smoke": "passed",
+      "test_phase1_core": "passed",
+      "test_phase2_runtime_23_scenarios": "passed",
+      "test_phase3_guard_9_groups": "passed"
+    },
+    "phase3_local_sessions": [
+      {
+        "scenario": "normal_once_active_guard_blocked_cpu_children_foreign",
+        "session_id": "ee9c83f7-7b68-470f-a8e0-20f93adeb05f",
+        "status": "passed",
+        "job_name": "Local\\PM_Job_36_ee9c83f7-7b68-470f-a8e0-20f93adeb05f_synthetic",
+        "job_initial_active_processes": 2,
+        "job_member_pids": [16184, 3344],
+        "job_final_active_processes": 0,
+        "guard_cpu_100ns_1200ms": 0,
+        "manifest_initial_state": "ACTIVE",
+        "manifest_final_state": "CLEANED",
+        "operation_final_state": "ROLLED_BACK",
+        "outsider_process_terminated": false
+      },
+      {
+        "scenario": "abrupt_pm_death_children_terminated",
+        "session_id": "6810ce16-9987-471f-a5cc-fc76a9cacd92",
+        "status": "passed",
+        "job_name": "Local\\PM_Job_36_6810ce16-9987-471f-a5cc-fc76a9cacd92_synthetic",
+        "job_initial_active_processes": 2,
+        "job_member_pids": [14492, 8904],
+        "job_final_active_processes": 0,
+        "owner_exit_code": 77,
+        "guard_exit_code": 0,
+        "guard_cpu_100ns_1200ms": 0,
+        "manifest_initial_state": "ACTIVE",
+        "manifest_final_state": "CLEANED",
+        "operation_final_state": "ROLLED_BACK",
+        "outsider_process_terminated": false
+      },
+      {
+        "scenario": "guard_death_pm_still_responsible",
+        "session_id": "4f4e1b74-aa4a-4447-aaf3-19888a6c14ab",
+        "status": "passed",
+        "job_name": "Local\\PM_Job_36_4f4e1b74-aa4a-4447-aaf3-19888a6c14ab_synthetic",
+        "job_initial_active_processes": 2,
+        "job_member_pids": [4252, 5816],
+        "job_final_active_processes": 0,
+        "guard_exit_code": 88,
+        "owner_exit_code": 0,
+        "manifest_initial_state": "ACTIVE",
+        "manifest_final_state": "CLEANED",
+        "operation_final_state": "ROLLED_BACK",
+        "outsider_process_terminated": false
+      },
+      {
+        "scenario": "source_folder_loss_then_pm_crash",
+        "session_id": "89318c7d-bbf6-4bf0-bd9f-285977dcd91c",
+        "status": "passed",
+        "job_name": "Local\\PM_Job_36_89318c7d-bbf6-4bf0-bd9f-285977dcd91c_synthetic",
+        "job_initial_active_processes": 2,
+        "job_member_pids": [11712, 14992],
+        "job_final_active_processes": 0,
+        "owner_exit_code": 77,
+        "guard_exit_code": 0,
+        "manifest_initial_state": "ACTIVE",
+        "manifest_final_state": "CLEANED",
+        "operation_final_state": "ROLLED_BACK",
+        "outsider_process_terminated": false
+      },
+      {
+        "scenario": "simultaneous_children_exit",
+        "session_id": "8634dd08-25a7-4c5d-9742-18fccee7f5fd",
+        "status": "passed",
+        "job_name": "Local\\PM_Job_36_8634dd08-25a7-4c5d-9742-18fccee7f5fd_synthetic",
+        "job_initial_active_processes": 2,
+        "job_member_pids": [8272, 12336],
+        "job_final_active_processes": 0,
+        "owner_exit_code": 0,
+        "guard_exit_code": 0,
+        "manifest_initial_state": "ACTIVE",
+        "manifest_final_state": "CLEANED",
+        "operation_final_state": "ROLLED_BACK",
+        "outsider_process_terminated": false
+      }
+    ]
+  },
+  "section_6b_6c_6d_usb_execution": {
+    "status": "failed",
+    "report_path": "build/phase3_usb_automated.json",
+    "diagnostics_path": "build/phase3_usb_automated.json.diagnostics.txt",
+    "direct_usb_probes": {
+      "test_phase0_smoke_against_usb_pm": {
+        "status": "passed",
+        "cwd": "%TEMP%",
+        "resolved_root": "E:\\PM_Lite_Fase03_Test"
+      },
+      "pm_smoke_test_from_usb": {
+        "status": "passed",
+        "cwd": "%TEMP%",
+        "output": "[PM] SMOKE_OK | Version=0.2.2 | Root=E:\\PM_Lite_Fase03_Test | ConfigPath=E:\\PM_Lite_Fase03_Test\\Data\\config.ini"
+      },
+      "pm_session_probe_from_usb": {
+        "status": "passed",
+        "session_id": "1cba5f60-6dd3-4326-9e3a-a1c930773e8f",
+        "manifest_final_state": "CLEANED"
+      },
+      "pm_job_probe_from_usb": {
+        "status": "passed",
+        "session_id": "ccfa89e3-85a7-46e7-82a5-b4e139153bd9",
+        "job_name": "Local\\PM_Job_36_ccfa89e3-85a7-46e7-82a5-b4e139153bd9_probe",
+        "manifest_final_state": "CLEANED",
+        "operation_final_state": "ROLLED_BACK"
+      }
+    },
+    "usb_phase3_suite_scenarios": [
+      {
+        "name": "normal_once_active_guard_blocked_cpu_children_foreign",
+        "session_id": "1e8cf971-9a88-4043-ab5e-f647979879f2",
+        "status": "passed",
+        "job_name": "Local\\PM_Job_36_1e8cf971-9a88-4043-ab5e-f647979879f2_synthetic",
+        "job_initial_active_processes": 2,
+        "job_member_pids": [9284, 5048],
+        "job_final_active_processes": 0,
+        "guard_cpu_100ns_1200ms": 0,
+        "manifest_initial_state": "ACTIVE",
+        "manifest_final_state": "CLEANED",
+        "operation_final_state": "ROLLED_BACK",
+        "outsider_process_terminated": false,
+        "win32_error": 0
+      },
+      {
+        "name": "abrupt_pm_death_children_terminated",
+        "session_id": "64740da2-ccde-418a-b845-8bc980379ae8",
+        "status": "failed",
+        "failed_step": "start_guard",
+        "job_name": "Local\\PM_Job_36_64740da2-ccde-418a-b845-8bc980379ae8_synthetic",
+        "job_initial_active_processes": 0,
+        "job_final_active_processes": 0,
+        "manifest_state": "PREPARING",
+        "operation_state": "APPLIED",
+        "win32_error": 225,
+        "win32_error_symbol": "ERROR_VIRUS_INFECTED",
+        "cause": "Windows Defender Real-Time Protection (Trojan:Win32/Bearfoos.A!ml, ThreatID 2147731250) blocked CopyFileW from E:\\PM_Lite_Fase03_Test\\pm.exe to %TEMP%\\PortableManager\\Session\\64740da2-ccde-418a-b845-8bc980379ae8\\pm-guard.exe and quarantined pm.exe."
+      },
+      {
+        "name": "guard_death_pm_still_responsible",
+        "session_id": "9be94225-e8f9-4afd-9ea3-626309d37b53",
+        "status": "failed",
+        "failed_step": "start_guard",
+        "job_name": "Local\\PM_Job_36_9be94225-e8f9-4afd-9ea3-626309d37b53_synthetic",
+        "job_initial_active_processes": 0,
+        "job_final_active_processes": 0,
+        "manifest_state": "PREPARING",
+        "operation_state": "APPLIED",
+        "win32_error": 225,
+        "win32_error_symbol": "ERROR_VIRUS_INFECTED"
+      },
+      {
+        "name": "source_folder_loss_then_pm_crash",
+        "session_id": "889e2f38-3d87-4e0d-80bc-d4f13f54d7b1",
+        "status": "failed",
+        "failed_step": "start_guard",
+        "job_name": "Local\\PM_Job_36_889e2f38-3d87-4e0d-80bc-d4f13f54d7b1_synthetic",
+        "job_initial_active_processes": 0,
+        "job_final_active_processes": 0,
+        "manifest_state": "PREPARING",
+        "operation_state": "APPLIED",
+        "win32_error": 225,
+        "win32_error_symbol": "ERROR_VIRUS_INFECTED"
+      },
+      {
+        "name": "simultaneous_children_exit",
+        "session_id": "f789959e-b3ec-4260-8b9c-31d5e2166fa8",
+        "status": "failed",
+        "failed_step": "start_guard",
+        "job_name": "Local\\PM_Job_36_f789959e-b3ec-4260-8b9c-31d5e2166fa8_synthetic",
+        "job_initial_active_processes": 0,
+        "job_final_active_processes": 0,
+        "manifest_state": "PREPARING",
+        "operation_state": "APPLIED",
+        "win32_error": 225,
+        "win32_error_symbol": "ERROR_VIRUS_INFECTED"
+      },
+      {
+        "name": "kill_on_last_job_handle_close",
+        "status": "passed",
+        "win32_error": 0
+      },
+      {
+        "name": "kill_failure_stops_restoration",
+        "status": "passed",
+        "win32_error": 0
+      },
+      {
+        "name": "launch_after_cleanup_rejected",
+        "status": "passed",
+        "win32_error": 0
+      },
+      {
+        "name": "invalid_id_duplicate_job_missing_executable",
+        "status": "passed",
+        "win32_error": 0
+      }
+    ]
+  },
+  "section_7_physical_usb_disconnection": {
+    "scenario_1_pm_disappears_after_origin_loss": {
+      "status": "blocked",
+      "reason": "Windows Defender Real-Time Protection quarantined E:\\PM_Lite_Fase03_Test\\pm.exe and %TEMP%\\PortableManager\\Session\\<SessionID>\\pm-guard.exe as Trojan:Win32/Bearfoos.A!ml (ThreatID 2147731250, Win32 error 225 ERROR_VIRUS_INFECTED) when copying pm.exe from the removable USB drive E: to %TEMP%. Because modifying global Windows security settings is prohibited by audit rules, physical disconnection test was halted before requesting manual USB removal."
+    },
+    "scenario_2_usb_disappears_while_pm_stays_alive": {
+      "status": "blocked",
+      "architectural_finding": "Phase 3 does not implement an active origin/volume loss detector (such as WM_DEVICECHANGE / volume handle notification) while PM remains alive; PMGuard waits strictly on WaitForSingleObject(parent, INFINITE) and explicitly must not clean while PM is alive. In addition, execution from E: is blocked by Windows Defender ERROR_VIRUS_INFECTED (225)."
+    }
+  },
+  "win32_errors_observed": [
+    {
+      "code": 225,
+      "symbol": "ERROR_VIRUS_INFECTED",
+      "context": "GuardProcess::Start -> CopyFileW(E:\\PM_Lite_Fase03_Test\\pm.exe, %TEMP%\\PortableManager\\Session\\<SessionID>\\pm-guard.exe)",
+      "defender_threat_id": 2147731250,
+      "defender_threat_name": "Trojan:Win32/Bearfoos.A!ml"
+    },
+    {
+      "code": 5,
+      "symbol": "ERROR_ACCESS_DENIED",
+      "context": "Injected synthetic failure in kill_failure_stops_restoration (expected test condition)"
+    },
+    {
+      "code": 50,
+      "symbol": "ERROR_NOT_SUPPORTED",
+      "context": "Phase 3 CleanupSession rejection of future-phase DELETE_DIR operation in kill_failure_stops_restoration (expected test condition)"
+    },
+    {
+      "code": 183,
+      "symbol": "ERROR_ALREADY_EXISTS",
+      "context": "Duplicate Job name collision check in invalid_id_duplicate_job_missing_executable (expected test condition)"
+    },
+    {
+      "code": 5023,
+      "symbol": "ERROR_INVALID_STATE",
+      "context": "Launch after cleanup rejection in launch_after_cleanup_rejected (expected test condition)"
+    }
+  ],
+  "remaining_test_files": {
+    "usb_e": [
+      "E:\\PM_Lite_Fase03_Test\\test_phase3_guard.exe"
+    ],
+    "host_temp_sessions_preserved_for_diagnosis": [
+      "%TEMP%\\PortableManager\\Session\\ccfa89e3-85a7-46e7-82a5-b4e139153bd9\\session.ini",
+      "%TEMP%\\PortableManager\\Session\\64740da2-ccde-418a-b845-8bc980379ae8\\session.ini",
+      "%TEMP%\\PortableManager\\Session\\64740da2-ccde-418a-b845-8bc980379ae8\\controller-diagnostic.txt",
+      "%TEMP%\\PortableManager\\Session\\889e2f38-3d87-4e0d-80bc-d4f13f54d7b1\\session.ini",
+      "%TEMP%\\PortableManager\\Session\\889e2f38-3d87-4e0d-80bc-d4f13f54d7b1\\controller-diagnostic.txt",
+      "%TEMP%\\PortableManager\\Session\\9be94225-e8f9-4afd-9ea3-626309d37b53\\session.ini",
+      "%TEMP%\\PortableManager\\Session\\9be94225-e8f9-4afd-9ea3-626309d37b53\\controller-diagnostic.txt",
+      "%TEMP%\\PortableManager\\Session\\f789959e-b3ec-4260-8b9c-31d5e2166fa8\\session.ini",
+      "%TEMP%\\PortableManager\\Session\\f789959e-b3ec-4260-8b9c-31d5e2166fa8\\controller-diagnostic.txt"
+    ],
+    "active_test_processes_remaining": 0
+  },
+  "phase_3_approval_ready": false,
+  "next_phase_started": false
+}

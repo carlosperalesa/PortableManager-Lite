@@ -1,0 +1,153 @@
+{
+  "schema_version": 2,
+  "audit_type": "Fase 3 — Investigacion Defender, deteccion de perdida del volumen de origen y validacion en USB E:",
+  "timestamp_local": "2026-11-11T23:39:00-03:00",
+  "timestamp_utc": "2026-11-12T02:39:00Z",
+  "repository": {
+    "branch": "feat/fase03-jobobjects-pmguard",
+    "base_commit_validated": "b4be9de6b8ef342ddee4243af5ca89fa5b8d53c3",
+    "code_commit": "46ab7b90257d485de1e93aa85140f5e1451e8529",
+    "pr_number": 2
+  },
+  "toolchain": {
+    "name": "llvm-mingw 20261104 (UCRT x86_64)",
+    "compiler_version": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+    "target": "x86_64-w64-windows-gnu",
+    "relative_path": "tools/toolchains/llvm-mingw/bin/clang++.exe",
+    "compile_flags": [
+      "-std=c++20",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-DUNICODE",
+      "-D_UNICODE",
+      "-DWIN32_LEAN_AND_MEAN",
+      "-DNOMINMAX",
+      "-municode",
+      "-static",
+      "-Wl,-Xlink=-swaprun:cd"
+    ]
+  },
+  "defender_forensic_investigation": {
+    "threat_name": "Trojan:Win32/Bearfoos.A!ml",
+    "threat_id": 2147731250,
+    "category_id": 8,
+    "severity_id": 5,
+    "engine_version": "AM: 1.1.26100.4",
+    "platform_version": "4.18.26100.4",
+    "security_intelligence_version": "1.463.246.0",
+    "did_threat_execute": false,
+    "win32_error_observed": 225,
+    "win32_error_symbol": "ERROR_VIRUS_INFECTED",
+    "historical_detections": [
+      {
+        "detection_id": "{8D38879F-0C7E-4CB9-8DEF-D72614476AF8}",
+        "detection_time_local": "2026-11-11T22:55:28-03:00",
+        "detection_type": "Concreto (ML Heuristic)",
+        "process_name": "E:\\PM_Lite_Fase03_Test\\test_phase3_guard.exe",
+        "resources": [
+          "file:_C:\\Users\\carlo\\AppData\\Local\\Temp\\PortableManager\\Session\\64740da2-ccde-418a-b845-8bc980379ae8\\pm-guard.exe",
+          "file:_C:\\Users\\carlo\\AppData\\Local\\Temp\\PortableManager\\Session\\889e2f38-3d87-4e0d-80bc-d4f13f54d7b1\\pm-guard.exe",
+          "file:_C:\\Users\\carlo\\AppData\\Local\\Temp\\PortableManager\\Session\\9be94225-e8f9-4afd-9ea3-626309d37b53\\pm-guard.exe",
+          "file:_C:\\Users\\carlo\\AppData\\Local\\Temp\\PortableManager\\Session\\f789959e-b3ec-4260-8b9c-31d5e2166fa8\\pm-guard.exe"
+        ]
+      },
+      {
+        "detection_id": "{E4BEA47B-E7AE-49A9-8029-904832C8}",
+        "detection_time_local": "2026-11-11T22:56:00-03:00",
+        "detection_type": "FastPath (Local Hash Cache)",
+        "process_name": "C:\\Windows\\System32\\svchost.exe",
+        "resources": [
+          "file:_E:\\PM_Lite_Fase03_Test\\pm.exe"
+        ]
+      },
+      {
+        "detection_id": "{18FAD07A-6F13-49A9-AC99-93D7E05EB006}",
+        "detection_time_local": "2026-11-11T22:56:54-03:00",
+        "detection_type": "FastPath (Local Hash Cache)",
+        "process_name": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+        "resources": [
+          "file:_D:\\OneDrive\\GitHub\\PML\\PortableManager-Lite\\build\\pm.exe"
+        ]
+      }
+    ],
+    "binary_integrity_verification": {
+      "previous_pm_exe_sha256": "20A9FF76826746664BD1F068813EC24B4752BA83D4C4EFC6C0876E94EA8FEA5C",
+      "previous_pm_exe_size_bytes": 900096,
+      "previous_test_phase3_guard_sha256_internal": "FC62532585C0A4A16FB36C2C88D8F9BF759CC0268A7A4B55A5E0B3540FC63E12",
+      "previous_test_phase3_guard_sha256_usb": "FC62532585C0A4A16FB36C2C88D8F9BF759CC0268A7A4B55A5E0B3540FC63E12",
+      "internal_and_usb_binaries_identical": true,
+      "tampering_or_compromise_detected": false,
+      "diagnosis": "Falso positivo heuristico ML (!ml) sobre el binario MinGW estatico sin recursos VERSIONINFO ni firma Authenticode al copiarse desde un volumen extraible USB (E:) a %TEMP% y lanzarse con CREATE_NO_WINDOW. La deteccion FastPath identica sobre E:\\PM_Lite_Fase03_Test\\pm.exe y build\\pm.exe demuestra que ambos binarios tenian exactamente el mismo hash SHA-256 (20A9FF76826746664BD1F068813EC24B4752BA83D4C4EFC6C0876E94EA8FEA5C) sin alteracion externa."
+    }
+  },
+  "updated_binaries": {
+    "pm_exe": {
+      "size_bytes": 903168,
+      "sha256_internal": "EDDDB8491CF7B6A4D9E9D3F761A5E5CFAA95CAFA7F1182BD296072EE6772A3DB",
+      "sha256_usb": "EDDDB8491CF7B6A4D9E9D3F761A5E5CFAA95CAFA7F1182BD296072EE6772A3DB",
+      "machine": "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+      "swaprun_cd_0x400": true,
+      "external_toolchain_dlls": [],
+      "defender_detections_on_new_binary": 0
+    },
+    "test_phase3_guard_exe": {
+      "size_bytes": 951296,
+      "sha256_internal": "98F61DE0B1B3AE44354355080C514BF53ECFF007291BE7C8A946712F20E7B74F",
+      "sha256_usb": "98F61DE0B1B3AE44354355080C514BF53ECFF007291BE7C8A946712F20E7B74F",
+      "machine": "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+      "swaprun_cd_0x400": true,
+      "defender_detections_on_new_binary": 0
+    }
+  },
+  "origin_loss_detection_implementation": {
+    "functions_added": [
+      "pm::guard::IsOriginAccessible(const std::wstring& pm_executable)",
+      "pm::guard::WaitForReleaseOrOriginLoss(const std::wstring& pm_executable, HANDLE release_event, DWORD timeout_ms, DWORD& error)"
+    ],
+    "mechanism": "Ventana popup oculta de nivel superior + RegisterDeviceNotificationW (DBT_DEVTYP_DEVICEINTERFACE sobre GUID_DEVINTERFACE_VOLUME) + MsgWaitForMultipleObjects con tajada pasiva de 200 ms + comprobacion sin retener handles abiertos en el USB (GetFileAttributesW + GetVolumeInformationW).",
+    "holds_open_handles_on_usb": false,
+    "cpu_overhead": "negligible (~0%)",
+    "requires_services_or_drivers": false
+  },
+  "internal_disk_validation": {
+    "test_phase0_smoke": "passed",
+    "test_phase1_core": "passed",
+    "test_phase2_runtime_23_scenarios": "passed",
+    "test_phase3_guard_11_scenarios": "passed",
+    "evidence_json": "reports/fase03_windows_final_20261111.json"
+  },
+  "usb_execution_validation": {
+    "drive": "E:\\PM_Lite_Fase03_Test",
+    "test_phase0_smoke_against_usb": "passed",
+    "pm_smoke_test_from_temp_cwd": "passed",
+    "pm_session_probe_from_usb": "passed",
+    "pm_job_probe_from_usb": "passed",
+    "test_phase3_guard_11_scenarios_from_usb": {
+      "normal_once_active_guard_blocked_cpu_children_foreign": "passed",
+      "abrupt_pm_death_children_terminated": "passed",
+      "guard_death_pm_still_responsible": "passed",
+      "source_folder_loss_then_pm_crash": "passed",
+      "origin_loss_while_pm_alive_triggers_critical_cleanup": "passed",
+      "pm_crash_during_critical_cleanup_guard_recovers": "passed",
+      "simultaneous_children_exit": "passed",
+      "kill_on_last_job_handle_close": "passed",
+      "kill_failure_stops_restoration": "passed",
+      "launch_after_cleanup_rejected": "passed",
+      "invalid_id_duplicate_job_missing_executable": "passed",
+      "summary": "11/11 passed (0 Defender detections, 0 Win32 errors)"
+    },
+    "evidence_json": "build/phase3_usb_final_20261111.json"
+  },
+  "physical_usb_disconnection_test": {
+    "status": "not_run",
+    "prepared_and_ready_for_manual_extraction": true,
+    "notes": "No se afirma que eliminar una carpeta sintética equivalga a desconectar fisicamente un USB. El procedimiento supervisado desde disco interno esta preparado y detenido antes de la extraccion manual, a la espera de autorizacion y desconexion fisica por parte del usuario."
+  },
+  "phase_3_approval_evaluation": {
+    "automated_suites_ready": true,
+    "physical_usb_disconnect_verified": false,
+    "phase_3_approval_ready": false
+  }
+}

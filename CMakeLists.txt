@@ -52,7 +52,13 @@ set(PM_RUNTIME_SOURCES
     src/runtime/session_manager.cpp
 )
 
+set(PM_GUARD_SOURCES
+    src/jobs/job_manager.cpp
+    src/guard/guard_process.cpp
+)
+
 add_executable(pm
+    ${PM_GUARD_SOURCES}
     src/core/main.cpp
     src/guard/guard_entry.cpp
     ${PM_CORE_SOURCES}
@@ -114,3 +120,15 @@ target_link_libraries(test_phase2_runtime PRIVATE
     ole32
 )
 add_test(NAME Phase2_RuntimeTest COMMAND test_phase2_runtime $<TARGET_FILE:pm>)
+
+add_executable(test_phase3_guard
+    tests/test_phase3_guard.cpp
+    ${PM_CORE_SOURCES}
+    ${PM_RUNTIME_SOURCES}
+    ${PM_GUARD_SOURCES}
+)
+target_include_directories(test_phase3_guard PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_options(test_phase3_guard PRIVATE "-Wl,-Xlink=-swaprun:cd")
+target_link_libraries(test_phase3_guard PRIVATE kernel32 user32 advapi32 ole32)
+add_test(NAME Phase3_GuardTest COMMAND test_phase3_guard $<TARGET_FILE:pm> "${CMAKE_CURRENT_BINARY_DIR}/phase3_windows_runtime.json")
+set_tests_properties(Phase3_GuardTest PROPERTIES TIMEOUT 120)

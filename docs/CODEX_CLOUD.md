@@ -1,11 +1,11 @@
 # Entorno de desarrollo cloud — PortableManager Lite
 
-Este documento prepara un entorno reproducible para continuar el desarrollo sin depender del PC local. No inicia la Fase 3 ni modifica decisiones arquitectónicas.
+Este documento prepara un entorno reproducible para continuar el desarrollo sin depender del PC local. No inicia fases por sí mismo ni modifica decisiones arquitectónicas. La Fase 3 fue autorizada por el propietario y su implementación ya pasó las suites Windows en Actions 43130358371 y espera revisión final; Fase 4 no está autorizada.
 
 ## Entornos y responsabilidades
 
 - **Codex Cloud (Linux):** instala LLVM-MinGW portable, compila de forma cruzada para Windows x64 e inspecciona el ejecutable PE. No ejecuta los binarios Win32.
-- **GitHub Actions (Windows):** descarga el mismo LLVM-MinGW portable, compila con `build.ps1` y ejecuta las suites de regresión de Fase 0B, Fase 1 y Fase 2.
+- **GitHub Actions (Windows):** descarga el mismo LLVM-MinGW portable, compila con `build.ps1` y ejecuta las suites de regresión de Fase 0B, Fase 1 y Fase 2, más la nueva suite de Fase 3.
 - **GitHub:** conserva fuentes, documentación, scripts e informes. El toolchain y los binarios generados permanecen fuera del repositorio.
 
 ## Toolchain fijado
@@ -54,7 +54,7 @@ El bootstrap no requiere administrador y no modifica `PATH`, Registro ni variabl
 El workflow `.github/workflows/portablemanager-ci.yml` ejecuta dos trabajos:
 
 1. `cross-compile-linux`: compilación cruzada en `ubuntu-22.04` e inspección de arquitectura AMD64, `SWAPRUN:CD` y ausencia de DLL externas del toolchain.
-2. `native-windows-tests`: compilación y ejecución en `windows-2022` de las suites ya existentes de Fase 0B, Fase 1 y Fase 2. Publica `reports/ci_windows_native.json` y los binarios como artefacto temporal de CI.
+2. `native-windows-tests`: compilación y ejecución en `windows-2022` de las suites de Fase 0B, Fase 1, Fase 2 y Fase 3. Publica `reports/ci_windows_native.json` y los binarios como artefacto temporal de CI.
 
 Los artefactos de CI se conservan 14 días. No se sube el toolchain al repositorio.
 
@@ -64,7 +64,7 @@ Los artefactos de CI se conservan 14 días. No se sube el toolchain al repositor
 - No repetir pruebas históricas sin una razón técnica; CI es una nueva regresión del estado actual del código.
 - No modificar datos reales del anfitrión, HKLM ni dispositivos USB.
 - Mantener todas las rutas de configuración del proyecto relativas a la raíz correspondiente; los scripts resuelven sus ubicaciones desde su propio directorio, no desde el CWD.
-- No iniciar Fase 3 automáticamente. La autorización del propietario sigue siendo obligatoria.
+- No iniciar Fase 4 automáticamente. Cada nueva fase requiere autorización expresa.
 - No fusionar Pull Requests ni cambiar `main` sin autorización expresa.
 
 ## Diagnóstico
@@ -72,3 +72,18 @@ Los artefactos de CI se conservan 14 días. No se sube el toolchain al repositor
 - Si el digest del release no coincide con `tools/toolchain.lock.json`, detener la instalación: no actualizar el hash para hacer pasar la descarga.
 - Si la compilación cruzada pasa y el trabajo Windows falla, usar el log Windows como evidencia; no sustituirlo por el resultado Linux.
 - Si Codex Cloud no dispone de `apt-get` o permisos para instalar dependencias, registrar el bloqueo y utilizar un entorno Ubuntu 22.04 con CMake, Ninja, curl, jq y xz ya disponibles.
+
+## Validación de la entrega de Fase 3
+
+No reinstalar el toolchain si ya está disponible. En Windows, con LLVM-MinGW
+portable existente, ejecutar desde la raíz:
+
+```powershell
+./build.ps1 -ReportJsonPath reports/rebuild_guard_windows_20261112_run01.json
+```
+
+Elegir una ruta nueva si el informe ya existe. El script compila y ejecuta las
+cuatro suites; el detalle de Fase 3 se guarda con timestamp en `build/phase3_windows_*.json`.
+El workflow de CI también recoge esas evidencias en sus artefactos. Alternativa
+con CMake configurado para Windows: `ctest --test-dir build --output-on-failure`.
+No ejecutar CTest sobre los PE desde Linux ni atribuirles un resultado `passed`.
