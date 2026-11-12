@@ -23,6 +23,7 @@ constexpr DWORD kCooperativeExit = 37;
 std::wstring self;
 std::wstring pm_exe;
 ULONGLONG fast_elapsed = 0;
+ULONGLONG fast_job_exit = 0;
 
 void Check(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(std::string(message) +
@@ -182,6 +183,10 @@ void LaunchWorker(Child& child, const std::wstring& event, bool cooperative,
     Check(::WaitForSingleObject(ready.value, 10000) == WAIT_OBJECT_0, "wait for worker window");
 }
 
+ULONGLONG FileTicks(const FILETIME& time) {
+    return (static_cast<ULONGLONG>(time.dwHighDateTime) << 32) | time.dwLowDateTime;
+}
+
 void CloseMode(Mode mode, bool cooperative, DWORD expected) {
     Fixture fixture;
     SessionManager session;
@@ -195,6 +200,8 @@ void CloseMode(Mode mode, bool cooperative, DWORD expected) {
     LaunchWorker(managed, EventName(fixture.id, L"_managed"), cooperative, &job);
     LaunchWorker(outsider, EventName(fixture.id, L"_outsider"), true, nullptr);
     const auto start = ::GetTickCount64();
+    FILETIME started{};
+    ::GetSystemTimeAsFileTime(&started);
     const auto result = CleanupEngine::Run(session, mode);
     const auto elapsed = ::GetTickCount64() - start;
     Check(result.ok, "close and restore");
@@ -202,7 +209,12 @@ void CloseMode(Mode mode, bool cooperative, DWORD expected) {
     Check(::WaitForSingleObject(outsider.info.hProcess, 0) == WAIT_TIMEOUT, "leave outsider alive");
     if (mode == Mode::Fast) {
         fast_elapsed = elapsed;
-        Check(elapsed >= pm::cleanup::kFastGraceMs - 16 && elapsed < 3000, "apply fast cooperative deadline");
+        FILETIME created{}, exited{}, kernel{}, user{};
+        Check(::GetProcessTimes(managed.info.hProcess, &created, &exited, &kernel, &user) &&
+              FileTicks(exited) >= FileTicks(started), "read controlled process exit time");
+        fast_job_exit = (FileTicks(exited) - FileTicks(started)) / 10000;
+        Check(fast_job_exit >= pm::cleanup::kFastGraceMs - 16 && fast_job_exit < 1500,
+              "enforce the fast cooperative deadline independently of restoration time");
     }
     fixture.CheckRestored(fixture.target);
     Check(!fs::exists(fixture.session_dir) && !fs::exists(fixture.log) &&
@@ -430,6 +442,7 @@ int wmain(int argc, wchar_t** argv) {
         run("live_pm_synthetic_origin_loss", [] { Emergency(false); });
         run("pmguard_recovers_abandoned_cleanup", [] { Emergency(true); });
         evidence << "\n  },\n  \"fast_total_ms\": " << fast_elapsed
+                 << ",\n  \"fast_job_exit_ms\": " << fast_job_exit
                  << ",\n  \"physical_usb_disconnect\": \"not_run\",\n  \"status\": \""
                  << (failures ? "failed" : "passed") << "\"\n}\n";
         return failures ? 1 : 0;

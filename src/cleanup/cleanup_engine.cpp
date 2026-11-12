@@ -116,7 +116,10 @@ void CooperativeClose(const std::vector<ManifestOperation>& operations, DWORD gr
 Result Execute(SessionManager& session, Mode mode, Artifacts artifacts,
                guard::GuardProcess* guard, bool recovering, bool managed_shadow) {
     const auto fail = [](const std::vector<Pending>& pending) {
-        return Result{false, pending.front().error, WriteLog(pending)};
+        const auto failure = std::find_if(pending.begin(), pending.end(), [](const Pending& item) {
+            return item.error != ERROR_IO_PENDING;
+        });
+        return Result{false, failure != pending.end() ? failure->error : ERROR_IO_PENDING, WriteLog(pending)};
     };
     const auto& path = session.manifest_path();
     if (path.empty()) return {false, ERROR_INVALID_STATE, ERROR_SUCCESS};
