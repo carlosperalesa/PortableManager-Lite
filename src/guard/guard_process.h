@@ -34,8 +34,7 @@ OriginWaitResult WaitForReleaseOrOriginLoss(const std::wstring &pm_executable,
                                             HANDLE release_event,
                                             DWORD timeout_ms,
                                             DWORD &error) noexcept;
-// Both PM's explicit shutdown and PMG use this path. Only KILL_JOB is enabled
-// in phase 3: unsupported future operations fail closed, preserving their
-// backups.
+// Both PM's explicit shutdown and PMG use this path. Controlled Jobs stop
+// before any managed junction is removed or backup restored.
 bool CleanupSession(pm::runtime::SessionManager &session, DWORD &error);
 } // namespace pm::guard
