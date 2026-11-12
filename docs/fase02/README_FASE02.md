@@ -5,17 +5,17 @@
 
 ---
 
-## Contenido de la Carpeta `fase02/`
+## Contenido de la Carpeta `docs/fase02/`
 
-Esta carpeta consolida toda la documentación técnica, evidencias JSON y ejemplos verificables de la **Fase 2 (Runtime y Manifiesto)** siguiendo la convención de dos dígitos (`fase01/` .. `fase08/`):
+Esta carpeta consolida toda la documentación técnica, evidencias JSON y ejemplos verificables de la **Fase 2 (Runtime y Manifiesto)** siguiendo la convención de dos dígitos (`docs/fase01/` .. `docs/fase08/`):
 
-1. [`README_FASE02.md`](README_FASE02.md) — Índice descriptivo de la carpeta `fase02/`.
-2. [`IMPLEMENTACION_FASE_2.md`](IMPLEMENTACION_FASE_2.md) — Especificación e implementación detallada de [`SessionManager`](../src/runtime/session_manager.h) y [`ManifestManager`](../src/runtime/manifest_manager.h).
+1. [`README_FASE02.md`](README_FASE02.md) — Índice descriptivo de la carpeta `docs/fase02/`.
+2. [`IMPLEMENTACION_FASE_2.md`](IMPLEMENTACION_FASE_2.md) — Especificación e implementación detallada de [`SessionManager`](../../src/runtime/session_manager.h) y [`ManifestManager`](../../src/runtime/manifest_manager.h).
 3. [`INFORME_DE_AUDITORIA.md`](INFORME_DE_AUDITORIA.md) — Informe detallado de la Auditoría Final de Fase 2 (orden de `KILL_JOB`, estrategia `.reg`, sesiones huérfanas, manifiesto sin dependencia del USB, estados unificados y pruebas adicionales).
 4. [`rebuild_runtime.json`](rebuild_runtime.json) — Copia histórica intacta del primer informe JSON de Fase 2 (16 escenarios).
 5. [`rebuild_runtime_audit.json`](rebuild_runtime_audit.json) — Informe JSON resultante de la Auditoría Final de Fase 2 (23 escenarios).
-6. [`ejemplo_session_manifest.ini`](ejemplo_session_manifest.ini) — Ejemplo completo y válido de manifiesto `session.ini` sin `PmRootPath`, con respaldo `.reg` en `%TEMP%` y `KILL_JOB` como última operación de preparación.
-7. [`ejemplo_uso_runtime.cpp`](ejemplo_uso_runtime.cpp) — Ejemplo C++20 compilable sin advertencias (`-Wall -Wextra -Werror`) que comprueba todos los retornos y preserva respaldos ante cualquier fallo.
+6. [`ejemplo_session_manifest.ini`](ejemplo_session_manifest.ini) — Ejemplo documental de manifiesto `session.ini` sin `PmRootPath`, con respaldo `.reg` en `%TEMP%` y `KILL_JOB` como última operación de preparación.
+7. [`ejemplo_uso_runtime.cpp`](ejemplo_uso_runtime.cpp) — Demostración C++20 independiente que comprueba los retornos y preserva respaldos ante fallos.
 8. Copias consolidadas de la documentación general al cierre de Fase 2:
    - [`IMPLEMENTACION_PM_LITE.md`](IMPLEMENTACION_PM_LITE.md)
    - [`PLAN_DE_PRUEBAS.md`](PLAN_DE_PRUEBAS.md)

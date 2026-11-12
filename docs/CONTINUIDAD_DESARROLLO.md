@@ -7,16 +7,16 @@
 
 ## 1. Documentos y Evidencias del Proyecto
 
-- **Auditoría e inventario inicial:** [AUDITORIA_CONTINUIDAD.md](file:///d:/Data/AUDITORIA_CONTINUIDAD.md)
-- **Plan de PoC:** [PLAN_POC_PM_LITE.md](file:///d:/Data/PLAN_POC_PM_LITE.md)
-- **Resultados de PoC (Fases 1 a 5):** [RESULTADOS_POC_PM_LITE.md](file:///d:/Data/RESULTADOS_POC_PM_LITE.md)
-- **Resultados con aplicaciones reales (D1, D2, D3):** [RESULTADOS_APLICACIONES_REALES.md](file:///d:/Data/RESULTADOS_APLICACIONES_REALES.md) y [RESULTADOS_D1_D3.md](file:///d:/Data/PM_Lite_FinalValidation/RESULTADOS_D1_D3.md)
+- **Auditoría e inventario inicial:** [AUDITORIA_CONTINUIDAD.md](AUDITORIA_CONTINUIDAD.md)
+- **Plan de PoC:** [PLAN_POC_PM_LITE.md](PLAN_POC_PM_LITE.md)
+- **Resultados de PoC (Fases 1 a 5):** [RESULTADOS_POC_PM_LITE.md](RESULTADOS_POC_PM_LITE.md)
+- **Resultados con aplicaciones reales (D1, D2, D3):** [RESULTADOS_APLICACIONES_REALES.md](RESULTADOS_APLICACIONES_REALES.md) y [RESULTADOS_D1_D3.md](../PM_Lite_FinalValidation/RESULTADOS_D1_D3.md)
 - **Reportes JSON independientes de cada PoC:**
-  - Fase 1 (Runtime y PMGuard): [poc_fase1_runtime_pmguard.json](file:///d:/Data/PM_Lite_FinalValidation/reports/poc_fase1_runtime_pmguard.json)
-  - Fase 2 (Directory Junction): [poc_fase2_junction.json](file:///d:/Data/PM_Lite_FinalValidation/reports/poc_fase2_junction.json)
-  - Fase 3 (Registro Win32): [poc_fase3_registro.json](file:///d:/Data/PM_Lite_FinalValidation/reports/poc_fase3_registro.json)
-  - Fase 4 (Aprendizaje ligero): [poc_fase4_aprendizaje.json](file:///d:/Data/PM_Lite_FinalValidation/reports/poc_fase4_aprendizaje.json)
-  - Fase 5 (Integración y 3 cierres): [poc_fase5_integracion.json](file:///d:/Data/PM_Lite_FinalValidation/reports/poc_fase5_integracion.json)
+  - Fase 1 (Runtime y PMGuard): [poc_fase1_runtime_pmguard.json](../PM_Lite_FinalValidation/reports/poc_fase1_runtime_pmguard.json)
+  - Fase 2 (Directory Junction): [poc_fase2_junction.json](../PM_Lite_FinalValidation/reports/poc_fase2_junction.json)
+  - Fase 3 (Registro Win32): [poc_fase3_registro.json](../PM_Lite_FinalValidation/reports/poc_fase3_registro.json)
+  - Fase 4 (Aprendizaje ligero): [poc_fase4_aprendizaje.json](../PM_Lite_FinalValidation/reports/poc_fase4_aprendizaje.json)
+  - Fase 5 (Integración y 3 cierres): [poc_fase5_integracion.json](../PM_Lite_FinalValidation/reports/poc_fase5_integracion.json)
 
 ---
 
@@ -30,8 +30,8 @@
 5. **Aprendizaje ligero acotado y recetas con rutas relativas:** Verificado en Fase 4 extrayendo metadatos PE (`version.dll`), comparando baseline vs. cierre en candidatos acotados, generando recetas con rutas estrictamente relativas (Regla 11) y conservando intactos los cambios concurrentes no atribuibles.
 6. **Tres modos de cierre (Normal, Rápido, Crítico) y registro `%TEMP%\pmlog`:** Verificados en Fase 5, incluyendo la conservación intacta de respaldos `.pmbkp` y la escritura de `%TEMP%\pmlog` (sin extensión, solo rutas y errores) cuando ocurre un fallo de restauración.
 
-### 2.2 Decisiones técnicas que requieren ajuste o precisión en la documentación normativa (`PMDocs/`)
-1. **Actualizar `PMDocs/` de `v0.2.1` / `v1.1` a `v0.2.2` / `v1.2`:**
+### 2.2 Decisiones técnicas que requieren ajuste o precisión en la documentación normativa ([`docs/PMDocs/`](PMDocs/))
+1. **Actualizar `docs/PMDocs/` de `v0.2.1` / `v1.1` a `v0.2.2` / `v1.2`:**
    - Sustituir en la sección de Prioridad 3 de `v0.2.1` y `v1.1` la copia/movimiento físico de perfiles al anfitrión por el mecanismo validado de **Directory Junctions (`IO_REPARSE_TAG_MOUNT_POINT`)**.
    - Incorporar la regla del archivo **`%TEMP%\pmlog`** (sin extensión) cuando quedan respaldos o residuos que no pueden restaurarse con seguridad en cierre crítico.
 2. **Requisitos obligatorios al usar `RegCopyTreeW` (`advapi32.dll`):**

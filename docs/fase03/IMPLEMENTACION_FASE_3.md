@@ -2,7 +2,7 @@
 
 ## Alcance autorizado
 
-Se implementan los módulos nativos de Fase 3 descritos en `AGENTS.md`,
+Se implementan los módulos nativos de Fase 3 descritos en [`AGENTS.md`](../../AGENTS.md),
 `ARQUITECTURA_NATIVE.md` y `PLAN_DE_PRUEBAS.md`. No se implementan Junctions,
 Registro, aprendizaje, CleanupEngine ni gestión de aplicaciones (fases 4–8).
 Las PoC antiguas son antecedentes, no pruebas de esta implementación.
@@ -96,8 +96,8 @@ de cierre y PMG comparten el estado persistido y el mutex para evitar doble limp
 ## Detección de pérdida del volumen de origen con PM activo
 
 En `src/guard/guard_process.{h,cpp}` se implementan `IsOriginAccessible` y
-`WaitForReleaseOrOriginLoss` conforme a la arquitectura aprobada (`AGENTS.md` §3.5–3.6,
-`PMDocs/PortableManager-Lite-Diseno-v0.2.1.md` §23.4 y `v0.2.2` §23.3):
+`WaitForReleaseOrOriginLoss` conforme a la arquitectura aprobada ([`AGENTS.md`](../../AGENTS.md) §3.5–3.6,
+[diseño v0.2.1](../PMDocs/PortableManager-Lite-Diseno-v0.2.1.md) §23.4 y `v0.2.2` §23.3):
 
 1. `IsOriginAccessible(pm_executable)` verifica la existencia y accesibilidad del
    ejecutable de origen, su directorio contenedor (`GetFileAttributesW`) y la raíz

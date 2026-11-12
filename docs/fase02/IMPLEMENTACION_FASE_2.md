@@ -9,7 +9,7 @@
 ## 1. Módulos Implementados en `src/runtime/`
 
 ### 1.1 `SessionManager`
-- **Archivos:** [`src/runtime/session_manager.h`](../src/runtime/session_manager.h), [`src/runtime/session_manager.cpp`](../src/runtime/session_manager.cpp)
+- **Archivos:** [`src/runtime/session_manager.h`](../../src/runtime/session_manager.h), [`src/runtime/session_manager.cpp`](../../src/runtime/session_manager.cpp)
 - **Responsabilidades:**
   - Generación de `SessionID` único de 128 bits mediante `CoCreateGuid` (`ole32.dll`).
   - Creación y validación estricta de confinamiento del directorio de sesión en `%TEMP%\PortableManager\Session\<SessionID>\` obteniendo `%TEMP%` mediante `GetTempPathW`.
@@ -19,13 +19,13 @@
     - `CLEANING`: Restauración y rollback del anfitrión en curso.
     - `CLEANED`: Todas las operaciones han alcanzado un estado terminal aceptable (`ROLLED_BACK` o `SKIPPED`).
   - **Directiva sobre sesiones huérfanas (Sección 3 de Auditoría):**
-    - [`OpenExistingSession`](../src/runtime/session_manager.cpp#L118-L127) permite que PMGuard (`--guard <SessionID> <Handle>`) abra la sesión activa indicada por PM sin depender del USB.
-    - [`InitializeNewSession`](../src/runtime/session_manager.cpp#L71-L82) **no realiza recuperación ni limpieza automática** de sesiones antiguas al iniciar una nueva instancia de PM.
-    - [`DiscoverOrphanSessions`](../src/runtime/session_manager.cpp#L129-L176) es una consulta diagnóstica estrictamente pasiva (funcionalidad futura) que jamás ejecuta limpiezas ni restauraciones automáticas.
+    - [`OpenExistingSession`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/session_manager.cpp#L129) permite que PMGuard (`--guard <SessionID> <Handle>`) abra la sesión activa indicada por PM sin depender del USB.
+    - [`InitializeNewSession`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/session_manager.cpp#L72) **no realiza recuperación ni limpieza automática** de sesiones antiguas al iniciar una nueva instancia de PM.
+    - [`DiscoverOrphanSessions`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/session_manager.cpp#L140) es una consulta diagnóstica estrictamente pasiva (funcionalidad futura) que jamás ejecuta limpiezas ni restauraciones automáticas.
   - Bloqueo de transición a `CLEANED` y prohibición de borrado del directorio de sesión si cualquier operación permanece en `INTENT_RECORDED`, `APPLIED` o `FAILED`, o si queda algún respaldo `.reg` sin confirmar.
 
 ### 1.2 `ManifestManager`
-- **Archivos:** [`src/runtime/manifest_manager.h`](../src/runtime/manifest_manager.h), [`src/runtime/manifest_manager.cpp`](../src/runtime/manifest_manager.cpp)
+- **Archivos:** [`src/runtime/manifest_manager.h`](../../src/runtime/manifest_manager.h), [`src/runtime/manifest_manager.cpp`](../../src/runtime/manifest_manager.cpp)
 - **Archivo gestionado:** `%TEMP%\PortableManager\Session\<SessionID>\session.ini` (sin `PmRootPath` ni rutas del USB).
 - **Tipos de operación soportados (`OperationType`):**
   1. `KILL_JOB`
@@ -36,9 +36,9 @@
 - **Estados unificados de operación (`OperationState`):**
   - `INTENT_RECORDED` → `APPLIED` → `ROLLED_BACK` | `FAILED` | `SKIPPED`
 - **Reglas obligatorias implementadas:**
-  1. **Write-Ahead obligatorio:** [`RecordOperationIntent`](../src/runtime/manifest_manager.cpp#L483-L553) valida todos los parámetros y persiste `INTENT_RECORDED` en `session.ini` mediante [`AtomicFile::WriteUtf8Text`](../src/core/atomic_file.cpp) **antes** de que se ejecute cualquier cambio en el anfitrión.
-  2. **Orden de limpieza — `KILL_JOB` primero en LIFO:** `KILL_JOB` se registra como última operación de preparación inmediatamente antes de lanzar la aplicación; `RecordOperationIntent` rechaza registrar operaciones adicionales después de `KILL_JOB`, y [`ExecutePendingRollbacks`](../src/runtime/manifest_manager.cpp#L604-L725) garantiza que `KILL_JOB` sea siempre la primera operación efectiva ejecutada durante el rollback.
-  3. **Respaldo del registro mediante archivos `.reg`:** Para `RESTORE_REG`, registra `RegKeyPath` (`HKCU\Software\...`), `BackupPath` (archivo `.reg` en el directorio de sesión en `%TEMP%`) y `OriginalExisted`. [`ValidateRegBackupFile`](../src/runtime/manifest_manager.cpp#L243-L315) verifica que el archivo `.reg` exista, esté completo, contenga cabecera válida (`Windows Registry Editor Version 5.00`) y termine en salto de línea antes de permitir el registro.
+  1. **Write-Ahead obligatorio:** [`RecordOperationIntent`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/manifest_manager.cpp#L637) valida todos los parámetros y persiste `INTENT_RECORDED` en `session.ini` mediante [`AtomicFile::WriteUtf8Text`](../../src/core/atomic_file.cpp) **antes** de que se ejecute cualquier cambio en el anfitrión.
+  2. **Orden de limpieza — `KILL_JOB` primero en LIFO:** `KILL_JOB` se registra como última operación de preparación inmediatamente antes de lanzar la aplicación; `RecordOperationIntent` rechaza registrar operaciones adicionales después de `KILL_JOB`, y [`ExecutePendingRollbacks`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/manifest_manager.cpp#L788) garantiza que `KILL_JOB` sea siempre la primera operación efectiva ejecutada durante el rollback.
+  3. **Respaldo del registro mediante archivos `.reg`:** Para `RESTORE_REG`, registra `RegKeyPath` (`HKCU\Software\...`), `BackupPath` (archivo `.reg` en el directorio de sesión en `%TEMP%`) y `OriginalExisted`. [`ValidateRegBackupFile`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/manifest_manager.cpp#L281) verifica que el archivo `.reg` exista, esté completo, contenga cabecera válida (`Windows Registry Editor Version 5.00`) y termine en salto de línea antes de permitir el registro.
   4. **Preservación de respaldos (`.pmbkp` y `.reg`):** Si la restauración falla, la operación queda en `FAILED` y el respaldo correspondiente (`.pmbkp` o `.reg`) **jamás se elimina**.
 
 ---

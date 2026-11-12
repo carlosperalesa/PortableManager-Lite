@@ -2,7 +2,7 @@
 
 **Fecha:** 11 de noviembre de 2026  
 **Alcance:** Consolidación de las pruebas con aplicaciones reales (`D1` FirefoxPortable, `D2` SumatraPDF y `D3` PuTTY) sin repetir las pruebas ya aprobadas.  
-**Informe detallado de las sesiones D1 y D3:** [RESULTADOS_D1_D3.md](file:///d:/Data/PM_Lite_FinalValidation/RESULTADOS_D1_D3.md)
+**Informe detallado de las sesiones D1 y D3:** [RESULTADOS_D1_D3.md](../PM_Lite_FinalValidation/RESULTADOS_D1_D3.md)
 
 ---
 
@@ -10,9 +10,9 @@
 
 | Aplicación | Prueba | Paquete / Hash SHA-256 | Estado Funcional | Clasificación de Privacidad | Evidencia Principal |
 |---|---|---|---|---|---|
-| **FirefoxPortable 160.0** | `D1` | `FirefoxPortable_160.0_English.paf.exe` (`99D406A460EF79B1815980A66649D294ABBB82C103F2013192E81B829A88B7DA`, Authenticode `Valid`) | Aprobada (2 sesiones GUI, perfil en USB) | **Amarillo** (requiere receta complementaria para 23 valores HKCU con ruta USB) | [d1_firefoxportable.json](file:///d:/Data/PM_Lite_FinalValidation/reports/d1_firefoxportable.json), [d1_residue_recipe.md](file:///d:/Data/PM_Lite_FinalValidation/reports/d1_residue_recipe.md) |
-| **SumatraPDF** | `D2` | *(Validada en fase histórica previa)* | Aprobada (comunicada en historial) | **Verde** | [RESULTADOS_D1_D3.md](file:///d:/Data/PM_Lite_FinalValidation/RESULTADOS_D1_D3.md) |
-| **PuTTY 0.85** | `D3` | `putty.zip` (`E0B36E5381ECC78DD06A291BAB25FB9D95BC991D0D864CF2741A5BDE82816668`, `PUTTY.EXE` Release 0.85) | Aprobada (2 sesiones GUI, persistencia y restauración de registro) | **Amarillo** (registro restaurado en Verde; JumpList `CustomDestinations` requiere receta de archivo) | [d3_putty.json](file:///d:/Data/PM_Lite_FinalValidation/reports/d3_putty.json), [d3_recent_file_attribution.json](file:///d:/Data/PM_Lite_FinalValidation/reports/d3_recent_file_attribution.json) |
+| **FirefoxPortable 160.0** | `D1` | `FirefoxPortable_160.0_English.paf.exe` (`99D406A460EF79B1815980A66649D294ABBB82C103F2013192E81B829A88B7DA`, Authenticode `Valid`) | Aprobada (2 sesiones GUI, perfil en USB) | **Amarillo** (requiere receta complementaria para 23 valores HKCU con ruta USB) | [d1_firefoxportable.json](../PM_Lite_FinalValidation/reports/d1_firefoxportable.json), [d1_residue_recipe.md](../PM_Lite_FinalValidation/reports/d1_residue_recipe.md) |
+| **SumatraPDF** | `D2` | *(Validada en fase histórica previa)* | Aprobada (comunicada en historial) | **Verde** | [RESULTADOS_D1_D3.md](../PM_Lite_FinalValidation/RESULTADOS_D1_D3.md) |
+| **PuTTY 0.85** | `D3` | `putty.zip` (`E0B36E5381ECC78DD06A291BAB25FB9D95BC991D0D864CF2741A5BDE82816668`, `PUTTY.EXE` Release 0.85) | Aprobada (2 sesiones GUI, persistencia y restauración de registro) | **Amarillo** (registro restaurado en Verde; JumpList `CustomDestinations` requiere receta de archivo) | [d3_putty.json](../PM_Lite_FinalValidation/reports/d3_putty.json), [d3_recent_file_attribution.json](../PM_Lite_FinalValidation/reports/d3_recent_file_attribution.json) |
 
 ---
 

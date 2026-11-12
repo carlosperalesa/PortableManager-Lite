@@ -2,7 +2,7 @@
 
 **Fecha:** 11 de noviembre de 2026  
 **Estado Definitivo de Fase 0 / 0B:** `passed`  
-**Informe JSON Oficial (C++20 Nativo):** [reports/fase0b_native.json](reports/fase0b_native.json) y [PM_Lite_FinalValidation/reports/fase0b_native.json](PM_Lite_FinalValidation/reports/fase0b_native.json)  
+**Informe JSON Oficial (C++20 Nativo):** [reports/fase0b_native.json](../reports/fase0b_native.json) y [PM_Lite_FinalValidation/reports/fase0b_native.json](../PM_Lite_FinalValidation/reports/fase0b_native.json)
 **Evaluación del Toolchain:** [EVALUACION_TOOLCHAIN_PORTABLE.md](EVALUACION_TOOLCHAIN_PORTABLE.md)
 
 ---
@@ -18,13 +18,13 @@ Para evitar cualquier contradicción documental entre fases intermedias, se deja
    - Se descargó desde el repositorio oficial (`https://github.com/mstorsjo/llvm-mingw/releases/tag/20261104`) el paquete portable `llvm-mingw-20261104-ucrt-x86_64.zip` (Clang 23.1.5, UCRT, Windows x86_64) en `tools/toolchains/llvm-mingw/`, verificando su hash SHA-256 (`552191b5754c49a5a20723276a6fc56541ea1922c4c50b7b669022333fc1b40f`) contra el digest oficial de GitHub Releases.
 3. **Fase 0B — Adopción Oficial de LLVM-MinGW y Compilación C++20 Nativa (`passed`):**
    - Se adoptó `tools/toolchains/llvm-mingw/bin/clang++.exe` como compilador oficial C++20 para el ejecutable definitivo `pm.exe` (descartando C# y MSVC para el binario final).
-   - Se compiló y validó `build/pm.exe` desde [`src/core/main.cpp`](src/core/main.cpp) y [`src/guard/guard_entry.cpp`](src/guard/guard_entry.cpp), superando todas las verificaciones de [`tests/test_phase0_smoke.cpp`](tests/test_phase0_smoke.cpp) y de `llvm-readobj.exe`.
+   - Se compiló y validó `build/pm.exe` desde [`src/core/main.cpp`](../src/core/main.cpp) y [`src/guard/guard_entry.cpp`](../src/guard/guard_entry.cpp), superando todas las verificaciones de [`tests/test_phase0_smoke.cpp`](../tests/test_phase0_smoke.cpp) y de `llvm-readobj.exe`.
 
 ---
 
 ## 2. Configuración del Compilador y Características PE Verificadas
 
-### 2.1 Flags de Compilación C++20 en [`build.ps1`](build.ps1) y [`CMakeLists.txt`](CMakeLists.txt)
+### 2.1 Flags de Compilación C++20 en [`build.ps1`](../build.ps1) y [`CMakeLists.txt`](../CMakeLists.txt)
 ```text
 -std=c++20 -O2 -Wall -Wextra -Werror -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNOMINMAX -municode -static "-Wl,-Xlink=-swaprun:cd"
 ```
@@ -59,7 +59,7 @@ Para evitar cualquier contradicción documental entre fases intermedias, se deja
 
 ## 3. Pruebas Ejecutadas en Fase 0B (`passed`)
 
-Ejecutado [`build.ps1`](build.ps1) invocándolo desde `C:\` (fuera del directorio del proyecto):
+Ejecutado [`build.ps1`](../build.ps1) invocándolo desde `C:\` (fuera del directorio del proyecto):
 1. **Compilación limpia (`clean_build_succeeded = true`):** `pm.exe` y `test_phase0_smoke.exe` compilados desde cero con `-Wall -Wextra -Werror` sin advertencias.
 2. **Arranque y salida normal (`normal_start_and_exit_code_0 = true`):** `pm.exe` inició, imprimió su raíz resuelta por `GetModuleFileNameW` y finalizó con código `0`.
 3. **Ejecución independiente del CWD (`execution_from_different_cwd_temp = true`):** Lanzado con `lpCurrentDirectory = %TEMP%`, `pm.exe --smoke-test` resolvió `Root=D:\Data\build` mediante `GetModuleFileNameW`.

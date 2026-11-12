@@ -4,7 +4,7 @@
 **Fecha:** 11 de noviembre de 2026\
 **Estado:** diseño normativo consolidado con validación empírica aprobada.\
 **Documentos base:** `PortableManager-Lite-Diseno-v0.1-base.md` y `PortableManager-Lite-Diseno-v0.2.1.md`.\
-**Evidencias técnicas:** [AUDITORIA_CONTINUIDAD.md](file:///d:/Data/AUDITORIA_CONTINUIDAD.md), [PLAN_POC_PM_LITE.md](file:///d:/Data/PLAN_POC_PM_LITE.md), [RESULTADOS_POC_PM_LITE.md](file:///d:/Data/RESULTADOS_POC_PM_LITE.md), [RESULTADOS_APLICACIONES_REALES.md](file:///d:/Data/RESULTADOS_APLICACIONES_REALES.md) y [CONTINUIDAD_DESARROLLO.md](file:///d:/Data/CONTINUIDAD_DESARROLLO.md).
+**Evidencias técnicas:** [AUDITORIA_CONTINUIDAD.md](../AUDITORIA_CONTINUIDAD.md), [PLAN_POC_PM_LITE.md](../PLAN_POC_PM_LITE.md), [RESULTADOS_POC_PM_LITE.md](../RESULTADOS_POC_PM_LITE.md), [RESULTADOS_APLICACIONES_REALES.md](../RESULTADOS_APLICACIONES_REALES.md) y [CONTINUIDAD_DESARROLLO.md](../CONTINUIDAD_DESARROLLO.md).
 
 > **Regla de interpretación:** este documento **complementa y sustituye** las decisiones previas de v0.1 y v0.2.1 donde existan discrepancias o precisiones técnicas derivadas de las PoCs. PortableManager (PM) es la aplicación principal; PM-Desktop (PMD) es únicamente su vista temporal. Contraer PMD **nunca** equivale a cerrar PM.
 

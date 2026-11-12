@@ -2,7 +2,7 @@
 
 **Fecha:** 11 de noviembre de 2026  
 **Alcance:** Revisión y corrección de coherencia arquitectónica, código, manifiesto, ejemplos y pruebas de la Fase 2 antes de autorizar el inicio de la Fase 3 (`JobObjects` y `PMGuard`).  
-**Estado Final:** `passed` (`23/23` escenarios en [`tests/test_phase2_runtime.cpp`](../tests/test_phase2_runtime.cpp) + compilación y ejecución limpia de [`fase02/ejemplo_uso_runtime.cpp`](ejemplo_uso_runtime.cpp)).
+**Estado Final:** `passed` (`23/23` escenarios en [`tests/test_phase2_runtime.cpp`](../../tests/test_phase2_runtime.cpp) + compilación y ejecución limpia de [`docs/fase02/ejemplo_uso_runtime.cpp`](ejemplo_uso_runtime.cpp)).
 
 ---
 
@@ -12,13 +12,13 @@
 En el ejemplo documental anterior (`ejemplo_session_manifest.ini`), `KILL_JOB` aparecía registrado como `op_0001` (primera operación de preparación), lo que en un recorrido estrictamente LIFO habría provocado que `KILL_JOB` se ejecutara en último lugar.
 
 ### Corrección implementada
-1. **Regla de preparación en [`ManifestManager::RecordOperationIntent`](../src/runtime/manifest_manager.cpp#L483-L500):**
+1. **Regla de preparación en [`ManifestManager::RecordOperationIntent`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/manifest_manager.cpp#L637):**
    - `KILL_JOB` debe registrarse como la **última operación de preparación**, inmediatamente antes de iniciar la aplicación portable.
    - Si ya existe una operación `KILL_JOB` registrada en el manifiesto y se intenta registrar cualquier operación adicional de preparación (`RESTORE_BKP`, `REMOVE_JUNCTION`, `RESTORE_REG`, `DELETE_DIR`), `RecordOperationIntent` la rechaza con `ERROR_INVALID_PARAMETER`.
-2. **Garantía de ejecución en [`ManifestManager::ExecutePendingRollbacks`](../src/runtime/manifest_manager.cpp#L604-L624):**
+2. **Garantía de ejecución en [`ManifestManager::ExecutePendingRollbacks`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/manifest_manager.cpp#L788):**
    - Durante el rollback en orden inverso (LIFO), `KILL_JOB` es siempre la **primera operación efectiva** ejecutada, garantizando que todos los procesos de la sesión se cierren antes de eliminar puntos de unión (`REMOVE_JUNCTION`), restaurar respaldos (`.pmbkp` / `.reg`) o borrar directorios temporales (`DELETE_DIR`).
    - `RollbackSummary` registra en `execution_order_ids` y `execution_order_types` el orden exacto ejecutado.
-3. **Verificación:** Cubierto en el **Escenario 17** de [`tests/test_phase2_runtime.cpp`](../tests/test_phase2_runtime.cpp).
+3. **Verificación:** Cubierto en el **Escenario 17** de [`tests/test_phase2_runtime.cpp`](../../tests/test_phase2_runtime.cpp).
 
 ---
 
@@ -34,33 +34,33 @@ La validación previa de `RESTORE_REG` asumía únicamente claves hermanas `.pmb
    - **Limitaciones documentadas del mecanismo `.reg`:**
      - `reg.exe import` fusiona (*merge*) los valores del archivo `.reg` sobre la clave existente sin borrar valores adicionales creados durante la sesión; por ello es **obligatorio** eliminar primero la clave modificada con `RegDeleteTreeW` (solo después de haber validado que el archivo `.reg` existe y está completo) antes de importar el `.reg`.
      - `reg.exe export` no exporta descriptores de seguridad (ACL/DACL) personalizados de subclaves; sin embargo, para configuraciones de aplicaciones de usuario bajo `HKCU\Software\...` heredadas del perfil del usuario actual, los permisos estándar del propietario (`HKCU`) se preservan correctamente.
-     - Una exportación interrumpida podría dejar un archivo `.reg` incompleto; por ello se implementó [`ManifestManager::ValidateRegBackupFile`](../src/runtime/manifest_manager.cpp#L243-L315).
-2. **Validación de integridad del respaldo `.reg` ([`ValidateRegBackupFile`](../src/runtime/manifest_manager.cpp#L243-L315)):**
+     - Una exportación interrumpida podría dejar un archivo `.reg` incompleto; por ello se implementó [`ManifestManager::ValidateRegBackupFile`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/manifest_manager.cpp#L281).
+2. **Validación de integridad del respaldo `.reg` ([`ValidateRegBackupFile`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/manifest_manager.cpp#L281)):**
    - Comprueba que la ruta esté dentro de `%TEMP%` y tenga extensión `.reg`.
    - Comprueba que el archivo exista, sea legible, tenga tamaño válido, comience por `Windows Registry Editor Version 5.00` (o `REGEDIT4`), contenga al menos una sección `[HKEY_CURRENT_USER\Software\...]` y termine en un salto de línea completo (`\r\n` o `\n`), rechazando cualquier exportación truncada o incompleta.
 3. **Reglas en el manifiesto:**
    - Se registra `BackupPath` apuntando al archivo `.reg` en la sesión, `RegKeyPath` apuntando a `HKCU\Software\...` y `OriginalExisted` (`1` o `0`).
    - `RecordOperationIntent` rechaza `RESTORE_REG` con `OriginalExisted=1` si el archivo `.reg` no supera `ValidateRegBackupFile`.
    - Durante el rollback, el archivo `.reg` **no se elimina** hasta confirmar que la restauración concluyó con éxito. Si la restauración falla, el archivo `.reg` se conserva intacto en la carpeta de sesión y la operación se marca `FAILED`.
-4. **Verificación:** Cubierto en los **Escenarios 12, 18 y 19** de [`tests/test_phase2_runtime.cpp`](../tests/test_phase2_runtime.cpp) usando exclusivamente claves sintéticas en `HKCU\Software\PortableManager\Tests\...`.
+4. **Verificación:** Cubierto en los **Escenarios 12, 18 y 19** de [`tests/test_phase2_runtime.cpp`](../../tests/test_phase2_runtime.cpp) usando exclusivamente claves sintéticas en `HKCU\Software\PortableManager\Tests\...`.
 
 ---
 
 ## 3. Sesiones Huérfanas (Sección 3)
 
 ### Revisión y directiva aplicada
-- [`SessionManager::OpenExistingSession`](../src/runtime/session_manager.cpp#L118-L127) se utiliza exclusivamente para que PMGuard (`--guard <SessionID> <Handle>`) abra la sesión activa indicada explícitamente por PM.
-- [`SessionManager::InitializeNewSession`](../src/runtime/session_manager.cpp#L71-L82) **no realiza ningún escaneo, limpieza ni recuperación automática** de sesiones antiguas al iniciar una nueva instancia de PM.
+- [`SessionManager::OpenExistingSession`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/session_manager.cpp#L129) se utiliza exclusivamente para que PMGuard (`--guard <SessionID> <Handle>`) abra la sesión activa indicada explícitamente por PM.
+- [`SessionManager::InitializeNewSession`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/session_manager.cpp#L72) **no realiza ningún escaneo, limpieza ni recuperación automática** de sesiones antiguas al iniciar una nueva instancia de PM.
 - No se implementa recuperación posterior automática si PM y PMG desaparecen simultáneamente.
-- [`SessionManager::DiscoverOrphanSessions`](../src/runtime/session_manager.cpp#L129-L176) se mantiene únicamente como consulta diagnóstica pasiva de solo lectura (funcionalidad futura): no se invoca al iniciar PM y jamás ejecuta limpiezas ni restauraciones automáticas.
-- **Verificación:** Cubierto en los **Escenarios 20 y 21** de [`tests/test_phase2_runtime.cpp`](../tests/test_phase2_runtime.cpp).
+- [`SessionManager::DiscoverOrphanSessions`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/session_manager.cpp#L140) se mantiene únicamente como consulta diagnóstica pasiva de solo lectura (funcionalidad futura): no se invoca al iniciar PM y jamás ejecuta limpiezas ni restauraciones automáticas.
+- **Verificación:** Cubierto en los **Escenarios 20 y 21** de [`tests/test_phase2_runtime.cpp`](../../tests/test_phase2_runtime.cpp).
 
 ---
 
 ## 4. Manifiesto `session.ini` sin Dependencia del USB (Sección 4)
 
 ### Corrección implementada
-- Se eliminó `PmRootDir` / `PmRootPath` y cualquier referencia al destino en el USB (`PortableTargetRef` / `SourcePath`) tanto de [`ManifestManager::SaveToDisk`](../src/runtime/manifest_manager.cpp#L350-L386) como de [`fase02/ejemplo_session_manifest.ini`](ejemplo_session_manifest.ini).
+- Se eliminó `PmRootDir` / `PmRootPath` y cualquier referencia al destino en el USB (`PortableTargetRef` / `SourcePath`) tanto de [`ManifestManager::SaveToDisk`](https://github.com/carlosperalesa/PortableManager-Lite/blob/283a86073060ee8cdb397976ce5bbed1f18a6388/src/runtime/manifest_manager.cpp#L451) como de [`docs/fase02/ejemplo_session_manifest.ini`](ejemplo_session_manifest.ini).
 - PMGuard no necesita acceder al USB para restaurar el anfitrión:
   - `REMOVE_JUNCTION` utiliza únicamente `TargetPath` en el anfitrión (`RemoveDirectoryW` elimina el reparse point NTFS local sin acceder al volumen de destino).
   - `RESTORE_BKP` utiliza `TargetPath` y `BackupPath` (`<TargetPath>.pmbkp`) en el anfitrión.
@@ -84,7 +84,7 @@ La sesión solo puede pasar a `CLEANED` cuando **todas** las operaciones han alc
 
 ## 6. Corrección del Ejemplo C++ (Sección 6)
 
-El archivo [`fase02/ejemplo_uso_runtime.cpp`](ejemplo_uso_runtime.cpp) fue actualizado y compilado con `clang++.exe -std=c++20 -O2 -Wall -Wextra -Werror`:
+El archivo [`docs/fase02/ejemplo_uso_runtime.cpp`](ejemplo_uso_runtime.cpp) fue actualizado y compilado con `clang++.exe -std=c++20 -O2 -Wall -Wextra -Werror`:
 - Utiliza la API real de `SessionManager` y `ManifestManager`.
 - Comprueba todos los resultados (`InitializeNewSession`, `RecordOperationIntent`, `fs::rename`, `UpdateOperationState`, `TransitionState`, `ExecutePendingRollbacks`, `FinalizeSessionAndCleanupOwnFiles`).
 - Comprueba `rollbackSummary.failed_count == 0` y no ejecuta `fs::remove_all()` si existen operaciones fallidas o respaldos pendientes.
@@ -93,6 +93,6 @@ El archivo [`fase02/ejemplo_uso_runtime.cpp`](ejemplo_uso_runtime.cpp) fue actua
 
 ## 7. Organización Documental por Fase (Sección 7)
 
-- Se migró el contenido de `fase2/` a [`fase02/`](fase02) y se eliminó la carpeta antigua `fase2/`.
-- Se creó [`fase01/`](fase01) para mantener la convención de dos dígitos (`fase01/` .. `fase08/`) en todo el proyecto.
-- Se conservó intacto el informe histórico [`fase02/rebuild_runtime.json`](rebuild_runtime.json) (y [`reports/rebuild_runtime.json`](../reports/rebuild_runtime.json)) y se generó el nuevo informe de auditoría [`fase02/rebuild_runtime_audit.json`](rebuild_runtime_audit.json) (y [`reports/rebuild_runtime_audit.json`](../reports/rebuild_runtime_audit.json)).
+- Se migró el contenido de `fase2/` a [`fase02/`](./) y se eliminó la carpeta antigua `fase2/`.
+- Se creó [`fase01/`](../fase01) para mantener la convención de dos dígitos (`fase01/` .. `fase08/`) en todo el proyecto.
+- Se conservó intacto el informe histórico [`fase02/rebuild_runtime.json`](rebuild_runtime.json) (y [`reports/rebuild_runtime.json`](../../reports/rebuild_runtime.json)) y se generó el nuevo informe de auditoría [`fase02/rebuild_runtime_audit.json`](rebuild_runtime_audit.json) (y [`reports/rebuild_runtime_audit.json`](../../reports/rebuild_runtime_audit.json)).

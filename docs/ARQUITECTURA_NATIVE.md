@@ -7,7 +7,7 @@
 
 ## 1. Estructura Modular del Proyecto
 
-El código fuente nativo se organiza en nueve módulos bajo [`src/`](file:///d:/Data/src), más la suite de pruebas independientes en [`tests/`](file:///d:/Data/tests) y documentación de compilación en [`docs/`](file:///d:/Data/docs):
+El código fuente nativo se organiza en nueve módulos bajo [`src/`](../src), más la suite de pruebas independientes en [`tests/`](../tests) y documentación de compilación en [`docs/`](./):
 
 ```text
 d:\Data\

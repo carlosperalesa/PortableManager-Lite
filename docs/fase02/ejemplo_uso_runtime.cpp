@@ -1,6 +1,6 @@
 // ============================================================================
 // PortableManager Lite — Ejemplo de Uso de Fase 2 (SessionManager + ManifestManager)
-// Archivo: fase02/ejemplo_uso_runtime.cpp
+// Archivo: docs/fase02/ejemplo_uso_runtime.cpp
 // Descripción:
 //   Demuestra el ciclo de vida completo de una sesión en C++20 con:
 //   - Comprobación estricta de todos los valores de retorno.
@@ -21,9 +21,9 @@
 #include <string>
 #include <system_error>
 
-#include "../src/core/atomic_file.h"
-#include "../src/runtime/manifest_manager.h"
-#include "../src/runtime/session_manager.h"
+#include "../../src/core/atomic_file.h"
+#include "../../src/runtime/manifest_manager.h"
+#include "../../src/runtime/session_manager.h"
 
 namespace fs = std::filesystem;
 

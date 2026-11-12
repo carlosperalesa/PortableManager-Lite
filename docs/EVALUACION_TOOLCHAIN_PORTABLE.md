@@ -3,7 +3,7 @@
 **Fecha:** 11 de noviembre de 2026  
 **Estado:** Evaluación completada y verificada empíricamente.  
 **Ubicación del Toolchain:** `d:\Data\tools\toolchains\llvm-mingw\`  
-**Ubicación de la Prueba de Compatibilidad:** [tools/toolchain_probe/probe.cpp](tools/toolchain_probe/probe.cpp)
+**Ubicación de la Prueba de Compatibilidad:** [tools/toolchain_probe/probe.cpp](../tools/toolchain_probe/probe.cpp)
 
 ---
 
@@ -60,7 +60,7 @@ Configuration file: D:/Data/tools/toolchains/llvm-mingw/bin/x86_64-w64-windows-g
 
 ## 3. Prueba de Compatibilidad con PM (`tools/toolchain_probe/`)
 
-Se creó en una carpeta aislada el archivo [tools/toolchain_probe/probe.cpp](tools/toolchain_probe/probe.cpp) sin modificar `src/`, `CMakeLists.txt` ni `build.ps1`.
+Se creó en una carpeta aislada el archivo [tools/toolchain_probe/probe.cpp](../tools/toolchain_probe/probe.cpp) sin modificar `src/`, `CMakeLists.txt` ni `build.ps1`.
 
 ### 3.1 APIs y características probadas en `probe.cpp`
 1. **C++20 real (`__cplusplus == 202002L`):** `<concepts>`, `consteval`, `<string_view>`, punto de entrada Unicode `wmain(int argc, wchar_t* argv[])` con `-municode`.

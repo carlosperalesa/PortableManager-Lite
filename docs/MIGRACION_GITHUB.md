@@ -28,7 +28,9 @@ Antes de inicializar el repositorio y organizar las carpetas de fase, se creó u
 
 ## 3. Organización Documental por Fases y `AGENTS.md`
 
-- Se verificó y ubicó [`AGENTS.md`](AGENTS.md) íntegramente en la raíz del proyecto (`18,436 bytes`), conservando también [`docs/AGENTS.md`](docs/AGENTS.md).
+Esta sección registra la estructura original de la migración. Los enlaces llevan a las ubicaciones vigentes.
+
+- Se verificó y ubicó [`AGENTS.md`](../AGENTS.md) íntegramente en la raíz del proyecto (`18,436 bytes`), conservando también [`docs/AGENTS.md`](AGENTS.md).
 - Se aplicó la estructura obligatoria de dos dígitos en la raíz (`fase01/` a `fase08/`):
   - [`fase01/`](fase01): Documentación e informe JSON de Fase 1 (`README_FASE01.md`, `IMPLEMENTACION_FASE_1.md`, `rebuild_core.json`).
   - [`fase02/`](fase02): Documentación, auditoría final, informes JSON (`rebuild_runtime.json`, `rebuild_runtime_audit.json`) y ejemplos (`ejemplo_session_manifest.ini`, `ejemplo_uso_runtime.cpp`) de Fase 2. La antigua carpeta `fase2/` fue migrada sin pérdida de archivos.
@@ -39,13 +41,13 @@ Antes de inicializar el repositorio y organizar las carpetas de fase, se creó u
 ## 4. Archivos Conservados vs. Archivos Excluidos (`.gitignore`)
 
 ### Archivos conservados y publicados en GitHub
-- [`AGENTS.md`](AGENTS.md) y toda la documentación vigente de la raíz (`README.md`, `IMPLEMENTACION_PM_LITE.md`, `IMPLEMENTACION_FASE_0.md`, `EVALUACION_TOOLCHAIN_PORTABLE.md`, `DECISIONES_TECNICAS.md`, `PLAN_DE_PRUEBAS.md`, `RESULTADOS_RECONSTRUCCION.md`, `ARQUITECTURA_NATIVE.md`, etc.).
+- [`AGENTS.md`](../AGENTS.md) y toda la documentación vigente de la raíz (`README.md`, `IMPLEMENTACION_PM_LITE.md`, `IMPLEMENTACION_FASE_0.md`, `EVALUACION_TOOLCHAIN_PORTABLE.md`, `DECISIONES_TECNICAS.md`, `PLAN_DE_PRUEBAS.md`, `RESULTADOS_RECONSTRUCCION.md`, `ARQUITECTURA_NATIVE.md`, etc.).
 - Documentación funcional y de arquitectura en [`PMDocs/`](PMDocs).
-- Código fuente C++20 nativo y antecedentes C# en [`src/`](src), [`tests/`](tests) y [`tools/toolchain_probe/probe.cpp`](tools/toolchain_probe/probe.cpp).
-- Scripts y archivos de compilación reproducibles ([`build.ps1`](build.ps1), [`build_msvc.ps1`](build_msvc.ps1), [`CMakeLists.txt`](CMakeLists.txt), [`cmake/llvm-mingw-toolchain.cmake`](cmake/llvm-mingw-toolchain.cmake)).
-- Todos los informes JSON de resultados, PoCs y evidencias de fases en [`reports/`](reports), [`fase01/`](fase01), [`fase02/`](fase02) y [`PM_Lite_FinalValidation/reports/`](PM_Lite_FinalValidation/reports).
+- Código fuente C++20 nativo y antecedentes C# en [`src/`](../src), [`tests/`](../tests) y [`tools/toolchain_probe/probe.cpp`](../tools/toolchain_probe/probe.cpp).
+- Scripts y archivos de compilación reproducibles ([`build.ps1`](../build.ps1), [`build_msvc.ps1`](../build_msvc.ps1), [`CMakeLists.txt`](../CMakeLists.txt), [`cmake/llvm-mingw-toolchain.cmake`](../cmake/llvm-mingw-toolchain.cmake)).
+- Todos los informes JSON de resultados, PoCs y evidencias de fases en [`reports/`](../reports), [`fase01/`](fase01), [`fase02/`](fase02) y [`PM_Lite_FinalValidation/reports/`](../PM_Lite_FinalValidation/reports).
 
-### Archivos excluidos mediante [`.gitignore`](.gitignore) (conservados localmente en `d:\Data`)
+### Archivos excluidos mediante [`.gitignore`](../.gitignore) (conservados localmente en `d:\Data`)
 - Directorio de salida `build/` y ejecutables compilados (`*.exe`, incluyendo `build/*.exe` y `tools/toolchain_probe/probe.exe`).
 - Toolchain portable descargado en `tools/toolchains/llvm-mingw/`.
 - Instaladores y paquetes de prueba (`FirefoxPortable_160.0_English.paf.exe`, `putty.zip`, `VSCode-win32-x64-1.146.0.zip`).

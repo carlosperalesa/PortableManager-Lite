@@ -2,7 +2,7 @@
 
 **Fecha:** 11 de noviembre de 2026  
 **Estado:** Fase 0 completada; plan consolidado a partir de los informes de los Agentes A, B y C.  
-**Referencia previa:** [AUDITORIA_CONTINUIDAD.md](file:///d:/Data/AUDITORIA_CONTINUIDAD.md)
+**Referencia previa:** [AUDITORIA_CONTINUIDAD.md](AUDITORIA_CONTINUIDAD.md)
 
 ---
 

@@ -57,14 +57,14 @@ vacío un Job que todavía tuviera procesos. En su lugar, los auxiliares usan
   error Win32, inventario de miembros del Job, códigos de salida y snapshots de
   manifiesto/controlador anteriores a la contención de errores. Los artefactos
   de CI recogen estos archivos. No se relajan umbrales ni estados esperados.
-- `AGENTS.md`: se añade el PATH autorizado sin sustituir directivas y se documentan
+- [`AGENTS.md`](../../AGENTS.md): se añade el PATH autorizado sin sustituir directivas y se documentan
   `clang++`, `x86_64-w64-mingw32-clang++`, `llvm-readobj`, `cmake` y `ninja`. Se comprobó
   que el wrapper prefijado tiene target Windows y `clang++` sin target es host Linux.
 - Documentación vigente actualizada: `README.md`, `IMPLEMENTACION_PM_LITE.md`,
   `RESULTADOS_RECONSTRUCCION.md`, `PLAN_DE_PRUEBAS.md`, `docs/CODEX_CLOUD.md` y
-  `fase03/{README_FASE03.md,IMPLEMENTACION_FASE_3.md,INFORME_FASE03.md}`.
+  `docs/fase03/{README_FASE03.md,IMPLEMENTACION_FASE_3.md,INFORME_FASE03.md}`.
 - Evidencia nueva: cuatro archivos `reports/fase03_actions_<run_id>.json`; la
-  documentación de `fase03/` enlaza esos informes como fuente única.
+  documentación de `docs/fase03/` enlaza esos informes como fuente única.
 
 También se inspeccionaron `guard_process.cpp`, `guard_entry.cpp`,
 `manifest_manager.cpp` y `session_lock.h`. Los fallos reproducidos no justificaron
@@ -140,7 +140,7 @@ y no se inició Fase 4.
 
 ### 2. Resultados de compilación nativa y regresiones desde disco interno (Sección 6.A)
 
-Evidencia generada: [`reports/fase03_windows_local_20261111.json`](../reports/fase03_windows_local_20261111.json) y copia en [`fase03/fase03_windows_local_20261111.json`](fase03_windows_local_20261111.json).
+Evidencia generada: [`reports/fase03_windows_local_20261111.json`](../../reports/fase03_windows_local_20261111.json) y copia en [`fase03/fase03_windows_local_20261111.json`](fase03_windows_local_20261111.json).
 
 | Verificación / Suite | Estado | Detalle |
 |---|---|---|
@@ -152,7 +152,7 @@ Evidencia generada: [`reports/fase03_windows_local_20261111.json`](../reports/fa
 
 ### 3. Ejecución desde el pendrive USB `E:\PM_Lite_Fase03_Test\` (Secciones 6.B, 6.C y 6.D)
 
-Evidencia generada: [`reports/fase03_usb_audit_20261111.json`](../reports/fase03_usb_audit_20261111.json) y copia en [`fase03/fase03_usb_audit_20261111.json`](fase03_usb_audit_20261111.json).
+Evidencia generada: [`reports/fase03_usb_audit_20261111.json`](../../reports/fase03_usb_audit_20261111.json) y copia en [`fase03/fase03_usb_audit_20261111.json`](fase03_usb_audit_20261111.json).
 
 1. **Sondas directas desde `E:\PM_Lite_Fase03_Test\pm.exe` con CWD en `%TEMP%`:**
    - `test_phase0_smoke.exe "E:\PM_Lite_Fase03_Test\pm.exe"`: **`passed`**.
@@ -174,14 +174,14 @@ Evidencia generada: [`reports/fase03_usb_audit_20261111.json`](../reports/fase03
 ### 5. Estado de la prueba física de desconexión USB (Sección 7)
 
 - **Escenario 1 (PM desaparece después de perder el origen):** **`blocked`** en unidad física `E:` debido a la cuarentena de `pm.exe` / `pm-guard.exe` por Windows Defender (`ERROR_VIRUS_INFECTED = 225`). En simulación sintética sobre disco interno (`source_folder_loss_then_pm_crash`, sesión `89318c7d-bbf6-4bf0-bd9f-285977dcd91c`), el escenario resultó `passed`.
-- **Escenario 2 (el USB desaparece, pero PM continúa ejecutándose):** **`blocked`** para prueba física por la misma cuarentena, y **limitación arquitectónica confirmada en código**: Fase 3 no incluye un detector de pérdida de volumen/origen (como `WM_DEVICECHANGE` o vigilancia del volumen origen) mientras el proceso PM permanece vivo en memoria (respaldado por `/SWAPRUN:CD`), y `PMGuard` permanece bloqueado en `WaitForSingleObject(parent, INFINITE)` por diseño (`AGENTS.md` §3.5: *"Si PM sigue activo, PMG no limpia"*).
+- **Escenario 2 (el USB desaparece, pero PM continúa ejecutándose):** **`blocked`** para prueba física por la misma cuarentena, y **limitación arquitectónica confirmada en código**: Fase 3 no incluye un detector de pérdida de volumen/origen (como `WM_DEVICECHANGE` o vigilancia del volumen origen) mientras el proceso PM permanece vivo en memoria (respaldado por `/SWAPRUN:CD`), y `PMGuard` permanece bloqueado en `WaitForSingleObject(parent, INFINITE)` por diseño ([`AGENTS.md`](../../AGENTS.md) §3.5: *"Si PM sigue activo, PMG no limpia"*).
 
 ### 6. Archivos de prueba que permanecieron en el host y en el USB
 
 - **Procesos de prueba activos al finalizar:** `0` (ningún proceso `pm.exe`, `pm-guard.exe` ni `test_phase*.exe` quedó en ejecución).
 - **En `E:\PM_Lite_Fase03_Test\`:**
   - `E:\PM_Lite_Fase03_Test\test_phase3_guard.exe` (`945,664` bytes). `E:\PM_Lite_Fase03_Test\pm.exe` fue retirado por la cuarentena de Windows Defender.
-- **En `%TEMP%\PortableManager\Session\` (preservados para diagnóstico conforme a `AGENTS.md`):**
+- **En `%TEMP%\PortableManager\Session\` (preservados para diagnóstico conforme a [`AGENTS.md`](../../AGENTS.md)):**
   - `ccfa89e3-85a7-46e7-82a5-b4e139153bd9\session.ini` (`State=CLEANED`, de `--job-probe`).
   - `64740da2-ccde-418a-b845-8bc980379ae8\{session.ini, controller-diagnostic.txt}` (`State=PREPARING`, `last_error=225`).
   - `889e2f38-3d87-4e0d-80bc-d4f13f54d7b1\{session.ini, controller-diagnostic.txt}` (`State=PREPARING`, `last_error=225`).
@@ -197,8 +197,8 @@ En la primera pasada de auditoría local, Fase 3 quedó bloqueada en los grupos 
 ## Corrección final de Fase 3: Investigación forense de Defender, detección de pérdida del origen y validación USB (11/11 PASS) — 11 de noviembre de 2026 (23:15–23:41)
 
 **Evidencias consolidadas generadas (sin modificar evidencias históricas):**
-- Disco interno (regresiones 0B/1/2 + 11/11 grupos de Fase 3): [`reports/fase03_windows_final_20261111.json`](../reports/fase03_windows_final_20261111.json) y copia en [`fase03/fase03_windows_final_20261111.json`](fase03_windows_final_20261111.json).
-- Auditoría forense Defender + validación en pendrive USB `E:` (11/11 grupos PASS): [`reports/fase03_usb_audit_v2_20261111.json`](../reports/fase03_usb_audit_v2_20261111.json) y copia en [`fase03/fase03_usb_audit_v2_20261111.json`](fase03_usb_audit_v2_20261111.json).
+- Disco interno (regresiones 0B/1/2 + 11/11 grupos de Fase 3): [`reports/fase03_windows_final_20261111.json`](../../reports/fase03_windows_final_20261111.json) y copia en [`fase03/fase03_windows_final_20261111.json`](fase03_windows_final_20261111.json).
+- Auditoría forense Defender + validación en pendrive USB `E:` (11/11 grupos PASS): [`reports/fase03_usb_audit_v2_20261111.json`](../../reports/fase03_usb_audit_v2_20261111.json) y copia en [`fase03/fase03_usb_audit_v2_20261111.json`](fase03_usb_audit_v2_20261111.json).
 
 ### 1. Diagnóstico forense de Microsoft Defender y verificación de integridad de los ejecutables
 
@@ -218,9 +218,9 @@ Se realizó una investigación exclusivamente de solo lectura mediante `Get-MpTh
 
 ### 2. Implementación de la detección de pérdida del volumen de origen con PM vivo
 
-Conforme al comportamiento crítico definido en la arquitectura aprobada (`AGENTS.md` §3.5–3.6, `PMDocs/PortableManager-Lite-Diseno-v0.2.1.md` §23.4 y `v0.2.2` §23.3), cuando el origen desaparece mientras PM sigue operativo en memoria (gracias a `/SWAPRUN:CD`), **es PM quien debe iniciar inmediatamente el cierre crítico (`CleanupSession`)**, mientras que **`PMGuard` permanece bloqueado y solo actúa si PM desaparece inesperadamente antes o durante dicho cierre**.
+Conforme al comportamiento crítico definido en la arquitectura aprobada ([`AGENTS.md`](../../AGENTS.md) §3.5–3.6, [diseño v0.2.1](../PMDocs/PortableManager-Lite-Diseno-v0.2.1.md) §23.4 y `v0.2.2` §23.3), cuando el origen desaparece mientras PM sigue operativo en memoria (gracias a `/SWAPRUN:CD`), **es PM quien debe iniciar inmediatamente el cierre crítico (`CleanupSession`)**, mientras que **`PMGuard` permanece bloqueado y solo actúa si PM desaparece inesperadamente antes o durante dicho cierre**.
 
-Se implementaron en [`src/guard/guard_process.h`](../src/guard/guard_process.h) y [`src/guard/guard_process.cpp`](../src/guard/guard_process.cpp):
+Se implementaron en [`src/guard/guard_process.h`](../../src/guard/guard_process.h) y [`src/guard/guard_process.cpp`](../../src/guard/guard_process.cpp):
 
 1. `pm::guard::IsOriginAccessible(const std::wstring& pm_executable)`:
    - Comprueba que el ejecutable de origen existe y no es un directorio (`GetFileAttributesW`), que su directorio contenedor existe y que el volumen raíz responde (`GetVolumeInformationW`).
@@ -232,7 +232,7 @@ Se implementaron en [`src/guard/guard_process.h`](../src/guard/guard_process.h) 
 
 ### 3. Pruebas automatizadas ampliadas (11 escenarios) y resultados en disco interno y USB `E:`
 
-Se amplió [`tests/test_phase3_guard.cpp`](../tests/test_phase3_guard.cpp) de 9 a **11 escenarios**, añadiendo:
+Se amplió [`tests/test_phase3_guard.cpp`](../../tests/test_phase3_guard.cpp) de 9 a **11 escenarios**, añadiendo:
 - `origin_loss_while_pm_alive_triggers_critical_cleanup`: elimina el ejecutable y directorio de origen mientras PM está vivo **sin enviar señal de cierre (`release`)**; verifica que PM detecta `OriginLost`, ejecuta `CleanupSession` de forma idempotente, termina todos los procesos del Job (`ActiveProcesses == 0`), persiste `State=CLEANED` (`ROLLED_BACK`), `PMGuard` termina con código `0` sin doble limpieza y el proceso ajeno (`outsider`) sobrevive.
 - `pm_crash_during_critical_cleanup_guard_recovers`: simula la caída abrupta de PM (`TerminateProcess` con código `78`) **durante el cierre crítico**, después de adquirir el mutex de sesión y persistir `State=CLEANING`, pero antes de terminar el Job; verifica que `PMGuard` despierta, recupera el mutex mediante `WAIT_ABANDONED`, termina los procesos del Job (`ActiveProcesses == 0`), persiste `State=CLEANED` y preserva el proceso ajeno (`outsider`).
 
@@ -262,13 +262,13 @@ se ejecutaron con **Microsoft Defender completamente activo** (sin exclusiones, 
 
 ### 4. Estado de la validación física de desconexión del pendrive USB (`E:`) — **`passed`**
 
-- **Primera ejecución supervisada (`SessionId = 59f825c2-2f0a-488a-85af-96be0aea3a0b`):** Registrada como **`failed` por causa del arnés de consola** en [`reports/fase03_usb_physical_disconnect_20261111.json`](../reports/fase03_usb_physical_disconnect_20261111.json) (y copia en [`fase03/fase03_usb_physical_disconnect_20261111.json`](fase03_usb_physical_disconnect_20261111.json)).
+- **Primera ejecución supervisada (`SessionId = 59f825c2-2f0a-488a-85af-96be0aea3a0b`):** Registrada como **`failed` por causa del arnés de consola** en [`reports/fase03_usb_physical_disconnect_20261111.json`](../../reports/fase03_usb_physical_disconnect_20261111.json) (y copia en [`fase03/fase03_usb_physical_disconnect_20261111.json`](fase03_usb_physical_disconnect_20261111.json)).
   - **Causa raíz comprobada:** Al invocar `Start-Process` dentro de una sesión efímera de PowerShell del arnés de herramientas (`23:49:08`), el cierre del proceso de consola al terminar `-Action Prepare` (`23:49:11`) cerró el Job Object del propio arnés de ejecución (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`), terminando simultáneamente **todos** los procesos hijos creados en ese turno (`owner_pid=16316`, `guard_pid=11832`, `worker_pid=8696`, `leaf_pid=14052` e incluso `outsider_pid=16296` que corría desde el disco interno `D:`) **antes** de que el pendrive `E:` fuera retirado manualmente (`23:50:59`).
   - Se conserva íntegra la evidencia de la sesión `59f825c2-2f0a-488a-85af-96be0aea3a0b` en `%TEMP%\PortableManager\Session\59f825c2-2f0a-488a-85af-96be0aea3a0b\` y en `reports/fase03_usb_physical_disconnect_20261111.json`.
-- **Corrección aplicada en [`tools/usb_physical_disconnect_test.ps1`](../tools/usb_physical_disconnect_test.ps1):**
+- **Corrección aplicada en [`tools/usb_physical_disconnect_test.ps1`](../../tools/usb_physical_disconnect_test.ps1):**
   1. `Prepare` lanza ahora `outsider` y `owner` mediante `Invoke-CimMethod -ClassName Win32_Process -MethodName Create` (WMI), desacoplándolos del Job Object de la consola efímera para que permanezcan vivos después de que finalice el comando `Prepare`.
   2. `Verify` utiliza `[System.IO.File]::ReadAllText(...)` para evitar que `ConvertTo-Json` serialice metadatos `PSDrive`/`Provider` de PowerShell 5.1.
-- **Segunda ejecución supervisada con extracción física real del pendrive `E:` (`SessionId = ed12c050-cbf9-4e98-938e-841b03d1c1e5`):** **`passed`** — evidencia en [`reports/fase03_usb_physical_disconnect_v2_20261112.json`](../reports/fase03_usb_physical_disconnect_v2_20261112.json) y copia en [`fase03/fase03_usb_physical_disconnect_v2_20261112.json`](fase03_usb_physical_disconnect_v2_20261112.json).
+- **Segunda ejecución supervisada con extracción física real del pendrive `E:` (`SessionId = ed12c050-cbf9-4e98-938e-841b03d1c1e5`):** **`passed`** — evidencia en [`reports/fase03_usb_physical_disconnect_v2_20261112.json`](../../reports/fase03_usb_physical_disconnect_v2_20261112.json) y copia en [`fase03/fase03_usb_physical_disconnect_v2_20261112.json`](fase03_usb_physical_disconnect_v2_20261112.json).
   - **Confirmación previa a la extracción (en un turno de comando separado tras `Prepare`):**
     - `owner_pid = 4076` (`Alive = True`, ejecutándose desde `E:\PM_Lite_Fase03_Test\test_phase3_guard.exe` en memoria gracias a `/SWAPRUN:CD`, con CWD en `%TEMP%`).
     - `guard_pid = 12256` (`Alive = True`, ejecutándose desde `%TEMP%\PortableManager\Session\ed12c050-cbf9-4e98-938e-841b03d1c1e5\pm-guard.exe`, bloqueado esperando al proceso padre).
