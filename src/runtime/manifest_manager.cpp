@@ -788,7 +788,10 @@ bool ManifestManager::DefaultDeleteCreatedDir(
 RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers& handlers) {
     RollbackSummary summary{};
     session_state_ = SessionState::Cleaning;
-    SaveToDisk();
+    if (!SaveToDisk().ok) {
+        summary.failed_count = 1;
+        return summary;
+    }
 
     // Construir el orden de índices en LIFO garantizando que cualquier operación KILL_JOB
     // se ejecute siempre en primer lugar antes de restaurar carpetas, Junctions o Registro.
@@ -900,13 +903,23 @@ RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers&
             summary.failed_op_ids.push_back(op.id);
         }
 
-        SaveToDisk();
+        if (!SaveToDisk().ok) {
+            ++summary.failed_count;
+            summary.failed_op_ids.push_back(op.id);
+            return summary;
+        }
+        // Never restore resources while a controlled process might still use them.
+        if (!step_ok && op.type == OperationType::KillJob) return summary;
     }
 
     summary.all_succeeded = (summary.failed_count == 0) && AreAllOperationsTerminalAcceptable();
     if (summary.all_succeeded) {
         session_state_ = SessionState::Cleaned;
-        SaveToDisk();
+        if (!SaveToDisk().ok) {
+            session_state_ = SessionState::Cleaning;
+            summary.all_succeeded = false;
+            ++summary.failed_count;
+        }
     }
     return summary;
 }

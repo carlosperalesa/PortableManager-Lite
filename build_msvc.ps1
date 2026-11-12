@@ -80,17 +80,5 @@ if ($cmakeCmd) {
     & ctest --test-dir $BuildDir -C Release --output-on-failure
     exit $LASTEXITCODE
 } else {
-    Write-Host "Compilando directamente con MSVC (cl.exe)..."
-    $compileCmd = @"
-call "$vcvars64" >nul
-cl.exe /nologo /std:c++20 /MT /O2 /W4 /WX /utf-8 /permissive- /EHsc /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DNOMINMAX /I"$ProjectRoot\src" "$ProjectRoot\src\core\main.cpp" "$ProjectRoot\src\guard\guard_entry.cpp" /Fe:"$BuildDir\pm.exe" /Fo:"$BuildDir\" /link /SWAPRUN:CD kernel32.lib user32.lib advapi32.lib shell32.lib shlwapi.lib version.lib ole32.lib
-if errorlevel 1 exit /b 1
-cl.exe /nologo /std:c++20 /MT /O2 /W4 /WX /utf-8 /permissive- /EHsc /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DNOMINMAX /I"$ProjectRoot\src" "$ProjectRoot\tests\test_phase0_smoke.cpp" /Fe:"$BuildDir\test_phase0_smoke.exe" /Fo:"$BuildDir\" /link kernel32.lib advapi32.lib
-if errorlevel 1 exit /b 1
-"$BuildDir\test_phase0_smoke.exe" "$BuildDir\pm.exe"
-"@
-    $batFile = Join-Path $BuildDir "run_msvc_build.bat"
-    Set-Content -Path $batFile -Value $compileCmd -Encoding ASCII
-    & cmd.exe /c "`"$batFile`""
-    exit $LASTEXITCODE
+    throw "La compilacion MSVC requiere CMake para incluir todos los modulos y suites. Usa el toolchain oficial LLVM-MinGW con build.ps1 o proporciona CMake; no se instalaran herramientas."
 }

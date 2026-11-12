@@ -3,6 +3,8 @@
 #include "core/path_resolver.h"
 #include "core/pm_version.h"
 #include "guard/guard_entry.h"
+#include "guard/guard_process.h"
+#include "jobs/job_manager.h"
 #include "runtime/runtime_module.h"
 
 #include <windows.h>
@@ -25,7 +27,8 @@ int wmain(int argc, wchar_t* argv[]) {
         if (arg1 == L"--guard") {
             const std::wstring_view session_id = (argc >= 3) ? std::wstring_view(argv[2]) : std::wstring_view{};
             const std::wstring_view handle_arg = (argc >= 4) ? std::wstring_view(argv[3]) : std::wstring_view{};
-            return pm::guard::RunGuardMode(session_id, handle_arg);
+            const std::wstring_view ready_arg = (argc == 5) ? std::wstring_view(argv[4]) : std::wstring_view{};
+            return pm::guard::RunGuardMode(session_id, handle_arg, ready_arg);
         }
 
         if (arg1 == L"--version") {
@@ -85,6 +88,30 @@ int wmain(int argc, wchar_t* argv[]) {
                          exe_dir.c_str(),
                          save_cfg.wrote_to_disk ? 1 : 0,
                          save_apps.wrote_to_disk ? 1 : 0);
+            return 0;
+        }
+
+        // Phase-3 diagnostic, not application management (phase 8). The controlled
+        // process is our own smoke probe; no real user application is touched.
+        if (arg1 == L"--job-probe") {
+            pm::runtime::SessionManager session;
+            if (!session.InitializeNewSession().ok) return 10;
+            pm::jobs::JobManager job;
+            DWORD error = 0;
+            if (!job.Create(session, L"probe", error)) return 11;
+            pm::guard::GuardProcess guard;
+            const std::wstring temp = pm::runtime::SessionManager::QuerySystemTempDir();
+            if (!::SetCurrentDirectoryW(temp.c_str()) ||
+                !guard.Start(pm::core::PathResolver::QueryExecutablePath(), session, error)) return 12;
+            PROCESS_INFORMATION process{};
+            if (!job.Launch(pm::core::PathResolver::QueryExecutablePath(), L"--smoke-test", temp, process, error)) return 13;
+            const DWORD waited = ::WaitForSingleObject(process.hProcess, 10000);
+            DWORD code = 1;
+            ::GetExitCodeProcess(process.hProcess, &code);
+            ::CloseHandle(process.hThread); ::CloseHandle(process.hProcess);
+            const bool cleaned = pm::guard::CleanupSession(session, error);
+            if (waited != WAIT_OBJECT_0 || code != 0 || !cleaned) return 14;
+            std::wprintf(L"[PM] JOB_PROBE_OK | SessionId=%ls\n", session.session_id().c_str());
             return 0;
         }
 

@@ -120,12 +120,11 @@ int wmain(int argc, wchar_t* argv[]) {
         return 1;
     }
 
-    // 3. Invocación de --guard <SessionID>
+    // 3. Fase 3: el protocolo real exige handles heredados; ya no acepta el stub.
     exit_code = 999;
     std::string out_guard_ok;
     if (!RunProcessCaptureOutput(L"\"" + pm_path + L"\" --guard fase0b_session_test", temp_dir, exit_code, out_guard_ok) ||
-        exit_code != 0 ||
-        out_guard_ok.find("[PMGuard] Fase 0 OK | SessionID=fase0b_session_test") == std::string::npos) {
+        exit_code != 2) {
         std::fwprintf(stderr, L"[FAIL] 3. --guard <SessionID> fallo (rc=%lu)\n", exit_code);
         return 1;
     }
