@@ -49,6 +49,10 @@ de Fase 6 y las regresiones 0B–5. CMake compila el mismo código y declara
 las mismas suites para CTest. GitHub Actions cruza la compilación desde
 Linux y ejecuta las pruebas nativas en Windows.
 
+En Windows local pasaron los seis escenarios sintéticos y las regresiones
+0B–5. La inspección PE confirmó AMD64 y `SWAPRUN:CD`. El JSON registra el
+commit probado, el SHA-256 del binario y el resultado de cada escenario.
+
 Las pruebas usan carpetas sintéticas y un subárbol HKCU con GUID propio.
 Las aplicaciones reales, las ACL personalizadas de Registro y la desconexión
 física USB quedan pendientes de validación. La atribución de candidatos y
