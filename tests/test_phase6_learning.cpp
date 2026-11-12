@@ -240,8 +240,10 @@ int Controller(const fs::path& root, std::wstring_view mode) {
     const auto recipe = Read(root / L"portable" / result.recipe_path);
     Check(recipe.find("Previous=keep") != std::string::npos, "retain previous recipe");
     Check(recipe.find("RoamingHost=%APPDATA%\\") != std::string::npos &&
-          recipe.find("RoamingDataPath=Data/apps/fixture/") != std::string::npos &&
-          recipe.find(":\\") == std::string::npos, "portable recipe");
+          recipe.find("RoamingCleanup=REMOVE_JUNCTION_RESTORE_ORIGINAL") != std::string::npos &&
+          recipe.find("RoamingItem1=FILE:learned.txt") != std::string::npos &&
+          recipe.find("RoamingDataPath") == std::string::npos &&
+          recipe.find(":\\") == std::string::npos, "cleanup-only relative recipe");
     if (mode == L"ambiguous") {
         Check(recipe.find("LocalHost") == std::string::npos && recipe.find("RegistryKey") == std::string::npos,
               "exclude ambiguous output");
