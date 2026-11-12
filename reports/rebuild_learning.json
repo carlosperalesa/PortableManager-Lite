@@ -1,0 +1,85 @@
+{
+  "phase": "Fase 6 — Aprendizaje Ligero; regresion 0B a 5",
+  "platform": "native_windows",
+  "source_commit": "5b8e56ae4abb1567d475c47ce817009a49b7ea83",
+  "timestamp_utc": "2026-11-12T13:16:48.2615494Z",
+  "build_command": "./build.ps1 -OutputDir (Join-Path $PWD build/phase06-final) -ReportJsonPath (Join-Path $PWD build/phase06-final/rebuild_learning.json)",
+  "toolchain": {
+    "name": "llvm-mingw 20261104 (UCRT x86_64)",
+    "compiler_version": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+    "relative_path": "tools/toolchains/llvm-mingw/bin/clang++.exe",
+    "compile_flags": [
+      "-std=c++20",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-municode",
+      "-static",
+      "-Wl,-Xlink=-swaprun:cd"
+    ]
+  },
+  "binaries": {
+    "pm_exe": {
+      "size_bytes": 992256,
+      "sha256": "24F881F0CD72C9EE44EB2745D9C5B3E2C0AD0C8CCABB12AC7DAE321AF0B4A935",
+      "machine": "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+      "characteristics": "0x422 (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP)",
+      "swaprun_cd_0x400": true,
+      "imported_dlls": [
+        "KERNEL32.dll",
+        "USER32.dll",
+        "ADVAPI32.dll",
+        "VERSION.dll",
+        "ole32.dll",
+        "bcrypt.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll"
+      ],
+      "external_toolchain_dlls": []
+    },
+    "test_phase2_runtime_exe": {
+      "size_bytes": 983552,
+      "sha256": "DD9438404D513F5555B0D0D4BF6DDB053ABC86E4F2E2F8ED3DC5AA974CF3C98E"
+    }
+  },
+  "phase6_runtime": {
+    "cases": {
+      "pe_metadata_and_scope": "passed",
+      "learn_restore_and_publish": "passed",
+      "preserve_ambiguous_changes": "passed",
+      "restore_existing_registry_without_exporting_host_values": "passed",
+      "restore_when_recipe_write_fails": "passed",
+      "guard_recovers_after_pm_crash": "passed"
+    },
+    "status": "passed"
+  },
+  "regression_status": "passed",
+  "regression_suites": [
+    "test_phase0_smoke",
+    "test_phase1_core",
+    "test_phase2_runtime",
+    "test_phase3_guard",
+    "test_phase4_junctions",
+    "test_phase5_registry"
+  ],
+  "regression_scenarios": {
+    "phase3": 11,
+    "phase4": 9,
+    "phase5": 8
+  },
+  "not_run": [
+    "real_applications",
+    "physical_usb_removal",
+    "custom_registry_acls"
+  ],
+  "status": "passed"
+}

@@ -5,7 +5,7 @@
 .DESCRIPTION
     Resuelve todas las rutas respecto a la ubicación del script (independiente del CWD),
     no modifica el PATH global ni el registro de Windows, compila pm.exe y las suites de prueba
-    (Fases 0B, 1, 2, 3, 4 y 5) con tools/toolchains/llvm-mingw/bin/clang++.exe, verifica las cabeceras PE
+    (Fases 0B a 6) con tools/toolchains/llvm-mingw/bin/clang++.exe, verifica las cabeceras PE
     y DLL importadas con llvm-readobj.exe, y genera el informe JSON de validación.
 #>
 
@@ -50,10 +50,14 @@ $Phase4TestExe = Join-Path $OutputDir "test_phase4_junctions.exe"
 $Phase4Report = Join-Path $OutputDir ("phase4_windows_" + (Get-Date -Format "yyyyMMddTHHmmssfff") + ".json")
 $Phase5TestExe = Join-Path $OutputDir "test_phase5_registry.exe"
 $Phase5Report = Join-Path $OutputDir ("phase5_windows_" + (Get-Date -Format "yyyyMMddTHHmmssfff") + ".json")
+$Phase6TestExe = Join-Path $OutputDir "test_phase6_learning.exe"
+$Phase6Report = Join-Path $OutputDir ("phase6_windows_" + (Get-Date -Format "yyyyMMddTHHmmssfff") + ".json")
+$Phase6Resource = Join-Path $OutputDir "phase6_fixture.o"
+$LearningSource = Join-Path $ProjectRoot "src\learning\learning_engine.cpp"
 $IncludeDir    = Join-Path $ProjectRoot "src"
 
 # 1. Compilación limpia
-foreach ($bin in @($PmExe, $SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe, $Phase4TestExe, $Phase5TestExe)) {
+foreach ($bin in @($PmExe, $SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe, $Phase4TestExe, $Phase5TestExe, $Phase6TestExe, $Phase6Resource)) {
     if (Test-Path $bin) { Remove-Item $bin -Force }
 }
 
@@ -77,6 +81,7 @@ $guardSources = @(
 
 Write-Host "=== [1/6] Compilando pm.exe (C++20, Windows x64, Unicode, -static, /SWAPRUN:CD) ==="
 $pmSources = @(
+    $LearningSource,
     (Join-Path $ProjectRoot "src\core\main.cpp"),
     (Join-Path $ProjectRoot "src\guard\guard_entry.cpp")
 ) + $coreSources + $runtimeSources + $guardSources
@@ -179,6 +184,25 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Phase5TestExe)) {
     throw "Fallo al compilar test_phase5_registry.exe (ExitCode=$LASTEXITCODE)"
 }
 
+Write-Host "=== Compilando test_phase6_learning.exe (C++20) ==="
+$Windres = Join-Path $ToolchainBin "x86_64-w64-mingw32-windres.exe"
+& $Windres -O coff -i (Join-Path $ProjectRoot "tests\phase6_fixture.rc") -o $Phase6Resource
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Phase6Resource)) {
+    throw "Fallo al compilar el recurso PE sintetico (ExitCode=$LASTEXITCODE)"
+}
+$test6Sources = @(
+    $LearningSource,
+    (Join-Path $ProjectRoot "src\guard\guard_entry.cpp"),
+    (Join-Path $ProjectRoot "tests\test_phase6_learning.cpp")
+) + $coreSources + $runtimeSources + $guardSources
+& $ClangPP -std=c++20 -O2 -Wall -Wextra -Werror `
+    -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNOMINMAX `
+    -municode -static "-Wl,-Xlink=-swaprun:cd" "-I$IncludeDir" $test6Sources $Phase6Resource -o $Phase6TestExe `
+    -lkernel32 -luser32 -ladvapi32 -lole32 -lbcrypt -lversion
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Phase6TestExe)) {
+    throw "Fallo al compilar test_phase6_learning.exe (ExitCode=$LASTEXITCODE)"
+}
+
 Write-Host "=== [5/6] Inspeccionando cabecera PE e importaciones COFF con llvm-readobj.exe ==="
 $peHeadersRaw = (& $ReadObj --file-headers $PmExe) -join "`n"
 $coffImportsRaw = (& $ReadObj --coff-imports $PmExe) -join "`n"
@@ -215,13 +239,14 @@ Write-Host "Ausencia de DLLs externas del toolchain -> OK (0 detectadas)"
 Write-Host "=== [6/6] Ejecutando suites de prueba desde directorio de trabajo externo (%TEMP%) ==="
 $tempWorkDir = [System.IO.Path]::GetTempPath().TrimEnd('\')
 
-foreach ($testBin in @($SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe, $Phase4TestExe, $Phase5TestExe)) {
+foreach ($testBin in @($SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe, $Phase4TestExe, $Phase5TestExe, $Phase6TestExe)) {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $testBin
     $psi.Arguments = "`"$PmExe`""
     if ($testBin -eq $Phase3TestExe) { $psi.Arguments += " `"$Phase3Report`"" }
     if ($testBin -eq $Phase4TestExe) { $psi.Arguments += " `"$Phase4Report`"" }
     if ($testBin -eq $Phase5TestExe) { $psi.Arguments += " `"$Phase5Report`"" }
+    if ($testBin -eq $Phase6TestExe) { $psi.Arguments = "`"$Phase6Report`"" }
     $psi.WorkingDirectory = $tempWorkDir
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
@@ -254,7 +279,7 @@ $clangVer    = ((& $ClangPP --version) | Select-Object -First 1).Trim()
 
 if (-not [string]::IsNullOrWhiteSpace($ReportJsonPath)) {
     $reportObj = [ordered]@{
-        phase         = "Fase 5 $([char]0x2014) Registro Windows; regresion 0B a 4"
+        phase         = "Fase 6 $([char]0x2014) Aprendizaje Ligero; regresion 0B a 5"
         timestamp_utc = (Get-Date).ToUniversalTime().ToString("o")
         toolchain     = [ordered]@{
             name             = "llvm-mingw 20261104 (UCRT x86_64)"
@@ -283,7 +308,9 @@ if (-not [string]::IsNullOrWhiteSpace($ReportJsonPath)) {
         phase4_evidence_path = $Phase4Report
         phase5_runtime = (Get-Content -LiteralPath $Phase5Report -Raw | ConvertFrom-Json)
         phase5_evidence_path = $Phase5Report
-        regression_suites = @("test_phase0_smoke", "test_phase1_core", "test_phase2_runtime", "test_phase3_guard", "test_phase4_junctions")
+        phase6_runtime = (Get-Content -LiteralPath $Phase6Report -Raw | ConvertFrom-Json)
+        phase6_evidence_path = $Phase6Report
+        regression_suites = @("test_phase0_smoke", "test_phase1_core", "test_phase2_runtime", "test_phase3_guard", "test_phase4_junctions", "test_phase5_registry")
         regression_status = "passed"
         status        = "passed"
     }

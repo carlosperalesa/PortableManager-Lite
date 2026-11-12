@@ -144,7 +144,8 @@ OriginWaitResult WaitForReleaseOrOriginLoss(const std::wstring &pm_executable,
   return result;
 }
 bool GuardProcess::Start(const std::wstring &executable,
-                         pm::runtime::SessionManager &session, DWORD &error) {
+                         pm::runtime::SessionManager &session, DWORD &error,
+                         HANDLE resource_reservation) {
   error = ERROR_SUCCESS;
   if (process_ || session.session_dir().empty()) {
     error = ERROR_INVALID_STATE;
@@ -180,11 +181,18 @@ bool GuardProcess::Start(const std::wstring &executable,
       reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(buffer.data());
   const bool initialized = ::InitializeProcThreadAttributeList(
                                startup.lpAttributeList, 1, 0, &bytes) != FALSE;
-  HANDLE inherited[] = {parent, ready};
-  bool ok = initialized &&
+  // The caller owns the original reservation. A duplicate keeps the named
+  // object alive in PMG even if PM dies before restoring its resources.
+  HANDLE reservation = nullptr;
+  const bool reserved = !resource_reservation ||
+      ::DuplicateHandle(::GetCurrentProcess(), resource_reservation, ::GetCurrentProcess(),
+                        &reservation, 0, TRUE, DUPLICATE_SAME_ACCESS);
+  HANDLE inherited[] = {parent, ready, reservation};
+  const SIZE_T inherited_bytes = reservation ? sizeof(inherited) : 2 * sizeof(HANDLE);
+  bool ok = reserved && initialized &&
             ::UpdateProcThreadAttribute(
                 startup.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
-                inherited, sizeof(inherited), nullptr, nullptr);
+                inherited, inherited_bytes, nullptr, nullptr);
   PROCESS_INFORMATION pi{};
   if (ok) {
     std::wstring command =
@@ -202,6 +210,8 @@ bool GuardProcess::Start(const std::wstring &executable,
     error = ::GetLastError();
   if (initialized)
     ::DeleteProcThreadAttributeList(startup.lpAttributeList);
+  if (reservation)
+    ::CloseHandle(reservation);
   ::CloseHandle(parent);
   if (ok) {
     ::CloseHandle(pi.hThread);

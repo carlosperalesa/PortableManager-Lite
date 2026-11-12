@@ -54,7 +54,7 @@ d:\Data\
    - `RegistryManager`: respaldo de subárboles exclusivos de HKCU mediante `reg.exe export` en la sesión temporal, validación de alcance e integridad, borrado previo con `RegDeleteTreeW` e importación tras cerrar los Jobs. El respaldo se retira tras verificar la restauración y persistir el resultado. [Detalles](fase05/README_FASE05.md).
 
 6. **`src/learning/` (Fase 6):**
-   - `LearningEngine`: inspección de recursos PE (`version.dll`), captura de baseline en candidatos acotados (`%APPDATA%\<Publisher>\<App>`, `%LOCALAPPDATA%\<App>`, `HKCU\Software\<Publisher>\<App>`), preservación de cambios ambiguos y generación de receta relativa.
+   - `LearningEngine`: inspección de recursos PE (`version.dll`) y candidatos acotados a `<Company>\<Product>` en `%APPDATA%`, `%LOCALAPPDATA%` y `HKCU\Software`. La ejecución requiere atribución exclusiva previa y usa los gestores de Junctions, Registro, Jobs y PMGuard. Registra los recursos realmente afectados y genera una receta relativa con reglas de limpieza y restauración, sin cosechar ni guardar configuraciones de la aplicación. Los respaldos de sesión solo sirven para restaurar el anfitrión. [Detalles](fase06/README_FASE06.md).
 
 7. **`src/cleanup/` y `src/applications/` (Fases 7 y 8):**
    - `CleanupEngine`: ejecución idempotente de los cierres `NORMAL`, `FAST` (timeout 200 ms) y `CRITICAL`, y generación de `%TEMP%\pmlog` (sin extensión) exclusivamente cuando una operación inversa falla, manteniendo los respaldos `.pmbkp` intactos.

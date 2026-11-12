@@ -13,10 +13,11 @@ public:
   GuardProcess(const GuardProcess &) = delete;
   GuardProcess &operator=(const GuardProcess &) = delete;
   // Copies the SAME PM executable into the active session. Only the PM
-  // synchronization handle and readiness event are inherited (STARTUPINFOEX
-  // handle allowlist).
+  // synchronization handle, readiness event and optional resource reservation
+  // are inherited (STARTUPINFOEX handle allowlist).
   bool Start(const std::wstring &pm_executable,
-             pm::runtime::SessionManager &session, DWORD &error);
+             pm::runtime::SessionManager &session, DWORD &error,
+             HANDLE resource_reservation = nullptr);
   HANDLE handle() const noexcept { return process_; }
 
 private:
