@@ -1,4 +1,5 @@
 #include "guard/guard_process.h"
+#include "junctions/junction_manager.h"
 #include "jobs/job_manager.h"
 #include "runtime/session_lock.h"
 #include <dbt.h>
@@ -235,9 +236,9 @@ bool CleanupSession(pm::runtime::SessionManager &session, DWORD &error) {
     // Validate ALL names and types before invoking any rollback. Do not allow a
     // forged manifest to reference another session's or an unrelated named Job.
     for (const auto &op : session.manifest().operations()) {
-      if (op.type != pm::runtime::OperationType::KillJob ||
-          op.job_name !=
-              pm::jobs::JobManager::MakeName(session.session_id(), op.app_id)) {
+      const bool session_job = op.type == pm::runtime::OperationType::KillJob &&
+          op.job_name == pm::jobs::JobManager::MakeName(session.session_id(), op.app_id);
+      if (!session_job && !pm::junctions::JunctionManager::IsJunctionOperation(op)) {
         error = ERROR_NOT_SUPPORTED;
         ok = false;
         break;
@@ -252,6 +253,7 @@ bool CleanupSession(pm::runtime::SessionManager &session, DWORD &error) {
         }
         return pm::jobs::JobManager::TerminateAndWait(op.job_name, err);
       };
+      handlers.on_remove_junction = pm::junctions::JunctionManager::Rollback;
       const auto summary = session.manifest().ExecutePendingRollbacks(handlers);
       ok = summary.all_succeeded;
       if (!ok)

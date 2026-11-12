@@ -472,6 +472,12 @@ ManifestStatusResult ManifestManager::SaveToDisk() const {
         text.append(L"OriginalExisted=").append(op.original_existed ? L"1" : L"0").append(L"\r\n");
         text.append(L"AppId=").append(op.app_id).append(L"\r\n");
         text.append(L"TargetPath=").append(op.target_host_path).append(L"\r\n");
+        if (!op.junction_target.empty()) {
+            text.append(L"JunctionTarget=").append(op.junction_target).append(L"\r\n");
+            text.append(L"JunctionFileId=").append(op.junction_file_id).append(L"\r\n");
+            text.append(L"OriginalFileId=").append(op.original_file_id).append(L"\r\n");
+            text.append(L"HostParentFileId=").append(op.host_parent_file_id).append(L"\r\n");
+        }
         text.append(L"BackupPath=").append(op.backup_host_path).append(L"\r\n");
         text.append(L"RegKeyPath=").append(op.reg_key_path).append(L"\r\n");
         text.append(L"JobName=").append(op.job_name).append(L"\r\n");
@@ -585,6 +591,10 @@ ManifestStatusResult ManifestManager::LoadFromDisk() {
         op.app_id = doc.GetValue(sec, L"AppId");
 
         op.target_host_path = doc.GetValue(sec, L"TargetPath");
+        op.junction_target = doc.GetValue(sec, L"JunctionTarget");
+        op.junction_file_id = doc.GetValue(sec, L"JunctionFileId");
+        op.original_file_id = doc.GetValue(sec, L"OriginalFileId");
+        op.host_parent_file_id = doc.GetValue(sec, L"HostParentFileId");
         if (op.target_host_path.empty()) {
             op.target_host_path = doc.GetValue(sec, L"TargetHostPath");
         }
@@ -697,6 +707,21 @@ ManifestStatusResult ManifestManager::RecordOperationIntent(
 
     operations_.push_back(std::move(op));
     return SaveToDisk();
+}
+
+ManifestStatusResult ManifestManager::RecordJunctionFileId(
+    std::wstring_view op_id, std::wstring_view file_id) {
+    for (auto& op : operations_) {
+        if (op.id != op_id) continue;
+        if (op.type != OperationType::RemoveJunction || op.junction_target.empty() ||
+            op.state != OperationState::IntentRecorded || !op.junction_file_id.empty() ||
+            file_id.empty()) {
+            return {false, false, ERROR_INVALID_PARAMETER, L"Intencion de Junction invalida."};
+        }
+        op.junction_file_id = file_id;
+        return SaveToDisk();
+    }
+    return {false, false, ERROR_NOT_FOUND, L"No se encontro la intencion de Junction."};
 }
 
 ManifestStatusResult ManifestManager::UpdateOperationState(
@@ -829,10 +854,13 @@ RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers&
                 break;
             }
             case OperationType::RemoveJunction: {
-                if (handlers.on_remove_junction) {
+                if (IsTerminalAcceptableState(op.state)) {
+                    step_ok = true;
+                    was_skipped = op.state == OperationState::Skipped;
+                } else if (handlers.on_remove_junction) {
                     step_ok = handlers.on_remove_junction(op, step_err);
                 } else {
-                    step_ok = DefaultDeleteCreatedDir(op, was_skipped, step_err);
+                    step_err = ERROR_NOT_SUPPORTED;
                 }
                 break;
             }

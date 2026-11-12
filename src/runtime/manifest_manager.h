@@ -48,6 +48,11 @@ struct ManifestOperation {
     std::wstring reg_key_path;     // RegKeyPath: clave original bajo HKCU\Software\... (para RESTORE_REG)
     std::wstring job_name;         // JobName: nombre del Job Object de la sesión (para KILL_JOB)
     DWORD last_error = ERROR_SUCCESS;
+    // Optional phase-4 fields. Legacy REMOVE_JUNCTION entries have no ownership proof.
+    std::wstring junction_target;
+    std::wstring junction_file_id;
+    std::wstring original_file_id;
+    std::wstring host_parent_file_id;
 };
 
 struct ManifestStatusResult {
@@ -118,6 +123,9 @@ public:
     // Directiva KILL_JOB: KILL_JOB debe ser la última operación de preparación; no se permite
     // registrar operaciones adicionales de preparación después de KILL_JOB.
     ManifestStatusResult RecordOperationIntent(ManifestOperation op, std::wstring& out_assigned_id);
+
+    // Records the identity of the staging directory before it can be published.
+    ManifestStatusResult RecordJunctionFileId(std::wstring_view op_id, std::wstring_view file_id);
 
     // Regla obligatoria 4 y 5: Actualiza el estado de una operación (ej. APPLIED, ROLLED_BACK, SKIPPED, FAILED)
     // y persiste nuevamente el manifiesto en disco.
