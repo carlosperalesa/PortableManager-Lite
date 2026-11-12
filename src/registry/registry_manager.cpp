@@ -338,24 +338,36 @@ bool RegistryManager::Prepare(SessionManager& session, std::wstring_view exclusi
     return intent.ok || Fail(error, intent.win32_error);
 }
 
-bool RegistryManager::CaptureNewData(const SessionManager& session, const ManifestOperation& op,
-                                     std::wstring& snapshot, DWORD& error) {
-    snapshot.clear();
+bool RegistryManager::HasChanges(const SessionManager& session, const ManifestOperation& op,
+                                 bool& changed, DWORD& error) {
+    changed = false;
     error = ERROR_SUCCESS;
-    if (!SessionManager::IsValidSessionId(op.id) || !IsRegistryOperation(op, session.session_dir()))
+    if (!SessionManager::IsValidSessionId(op.id) ||
+        !IsRegistryOperation(op, session.session_dir()))
         return Fail(error, ERROR_INVALID_DATA);
-    if (op.original_existed) return true;
+
     Key parent, leaf;
     std::wstring leaf_name;
     if (!InspectKey(op.reg_key_path, false, parent, leaf, leaf_name, error)) return false;
-    if (!leaf) return true;
-    Handle directory, file;
+    if (!op.original_existed || !leaf) {
+        changed = op.original_existed != static_cast<bool>(leaf);
+        return true;
+    }
+
+    Handle directory;
     if (!PinSessionDirectory(session.session_dir(), directory, error)) return false;
-    const auto path = session.session_dir() + L"\\learned-" + op.id + L".reg";
+    const std::wstring check = session.session_dir() + L"\\registry-observe-" + op.id + L".reg";
+    if (!DiscardSessionExport(check, error)) return false;
+    Handle file;
     std::wstring digest;
-    if (!Export(op.reg_key_path, path, error) ||
-        !ReadBackup(op, path, 0, file, digest, error)) return false;
-    snapshot = path;
+    bool ok = Export(op.reg_key_path, check, error) &&
+              ReadBackup(op, check, 0, file, digest, error);
+    file.reset();
+    DWORD discard_error = ERROR_SUCCESS;
+    if (!DiscardSessionExport(check, discard_error) && ok)
+        return Fail(error, discard_error);
+    if (!ok) return false;
+    changed = digest != op.registry_backup_sha256;
     return true;
 }
 
