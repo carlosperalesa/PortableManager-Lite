@@ -142,16 +142,8 @@ struct Folder {
 
 DWORD Publish(const PathResolver& resolver, const LearningRequest& request,
               const Candidates& candidates, std::array<Folder, 2>& folders,
-              const std::wstring& registry_snapshot, LearningResult& result) {
-    const auto registry_relative = result.data_path + L"\\registry.reg";
-    if (!registry_snapshot.empty()) {
-        PinnedDirectories pinned;
-        const DWORD error = PinPortableDirectory(resolver, result.data_path, false, pinned);
-        if (error != ERROR_SUCCESS) return error;
-        const auto dest = resolver.ResolvePmRelativePath(registry_relative);
-        if (!dest.ok) return ERROR_INVALID_NAME;
-        if (!::CopyFileW(registry_snapshot.c_str(), dest.resolved_path.c_str(), TRUE)) return ::GetLastError();
-    }
+              bool registry_changed, LearningResult& result) {
+    // A recipe contains cleanup metadata, never application settings.
     for (auto& folder : folders) {
         if (!folder.approved) continue;
         PinnedDirectories pinned;
@@ -161,7 +153,7 @@ DWORD Publish(const PathResolver& resolver, const LearningRequest& request,
                                         folder.learned);
         if (scanned != ERROR_SUCCESS) return scanned;
     }
-    if (registry_snapshot.empty() &&
+    if (!registry_changed &&
         std::none_of(folders.begin(), folders.end(), [](const Folder& folder) { return folder.learned; }))
         return ERROR_SUCCESS;
 
@@ -195,12 +187,10 @@ DWORD Publish(const PathResolver& resolver, const LearningRequest& request,
             !doc.SetRelativePathValue(section, label + L"DataPath", relative.resolved_path, message))
             return ERROR_INVALID_DATA;
     }
-    if (!registry_snapshot.empty()) {
-        const auto relative = resolver.ToPersistentRelativePath(registry_relative);
-        if (!relative.ok || !doc.SetValue(section, L"RegistryKey", candidates.registry, message) ||
-            !doc.SetRelativePathValue(section, L"RegistryDataPath", relative.resolved_path, message))
-            return ERROR_INVALID_DATA;
-    }
+    if (registry_changed &&
+        (!doc.SetValue(section, L"RegistryKey", candidates.registry, message) ||
+         !doc.SetValue(section, L"RegistryCleanup", L"RESTORE_REG", message)))
+        return ERROR_INVALID_DATA;
     if (!doc.SetValue(L"Learning", L"LatestSession", result.session_id, message))
         return ERROR_INVALID_DATA;
     const auto saved = config.SaveRelativeIniIfModified(recipe, doc);
@@ -293,7 +283,7 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
     if (!guard.Start(origin, session, result.error, reservation.get())) return result;
 
     jobs::JobManager job;
-    std::wstring registry_snapshot;
+    bool registry_changed = false;
     const bool uses_folders = folders[0].approved || folders[1].approved;
     const auto run = [&]() -> DWORD {
         if (uses_folders) {
@@ -334,7 +324,7 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         if (registry_approved) {
             for (const auto& op : session.manifest().operations()) {
                 if (op.type == OperationType::RestoreReg &&
-                    !RegistryManager::CaptureNewData(session, op, registry_snapshot, error))
+                    !RegistryManager::HasChanges(session, op, registry_changed, error))
                     return error;
             }
         }
@@ -347,13 +337,7 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         result.error = ERROR_DEVICE_NOT_CONNECTED;
         return result;
     }
-    if (!registry_snapshot.empty() && !uses_folders) {
-        result.error = ReserveDataDirectory(resolver, request, result);
-        if (result.error != ERROR_SUCCESS) return result;
-    }
-    result.error = Publish(resolver, request, *candidates, folders, registry_snapshot, result);
-    if (result.error == ERROR_SUCCESS && !registry_snapshot.empty() &&
-        !::DeleteFileW(registry_snapshot.c_str())) result.error = ::GetLastError();
+    result.error = Publish(resolver, request, *candidates, folders, registry_changed, result);
     return result;
 }
 }
