@@ -448,17 +448,22 @@ ManifestStatusResult ManifestManager::InitializeNew() {
     return SaveToDisk();
 }
 
+std::wstring ManifestManager::SessionHeader(std::wstring_view session_id) {
+    std::wstring text;
+    text.append(L"; PortableManager Lite — Transient Host Restoration Manifest\r\n");
+    text.append(L"[Session]\r\n");
+    text.append(L"FormatSignature=").append(kFormatSignature).append(L"\r\n");
+    text.append(L"SessionId=").append(session_id).append(L"\r\n");
+    return text;
+}
+
 ManifestStatusResult ManifestManager::SaveToDisk() const {
     if (session_id_.empty() || manifest_path_.empty()) {
         return {false, false, ERROR_INVALID_PARAMETER, L"Manifiesto no configurado."};
     }
 
-    std::wstring text;
+    auto text = SessionHeader(session_id_);
     text.reserve(1024 + operations_.size() * 256);
-    text.append(L"; PortableManager Lite — Transient Host Restoration Manifest\r\n");
-    text.append(L"[Session]\r\n");
-    text.append(L"FormatSignature=").append(kFormatSignature).append(L"\r\n");
-    text.append(L"SessionId=").append(session_id_).append(L"\r\n");
     text.append(L"State=").append(SessionStateToString(session_state_)).append(L"\r\n");
     text.append(L"OperationCount=").append(std::to_wstring(operations_.size())).append(L"\r\n");
 
@@ -816,7 +821,8 @@ bool ManifestManager::DefaultDeleteCreatedDir(
 RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers& handlers) {
     RollbackSummary summary{};
     session_state_ = SessionState::Cleaning;
-    if (!SaveToDisk().ok) {
+    if (const auto saved = SaveToDisk(); !saved.ok) {
+        summary.persistence_error = saved.win32_error;
         summary.failed_count = 1;
         return summary;
     }
@@ -927,7 +933,8 @@ RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers&
             summary.failed_op_ids.push_back(op.id);
         }
 
-        if (!SaveToDisk().ok) {
+        if (const auto saved = SaveToDisk(); !saved.ok) {
+            summary.persistence_error = saved.win32_error;
             ++summary.failed_count;
             summary.failed_op_ids.push_back(op.id);
             return summary;
@@ -952,7 +959,8 @@ RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers&
     summary.all_succeeded = (summary.failed_count == 0) && AreAllOperationsTerminalAcceptable();
     if (summary.all_succeeded) {
         session_state_ = SessionState::Cleaned;
-        if (!SaveToDisk().ok) {
+        if (const auto saved = SaveToDisk(); !saved.ok) {
+            summary.persistence_error = saved.win32_error;
             session_state_ = SessionState::Cleaning;
             summary.all_succeeded = false;
             ++summary.failed_count;

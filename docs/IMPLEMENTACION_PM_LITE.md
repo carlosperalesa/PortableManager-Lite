@@ -1,7 +1,7 @@
 # Estado de Implementación Nativa (C++20) — PortableManager Lite
 
 **Fecha:** 12 de noviembre de 2026
-**Fase actual:** Fase 6 cerrada y fusionada. Fase 7 — CleanupEngine pendiente de iniciar.
+**Fase actual:** Fase 6 cerrada y fusionada. Fase 7 — CleanupEngine en revisión.
 
 ---
 
@@ -23,5 +23,5 @@
 - [x] **Fase 4:** JunctionManager aprobado y fusionado en `main` como `5ca03b7`. [Informe de Fase 4](fase04/README_FASE04.md).
 - [x] **Fase 5:** Respaldo y restauración de Registro Win32 mediante `RegistryManager`, aprobado y fusionado en `main` como `f79b947`. [Alcance y pruebas](fase05/README_FASE05.md).
 - [x] **Fase 6:** Aprendizaje Ligero mediante `LearningEngine`; implementación adaptada para generar solo recetas operativas de limpieza, sin cosecha de configuraciones. [PR #5 fusionado](https://github.com/carlosperalesa/PortableManager-Lite/pull/5), [CI 43246078395](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43246078395) superada. [Alcance y pruebas](fase06/README_FASE06.md).
-- [ ] **Fase 7:** Motor de Limpieza (`CleanupEngine`, carpeta `docs/fase07/`).
+- [ ] **Fase 7:** Motor de Limpieza (`CleanupEngine`). Implementación en revisión. [Protocolo y verificación](fase07/README_FASE07.md).
 - [ ] **Fase 8:** Integración Nativa (carpeta `docs/fase08/`).

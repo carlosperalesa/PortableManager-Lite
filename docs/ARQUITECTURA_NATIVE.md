@@ -56,5 +56,5 @@ d:\Data\
 6. **`src/learning/` (Fase 6):**
    - `LearningEngine`: inspección de recursos PE (`version.dll`) y candidatos acotados a `<Company>\<Product>` en `%APPDATA%`, `%LOCALAPPDATA%` y `HKCU\Software`. La ejecución requiere atribución exclusiva previa y usa los gestores de Junctions, Registro, Jobs y PMGuard. Registra los recursos realmente afectados y genera una receta relativa con reglas de limpieza y restauración, sin cosechar ni guardar configuraciones de la aplicación. Los respaldos de sesión solo sirven para restaurar el anfitrión. [Detalles](fase06/README_FASE06.md).
 
-7. **`src/cleanup/` y `src/applications/` (Fases 7 y 8):**
-   - `CleanupEngine`: ejecución idempotente de los cierres `NORMAL`, `FAST` (timeout 200 ms) y `CRITICAL`, y generación de `%TEMP%\pmlog` (sin extensión) exclusivamente cuando una operación inversa falla, manteniendo los respaldos `.pmbkp` intactos.
+7. **`src/cleanup/` (Fase 7):**
+   - `CleanupEngine` comparte la limpieza de PM y PMGuard bajo el mutex de sesión. `NORMAL` solicita cierre cooperativo, `FAST` limita la espera cooperativa a 200 ms y `CRITICAL` inicia terminación inmediata. El rollback de Junctions y HKCU empieza cuando se confirma el vaciado de los Jobs. La finalización preserva respaldos pendientes y crea `%TEMP%\pmlog` solo si quedan residuos u operaciones sin completar. [Protocolo](fase07/README_FASE07.md).

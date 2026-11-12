@@ -225,11 +225,9 @@ int Controller(const fs::path& root, std::wstring_view mode) {
         Check(descendant ? ::WaitForSingleObject(descendant.get(), 0) == WAIT_OBJECT_0 :
               ::GetLastError() == ERROR_INVALID_PARAMETER, "drain Job descendants");
     }
-    SessionManager session;
-    Check(session.OpenExistingSession(result.session_id).ok, "reopen session manifest");
-    DWORD error = 0;
-    Check(pm::guard::CleanupSession(session, error), "idempotent rollback");
-    Check(session.manifest().session_state() == pm::runtime::SessionState::Cleaned, "cleaned manifest");
+    const auto session_dir = fs::path(SessionManager::QuerySystemTempDir()) /
+        L"PortableManager" / L"Session" / result.session_id;
+    Check(!fs::exists(session_dir), "cleaned session temporaries removed");
     const auto data = root / L"portable" / result.data_path;
     Check(Read(data / L"roaming" / L"learned.txt") == "roaming output", "keep learned roaming data");
     if (mode == L"failure") {
@@ -363,8 +361,8 @@ void Metadata() {
 
 int wmain(int argc, wchar_t** argv) {
     try {
-        if (argc == 5 && std::wstring_view(argv[1]) == L"--guard")
-            return pm::guard::RunGuardMode(argv[2], argv[3], argv[4]);
+        if ((argc == 5 || argc == 6) && std::wstring_view(argv[1]) == L"--guard")
+            return pm::guard::RunGuardMode(argv[2], argv[3], argv[4], argc == 6 ? argv[5] : L"");
         if (argc == 4 && (std::wstring_view(argv[1]) == L"--case" || std::wstring_view(argv[1]) == L"--write")) {
             const fs::path root(argv[2]);
             const auto name = root.filename().wstring();

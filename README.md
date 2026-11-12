@@ -1,6 +1,6 @@
 # PortableManager Lite (PM Lite) — Núcleo Nativo C++20
 
-**Estado actual:** Fases 0B a 6 aprobadas. [Fase 6 — Aprendizaje Ligero](docs/fase06/README_FASE06.md) fue corregida para generar recetas operativas de limpieza sin copia de configuraciones y fusionada en `main` mediante [PR #5](https://github.com/carlosperalesa/PortableManager-Lite/pull/5). Fase 7 aún no iniciada.
+**Estado actual:** Fases 0B a 6 aprobadas. [Fase 6 — Aprendizaje Ligero](docs/fase06/README_FASE06.md) fue corregida para generar recetas operativas de limpieza sin copia de configuraciones y fusionada en `main` mediante [PR #5](https://github.com/carlosperalesa/PortableManager-Lite/pull/5). [Fase 7 — Motor de limpieza](docs/fase07/README_FASE07.md) en revisión.
 **Toolchain oficial:** LLVM-MinGW `20261104` (Clang `23.1.5`, UCRT, Windows `x86_64`) portable en `tools/toolchains/llvm-mingw/`.
 
 ---

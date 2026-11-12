@@ -97,16 +97,16 @@ Esta definición sustituye el antiguo apartado de «cosecha y receta» por decis
 
 ---
 
-## 23. Ciclo de Vida y Protocolo de Cierre (Validación Fase 5)
+## 23. Ciclo de Vida y Protocolo de Cierre
 
 PM implementa tres modos deterministas de finalización:
 
 ### 23.1 Cierre Normal (`NORMAL`)
 - El usuario solicita salir de PM o de la aplicación.
-- Cierre cooperativo (`WM_CLOSE` / `WM_QUIT`) a las ventanas principales de los procesos del Job Object.
+- Cierre cooperativo mediante `WM_CLOSE` a ventanas de los procesos del Job Object. El motor nativo concede hasta 5 segundos cuando encuentra ventanas notificables.
 - No realizar cosecha ni respaldo de configuraciones de aplicaciones; cerrar los Jobs y ejecutar limpieza/restauración con el manifiesto operativo.
 - Desmantelamiento de Junctions (`RemoveDirectoryW`).
-- Restauración transaccional de claves de registro desde respaldo `.pmbkp`.
+- Restauración transaccional de claves de Registro desde el respaldo operativo `.reg` local.
 - Restauración de carpetas `.pmbkp` del anfitrión.
 - Salida limpia de PM y desactivación del monitor PMGuard.
 
@@ -123,9 +123,11 @@ PM implementa tres modos deterministas de finalización:
 - Terminación inmediata de procesos huérfanos mediante `TerminateJobObject`.
 - PMGuard (ejecutándose desde `%TEMP%`) toma el control mediante la adquisición del Mutex de sesión.
 - Eliminación de Junctions huérfanas en el anfitrión.
-- Restauración del Registro y carpetas del anfitrión desde los respaldos `.pmbkp` locales.
+- Restauración del Registro y carpetas del anfitrión desde los respaldos locales `.reg` y `.pmbkp`, respectivamente.
 - **Protocolo de Residuos no Restaurables:** Si un archivo o clave no puede restaurarse (ej. por bloqueo de antivirus):
-  - Los respaldos `.pmbkp` se mantienen estrictamente intactos.
+  - Los respaldos `.pmbkp` y `.reg` necesarios para restaurar se conservan intactos.
   - Se genera el archivo `%TEMP%\pmlog` (texto plano, sin extensión).
   - Se registran exclusivamente las rutas afectadas y los códigos Win32 de error.
   - PM y PMG finalizan sin bloquear el sistema.
+
+El [protocolo nativo de Fase 7](../fase07/README_FASE07.md) describe el drenaje de Jobs, la recuperación de PMGuard y la finalización de temporales.

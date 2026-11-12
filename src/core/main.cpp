@@ -33,8 +33,9 @@ int wmain(int argc, wchar_t *argv[]) {
       const std::wstring_view handle_arg =
           (argc >= 4) ? std::wstring_view(argv[3]) : std::wstring_view{};
       const std::wstring_view ready_arg =
-          (argc == 5) ? std::wstring_view(argv[4]) : std::wstring_view{};
-      return pm::guard::RunGuardMode(session_id, handle_arg, ready_arg);
+          (argc >= 5 && argc <= 6) ? std::wstring_view(argv[4]) : std::wstring_view{};
+      const std::wstring_view stop_arg = argc == 6 ? std::wstring_view(argv[5]) : std::wstring_view{};
+      return pm::guard::RunGuardMode(session_id, handle_arg, ready_arg, stop_arg);
     }
 
     if (arg1 == L"--version") {
@@ -119,30 +120,39 @@ int wmain(int argc, wchar_t *argv[]) {
       if (!session.InitializeNewSession().ok)
         return 10;
       pm::jobs::JobManager job;
-      DWORD error = 0;
-      if (!job.Create(session, L"probe", error))
-        return 11;
       pm::guard::GuardProcess guard;
-      const std::wstring temp =
-          pm::runtime::SessionManager::QuerySystemTempDir();
+      DWORD error = ERROR_SUCCESS;
+      const auto close = [&](pm::cleanup::Mode mode) {
+        return pm::cleanup::CleanupEngine::Run(
+            session, mode, pm::cleanup::Artifacts::Remove, &guard);
+      };
+      if (!job.Create(session, L"probe", error)) {
+        close(pm::cleanup::Mode::Critical);
+        return 11;
+      }
+      const std::wstring temp = pm::runtime::SessionManager::QuerySystemTempDir();
       if (!::SetCurrentDirectoryW(temp.c_str()) ||
-                !guard.Start(exe_path, session, error)) return 12;
-                PROCESS_INFORMATION process{};
-                if (!job.Launch(exe_path, L"--smoke-test", temp, process,
-                                error))
-                  return 13;
-                const DWORD waited =
-                    ::WaitForSingleObject(process.hProcess, 10000);
-                DWORD code = 1;
-                ::GetExitCodeProcess(process.hProcess, &code);
-                ::CloseHandle(process.hThread);
-                ::CloseHandle(process.hProcess);
-                const bool cleaned = pm::guard::CleanupSession(session, error);
-                if (waited != WAIT_OBJECT_0 || code != 0 || !cleaned)
-                  return 14;
-                std::wprintf(L"[PM] JOB_PROBE_OK | SessionId=%ls\n",
-                             session.session_id().c_str());
-                return 0;
+          !guard.Start(exe_path, session, error)) {
+        close(pm::cleanup::Mode::Critical);
+        return 12;
+      }
+      PROCESS_INFORMATION process{};
+      if (!job.Launch(exe_path, L"--smoke-test", temp, process, error)) {
+        close(pm::cleanup::Mode::Critical);
+        return 13;
+      }
+      const auto waited = pm::guard::WaitForReleaseOrOriginLoss(
+          exe_path, process.hProcess, 10000, error);
+      DWORD code = 1;
+      ::GetExitCodeProcess(process.hProcess, &code);
+      ::CloseHandle(process.hThread);
+      ::CloseHandle(process.hProcess);
+      const auto mode = waited == pm::guard::OriginWaitResult::Released
+          ? pm::cleanup::Mode::Normal : pm::cleanup::Mode::Critical;
+      if (!close(mode).ok || waited != pm::guard::OriginWaitResult::Released || code != 0)
+        return 14;
+      std::wprintf(L"[PM] JOB_PROBE_OK | SessionId=%ls\n", session.session_id().c_str());
+      return 0;
     }
 
     if (arg1 == L"--session-probe") {
