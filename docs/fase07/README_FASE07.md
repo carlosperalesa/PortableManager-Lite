@@ -1,6 +1,6 @@
 # Fase 07 — Motor de limpieza
 
-Implementación en revisión en el [PR #7 en borrador](https://github.com/carlosperalesa/PortableManager-Lite/pull/7). La aprobación corresponde al propietario.
+**Estado:** Fase 7 aprobada y fusionada en `main` mediante [PR #7](https://github.com/carlosperalesa/PortableManager-Lite/pull/7), commit `c64b3835065be056696cf0582217286126b759fb`.
 
 ## Protocolo de cierre
 
@@ -52,7 +52,7 @@ La suite usa ejecutables auxiliares, directorios temporales con GUID y claves
 sintéticas de HKCU. Cubre los tres modos, la barrera de Jobs, los conflictos de
 propiedad, los reintentos, la pérdida simulada del origen y la recuperación por
 PMGuard. La [CI 43254084270](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43254084270)
-validó 10/10 escenarios de Fase 7, las regresiones 0B–6 en Windows y la
+y la [CI final del código integrado con la reorganización documental (43263214086)](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43263214086) validaron 10/10 escenarios de Fase 7, las regresiones 0B–6 en Windows y la
 compilación cruzada con inspección del PE x64 en Linux. La suite local de Fase 7
 también pasó 10/10. En la regresión local de Fase 6, Defender impidió actualizar
 dos fixtures PE sintéticos (Win32 225). Los seis escenarios pasaron en CI.
