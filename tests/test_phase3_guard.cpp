@@ -39,7 +39,7 @@ bool Spawn(const std::wstring& exe, const std::wstring& args, PROCESS_INFORMATIO
     std::wstring command = Q(exe) + L" " + args;
     const std::wstring temp = SessionManager::QuerySystemTempDir();
     return ::CreateProcessW(exe.c_str(), command.data(), nullptr, nullptr, FALSE,
-        CREATE_NO_WINDOW, nullptr, temp.c_str(), &si, &p) != FALSE;
+        DETACHED_PROCESS, nullptr, temp.c_str(), &si, &p) != FALSE;
 }
 bool WaitExit(HANDLE process, DWORD expected = 0) {
     DWORD code = 999;
@@ -74,9 +74,10 @@ int Controller(int argc, wchar_t** argv) {
     if (!Check(job.Create(session, L"synthetic", error), "create_job", error)) return 4;
     pm::guard::GuardProcess guard;
     if (!Check(guard.Start(pm, session, error), "start_guard", error)) return 5;
-    PROCESS_INFORMATION worker{};
-    if (!Check(job.Launch(self, L"--tree " + Q(id), SessionManager::QuerySystemTempDir(), worker, error), "launch_tree", error)) return 6;
+    // Keep the event alive before the child can signal and close its handle.
     HANDLE tree_ready = Event(id, L"_tree");
+    PROCESS_INFORMATION worker{};
+    if (!Check(job.Launch(self, L"--tree " + Q(id), SessionManager::QuerySystemTempDir(), worker, error, pm::jobs::ConsoleMode::Detached), "launch_tree", error)) return 6;
     if (!Value("tree_ready", ::WaitForSingleObject(tree_ready, 10000), WAIT_OBJECT_0)) return 7;
     ::CloseHandle(tree_ready);
     if (!Check(session.TransitionState(SessionState::Active).ok, "activate_session")) return 8;

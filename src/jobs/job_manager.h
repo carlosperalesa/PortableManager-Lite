@@ -5,6 +5,8 @@
 #include <string_view>
 
 namespace pm::jobs {
+// Hidden preserves a private console; Detached creates no console or conhost.
+enum class ConsoleMode { Hidden, Detached };
 // One non-inheritable owner handle per application instance. No breakaway allowed.
 class JobManager {
 public:
@@ -15,7 +17,8 @@ public:
     static std::wstring MakeName(std::wstring_view session, std::wstring_view instance);
     bool Create(pm::runtime::SessionManager& session, std::wstring_view instance, DWORD& error);
     bool Launch(const std::wstring& executable, std::wstring_view arguments,
-                const std::wstring& cwd, PROCESS_INFORMATION& process, DWORD& error);
+                const std::wstring& cwd, PROCESS_INFORMATION& process, DWORD& error,
+                ConsoleMode console = ConsoleMode::Hidden);
     static bool TerminateAndWait(const std::wstring& name, DWORD& error);
     const std::wstring& name() const noexcept { return name_; }
 private:
