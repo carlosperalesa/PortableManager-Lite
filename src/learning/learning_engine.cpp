@@ -116,7 +116,7 @@ DWORD ScanOutput(const std::wstring& directory, const std::wstring& prefix,
     do {
         const std::wstring_view name(entry.cFileName);
         if (name == L"." || name == L"..") continue;
-        if (name.find_first_of(L"\\r\\n=[]") != std::wstring_view::npos ||
+        if (name.find_first_of(L"\r\n=[]") != std::wstring_view::npos ||
             (entry.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
             error = ERROR_INVALID_DATA;
             break;
