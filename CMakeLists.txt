@@ -39,6 +39,7 @@ set(PM_GUARD_SOURCES
     src/junctions/junction_manager.cpp
     src/registry/registry_manager.cpp
     src/guard/guard_process.cpp
+    src/cleanup/cleanup_engine.cpp
 )
 
 add_executable(pm
@@ -154,3 +155,23 @@ target_include_directories(test_phase6_learning PRIVATE ${CMAKE_CURRENT_SOURCE_D
 target_link_libraries(test_phase6_learning PRIVATE kernel32 user32 advapi32 ole32 bcrypt version)
 add_test(NAME Phase6_LearningTest COMMAND test_phase6_learning "${CMAKE_CURRENT_BINARY_DIR}/phase6_windows_runtime.json")
 set_tests_properties(Phase6_LearningTest PROPERTIES TIMEOUT 120)
+
+add_executable(test_phase7_cleanup
+    tests/test_phase7_cleanup.cpp
+    ${PM_CORE_SOURCES}
+    ${PM_RUNTIME_SOURCES}
+    ${PM_GUARD_SOURCES}
+)
+target_include_directories(test_phase7_cleanup PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(test_phase7_cleanup PRIVATE kernel32 user32 advapi32 ole32 bcrypt)
+add_test(NAME Phase7_CleanupTest COMMAND test_phase7_cleanup $<TARGET_FILE:pm> "${CMAKE_CURRENT_BINARY_DIR}/phase7_windows_runtime.json")
+set_tests_properties(Phase7_CleanupTest PROPERTIES TIMEOUT 120)
+
+if(NOT CMAKE_CROSSCOMPILING)
+    foreach(suite IN ITEMS Phase3_GuardTest Phase4_JunctionsTest Phase5_RegistryTest Phase6_LearningTest)
+        set(suite_temp "${CMAKE_CURRENT_BINARY_DIR}/temp/${suite}")
+        file(MAKE_DIRECTORY "${suite_temp}")
+        file(TO_NATIVE_PATH "${suite_temp}" suite_temp_native)
+        set_tests_properties(${suite} PROPERTIES ENVIRONMENT "TEMP=${suite_temp_native};TMP=${suite_temp_native}")
+    endforeach()
+endif()

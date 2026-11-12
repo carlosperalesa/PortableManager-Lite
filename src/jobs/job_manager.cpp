@@ -101,6 +101,61 @@ bool JobManager::Launch(const std::wstring& executable, std::wstring_view argume
     }
     error = ERROR_SUCCESS; return true;
 }
+namespace {
+struct CloseWindows {
+    HANDLE job;
+    ULONGLONG deadline;
+    bool requested = false;
+};
+
+BOOL CALLBACK RequestWindowClose(HWND window, LPARAM param) {
+    auto& context = *reinterpret_cast<CloseWindows*>(param);
+    if (::GetTickCount64() >= context.deadline) return FALSE;
+    DWORD pid = 0;
+    const DWORD thread = ::GetWindowThreadProcessId(window, &pid);
+    if (!thread || !pid) return TRUE;
+    HANDLE process = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!process) return TRUE;
+    BOOL in_job = FALSE;
+    DWORD current_pid = 0;
+    if (::IsProcessInJob(process, context.job, &in_job) && in_job &&
+        ::GetWindowThreadProcessId(window, &current_pid) == thread && current_pid == pid &&
+        ::PostMessageW(window, WM_CLOSE, 0, 0))
+        context.requested = true;
+    ::CloseHandle(process);
+    return TRUE;
+}
+
+bool QueryActiveProcesses(HANDLE job, DWORD& active) {
+    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION info{};
+    if (!::QueryInformationJobObject(job, JobObjectBasicAccountingInformation,
+                                     &info, sizeof(info), nullptr))
+        return false;
+    active = info.ActiveProcesses;
+    return true;
+}
+}
+
+bool JobManager::RequestClose(const std::wstring& name, ULONGLONG deadline) {
+    HANDLE job = ::OpenJobObjectW(JOB_OBJECT_QUERY, FALSE, name.c_str());
+    if (!job) return false;
+    CloseWindows context{job, deadline};
+    DWORD active = 0;
+    if (QueryActiveProcesses(job, active) && active)
+        ::EnumWindows(RequestWindowClose, reinterpret_cast<LPARAM>(&context));
+    ::CloseHandle(job);
+    return context.requested;
+}
+
+bool JobManager::IsEmpty(const std::wstring& name) {
+    HANDLE job = ::OpenJobObjectW(JOB_OBJECT_QUERY, FALSE, name.c_str());
+    if (!job) return ::GetLastError() == ERROR_FILE_NOT_FOUND;
+    DWORD active = 0;
+    const bool empty = QueryActiveProcesses(job, active) && active == 0;
+    ::CloseHandle(job);
+    return empty;
+}
+
 bool JobManager::TerminateAndWait(const std::wstring& name, DWORD& error) {
     error = ERROR_SUCCESS;
     HANDLE job = ::OpenJobObjectW(JOB_OBJECT_TERMINATE | JOB_OBJECT_QUERY, FALSE, name.c_str());
@@ -113,11 +168,11 @@ bool JobManager::TerminateAndWait(const std::wstring& name, DWORD& error) {
     if (!ok) error = ::GetLastError();
     const ULONGLONG deadline = ::GetTickCount64() + 10000;
     while (ok) {
-        JOBOBJECT_BASIC_ACCOUNTING_INFORMATION info{};
-        if (!::QueryInformationJobObject(job, JobObjectBasicAccountingInformation, &info, sizeof(info), nullptr)) {
+        DWORD active = 0;
+        if (!QueryActiveProcesses(job, active)) {
             error = ::GetLastError(); ok = false; break;
         }
-        if (info.ActiveProcesses == 0) break;
+        if (active == 0) break;
         if (::GetTickCount64() >= deadline) { error = WAIT_TIMEOUT; ok = false; break; }
         ::Sleep(10); // Bounded drain of terminated Job; never used to monitor PM.
     }

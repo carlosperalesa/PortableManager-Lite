@@ -65,6 +65,7 @@ struct ManifestStatusResult {
 
 struct RollbackSummary {
     bool all_succeeded = false;
+    DWORD persistence_error = ERROR_SUCCESS;
     std::size_t total_considered = 0;
     std::size_t rolled_back_count = 0;
     std::size_t skipped_count = 0;
@@ -94,6 +95,8 @@ public:
     ManifestManager(std::wstring_view session_id, std::wstring_view manifest_file_path);
 
     void Configure(std::wstring_view session_id, std::wstring_view manifest_file_path);
+
+    static std::wstring SessionHeader(std::wstring_view session_id);
 
     const std::wstring& session_id() const noexcept { return session_id_; }
     const std::wstring& manifest_path() const noexcept { return manifest_path_; }

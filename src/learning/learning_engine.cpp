@@ -307,7 +307,12 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
     result.data_path = L"Data\\apps\\" + request.app_id + L"\\" + result.session_id;
     const auto origin = PathResolver::QueryExecutablePath();
     guard::GuardProcess guard;
-    if (!guard.Start(origin, session, result.error, reservation.get())) return result;
+    if (!guard.Start(origin, session, result.error, reservation.get())) {
+        const auto restored = cleanup::CleanupEngine::Run(session, cleanup::Mode::Critical);
+        result.host_restored = restored.ok;
+        result.rollback_error = restored.error;
+        return result;
+    }
 
     jobs::JobManager job;
     bool registry_changed = false;
@@ -358,7 +363,11 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         return ERROR_SUCCESS;
     };
     result.error = run();
-    result.host_restored = guard::CleanupSession(session, result.rollback_error);
+    const auto restored = cleanup::CleanupEngine::Run(
+        session, result.error == ERROR_SUCCESS ? cleanup::Mode::Normal : cleanup::Mode::Critical,
+        cleanup::Artifacts::Remove, &guard);
+    result.host_restored = restored.ok;
+    result.rollback_error = restored.error;
     if (!result.host_restored || result.error != ERROR_SUCCESS) return result;
     if (!guard::IsOriginAccessible(origin)) {
         result.error = ERROR_DEVICE_NOT_CONNECTED;

@@ -94,7 +94,7 @@ int Controller(int argc, wchar_t **argv) {
   if (!Check(job.Create(session, L"synthetic", error), "create_job", error))
     return 4;
   pm::guard::GuardProcess guard;
-  if (!Check(guard.Start(pm, session, error), "start_guard", error))
+  if (!Check(guard.Start(pm, session, error, nullptr, pm::cleanup::Artifacts::KeepManifest), "start_guard", error))
     return 5;
   // Keep the event alive before the child can signal and close its handle.
   HANDLE tree_ready = Event(id, L"_tree");

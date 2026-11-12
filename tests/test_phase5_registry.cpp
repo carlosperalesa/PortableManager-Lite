@@ -334,7 +334,7 @@ int Owner(const std::wstring& self, const std::wstring& pm, const std::wstring& 
     Check(session.OpenExistingSession(id).ok, "open synthetic owner session");
     pm::guard::GuardProcess guard;
     DWORD error = 0;
-    const bool started = guard.Start(pm, session, error);
+    const bool started = guard.Start(pm, session, error, nullptr, pm::cleanup::Artifacts::KeepManifest);
     Check(started, "start PMGuard", error);
     const auto ids = fs::path(session.session_dir()) / L"test-process-ids.txt";
     const bool prepared = RegistryManager::Prepare(session, Full(id), error);

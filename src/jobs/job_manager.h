@@ -19,6 +19,8 @@ public:
     bool Launch(const std::wstring& executable, std::wstring_view arguments,
                 const std::wstring& cwd, PROCESS_INFORMATION& process, DWORD& error,
                 ConsoleMode console = ConsoleMode::Hidden);
+    static bool RequestClose(const std::wstring& name, ULONGLONG deadline);
+    static bool IsEmpty(const std::wstring& name);
     static bool TerminateAndWait(const std::wstring& name, DWORD& error);
     const std::wstring& name() const noexcept { return name_; }
 private:

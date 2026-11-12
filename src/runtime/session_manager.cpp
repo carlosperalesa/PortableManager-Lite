@@ -1,8 +1,10 @@
 #include "runtime/session_manager.h"
 
 #include "core/atomic_file.h"
+#include "core/config_manager.h"
 
 #include <objbase.h>
+#include <algorithm>
 #include <cwchar>
 #include <cwctype>
 
@@ -198,6 +200,40 @@ ManifestStatusResult SessionManager::QueryCurrentStateFromDisk(SessionState& out
     return st;
 }
 
+namespace {
+bool RemoveOwnedManifestFile(const std::wstring& path, const std::string& header,
+                             bool& foreign, DWORD& error) {
+    HANDLE file = ::CreateFileW(path.c_str(), DELETE | GENERIC_READ, FILE_SHARE_READ,
+                                nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        error = ::GetLastError();
+        if (error != ERROR_FILE_NOT_FOUND) return false;
+        error = ERROR_SUCCESS;
+        return true;
+    }
+    BY_HANDLE_FILE_INFORMATION info{};
+    DWORD read = 0;
+    std::string actual(header.size(), '\0');
+    error = ERROR_SUCCESS;
+    if (!::GetFileInformationByHandle(file, &info)) {
+        error = ::GetLastError();
+    } else if (info.nNumberOfLinks != 1 ||
+               (info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))) {
+        foreign = true;
+    } else if (!::ReadFile(file, actual.data(), static_cast<DWORD>(actual.size()), &read, nullptr)) {
+        error = ::GetLastError();
+    } else if (read != header.size() || actual != header) {
+        foreign = true;
+    } else {
+        FILE_DISPOSITION_INFO disposition{TRUE};
+        if (!::SetFileInformationByHandle(file, FileDispositionInfo, &disposition, sizeof(disposition)))
+            error = ::GetLastError();
+    }
+    ::CloseHandle(file);
+    return error == ERROR_SUCCESS;
+}
+}
+
 bool SessionManager::FinalizeSessionAndCleanupOwnFiles(
     bool remove_manifest_when_cleaned,
     DWORD& out_error) {
@@ -208,35 +244,51 @@ bool SessionManager::FinalizeSessionAndCleanupOwnFiles(
         return false;
     }
 
-    // 1. Eliminar exclusivamente archivos temporales transitorios de escritura atómica (session.ini.pmtmp.*)
-    const std::wstring pattern = session_dir_ + L"\\session.ini.pmtmp.*";
-    WIN32_FIND_DATAW fd{};
-    HANDLE hFind = ::FindFirstFileW(pattern.c_str(), &fd);
-    if (hFind != INVALID_HANDLE_VALUE) {
-        do {
-            if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
-                const std::wstring tmp_file = session_dir_ + L"\\" + fd.cFileName;
-                ::DeleteFileW(tmp_file.c_str());
-            }
-        } while (::FindNextFileW(hFind, &fd));
-        ::FindClose(hFind);
+    const DWORD attributes = ::GetFileAttributesW(session_dir_.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES) {
+        out_error = ::GetLastError();
+        return false;
     }
-
-    // 2. Comprobar que TODAS las operaciones estén en un estado terminal aceptable (ROLLED_BACK o SKIPPED)
+    if (!(attributes & FILE_ATTRIBUTE_DIRECTORY) || (attributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+        out_error = ERROR_INVALID_DATA;
+        return false;
+    }
     if (!manifest_.AreAllOperationsTerminalAcceptable()) {
         out_error = ERROR_DS_BUSY;
         return false;
     }
 
-    // 3. Verificar que no quede ningún respaldo .reg pendiente de restaurar en la carpeta de sesión
-    const std::wstring reg_pattern = session_dir_ + L"\\*.reg";
-    WIN32_FIND_DATAW reg_fd{};
-    HANDLE hRegFind = ::FindFirstFileW(reg_pattern.c_str(), &reg_fd);
-    if (hRegFind != INVALID_HANDLE_VALUE) {
-        ::FindClose(hRegFind);
-        out_error = ERROR_DS_BUSY;
+    const auto header = core::IniDocument::WideToUtf8(ManifestManager::SessionHeader(session_id_));
+    bool other_entries = false;
+    WIN32_FIND_DATAW entry{};
+    const HANDLE scan = ::FindFirstFileW((session_dir_ + L"\\*").c_str(), &entry);
+    if (scan == INVALID_HANDLE_VALUE) {
+        out_error = ::GetLastError();
         return false;
     }
+    constexpr std::wstring_view temp_prefix = L"session.ini.pmtmp.";
+    do {
+        const std::wstring_view name(entry.cFileName);
+        if (name == L"." || name == L".." || name == L"session.ini") continue;
+        const auto suffix = name.starts_with(temp_prefix) ? name.substr(temp_prefix.size()) : L"";
+        const bool atomic_name = std::count(suffix.begin(), suffix.end(), L'.') == 3 &&
+            suffix.find_first_not_of(L"0123456789.") == std::wstring_view::npos &&
+            !suffix.starts_with(L".") && !suffix.ends_with(L".") &&
+            suffix.find(L"..") == std::wstring_view::npos;
+        if (!atomic_name || (entry.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))) {
+            other_entries = true;
+            if (name.size() >= 4 && ::CompareStringOrdinal(name.data() + name.size() - 4, 4, L".reg", 4, TRUE) == CSTR_EQUAL)
+                out_error = ERROR_DS_BUSY;
+            continue;
+        }
+        const auto temp = session_dir_ + L"\\" + std::wstring(name);
+        DWORD temp_error = ERROR_SUCCESS;
+        if (!RemoveOwnedManifestFile(temp, header, other_entries, temp_error)) out_error = temp_error;
+    } while (::FindNextFileW(scan, &entry));
+    const DWORD scan_error = ::GetLastError();
+    ::FindClose(scan);
+    if (scan_error != ERROR_NO_MORE_FILES) out_error = scan_error;
+    if (out_error != ERROR_SUCCESS) return false;
 
     if (manifest_.session_state() != SessionState::Cleaned) {
         const auto st = manifest_.SetSessionStateAndPersist(SessionState::Cleaned);
@@ -246,17 +298,19 @@ bool SessionManager::FinalizeSessionAndCleanupOwnFiles(
         }
     }
 
-    if (remove_manifest_when_cleaned) {
-        if (::GetFileAttributesW(manifest_path_.c_str()) != INVALID_FILE_ATTRIBUTES) {
-            if (!::DeleteFileW(manifest_path_.c_str())) {
-                out_error = ::GetLastError();
-                return false;
-            }
+    // Keep the terminal manifest if an unowned entry prevents removing the directory.
+    if (remove_manifest_when_cleaned && !other_entries) {
+        bool foreign_manifest = false;
+        if (!RemoveOwnedManifestFile(manifest_path_, header, foreign_manifest, out_error)) return false;
+        if (foreign_manifest) {
+            out_error = ERROR_INVALID_DATA;
+            return false;
         }
-        // RemoveDirectoryW solo elimina la carpeta si está completamente vacía
-        ::RemoveDirectoryW(session_dir_.c_str());
+        if (!::RemoveDirectoryW(session_dir_.c_str())) {
+            out_error = ::GetLastError();
+            return out_error == ERROR_FILE_NOT_FOUND || out_error == ERROR_PATH_NOT_FOUND;
+        }
     }
-
     return true;
 }
 

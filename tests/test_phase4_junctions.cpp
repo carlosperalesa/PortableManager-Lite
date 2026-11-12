@@ -250,7 +250,7 @@ int Owner(const std::wstring& pm, const fs::path& root, const std::wstring& id) 
     Check(session.OpenExistingSession(id).ok, "owner opens session");
     pm::guard::GuardProcess guard;
     DWORD error = 0;
-    const bool started = guard.Start(pm, session, error);
+    const bool started = guard.Start(pm, session, error, nullptr, pm::cleanup::Artifacts::KeepManifest);
     Check(started, "start real PMGuard", error);
     const bool applied = JunctionManager::Prepare(session, pm::core::PathResolver((root / L"portable").native()),
                                                    L"synthetic", (root / L"exclusive").native(), kData, error);

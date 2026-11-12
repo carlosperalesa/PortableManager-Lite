@@ -1,8 +1,5 @@
 #include "guard/guard_process.h"
-#include "junctions/junction_manager.h"
 #include "jobs/job_manager.h"
-#include "registry/registry_manager.h"
-#include "runtime/session_lock.h"
 #include <dbt.h>
 #include <vector>
 
@@ -47,8 +44,41 @@ HWND CreateOriginMonitorWindow(HDEVNOTIFY &out_notify) noexcept {
 } // namespace
 
 GuardProcess::~GuardProcess() {
-  if (process_)
-    ::CloseHandle(process_);
+  if (process_) ::CloseHandle(process_);
+  if (stop_) ::CloseHandle(stop_);
+  if (shadow_) ::CloseHandle(shadow_);
+}
+
+bool GuardProcess::Retire(DWORD& error) {
+  error = ERROR_SUCCESS;
+  if (!process_ || !stop_ || !shadow_) return true;
+  if (!::SetEvent(stop_)) {
+    error = ::GetLastError();
+    return false;
+  }
+  const DWORD waited = ::WaitForSingleObject(process_, 10000);
+  if (waited != WAIT_OBJECT_0) {
+    error = waited == WAIT_TIMEOUT ? ERROR_TIMEOUT : ::GetLastError();
+    return false;
+  }
+  BY_HANDLE_FILE_INFORMATION info{};
+  if (!::GetFileInformationByHandle(shadow_, &info)) {
+    error = ::GetLastError();
+    return false;
+  }
+  if (info.nNumberOfLinks != 1 ||
+      (info.dwFileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY))) {
+    error = ERROR_INVALID_DATA;
+    return false;
+  }
+  FILE_DISPOSITION_INFO remove{TRUE};
+  if (!::SetFileInformationByHandle(shadow_, FileDispositionInfo, &remove, sizeof(remove))) {
+    error = ::GetLastError();
+    return false;
+  }
+  ::CloseHandle(shadow_);
+  shadow_ = nullptr;
+  return true;
 }
 
 bool IsOriginAccessible(const std::wstring &pm_executable) noexcept {
@@ -145,7 +175,7 @@ OriginWaitResult WaitForReleaseOrOriginLoss(const std::wstring &pm_executable,
 }
 bool GuardProcess::Start(const std::wstring &executable,
                          pm::runtime::SessionManager &session, DWORD &error,
-                         HANDLE resource_reservation) {
+                         HANDLE resource_reservation, cleanup::Artifacts artifacts) {
   error = ERROR_SUCCESS;
   if (process_ || session.session_dir().empty()) {
     error = ERROR_INVALID_STATE;
@@ -156,19 +186,40 @@ bool GuardProcess::Start(const std::wstring &executable,
     error = ::GetLastError();
     return false;
   }
-  HANDLE parent = nullptr;
-  if (!::DuplicateHandle(
-          ::GetCurrentProcess(), ::GetCurrentProcess(), ::GetCurrentProcess(),
-          &parent, SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, TRUE, 0)) {
-    error = ::GetLastError();
-    ::DeleteFileW(shadow.c_str());
-    return false;
-  }
   SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
-  HANDLE ready = ::CreateEventW(&sa, TRUE, FALSE, nullptr);
-  if (!ready) {
+  const bool retire = artifacts == cleanup::Artifacts::Remove;
+  HANDLE parent = nullptr;
+  HANDLE ready = nullptr;
+  HANDLE stop = nullptr;
+  HANDLE shadow_file = INVALID_HANDLE_VALUE;
+  const auto release = [&] {
+    if (parent) ::CloseHandle(parent);
+    if (ready) ::CloseHandle(ready);
+    if (stop) ::CloseHandle(stop);
+    if (shadow_file != INVALID_HANDLE_VALUE) ::CloseHandle(shadow_file);
+  };
+  bool ok = ::DuplicateHandle(
+      ::GetCurrentProcess(), ::GetCurrentProcess(), ::GetCurrentProcess(),
+      &parent, SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, TRUE, 0) != FALSE;
+  if (ok) {
+    ready = ::CreateEventW(&sa, TRUE, FALSE, nullptr);
+    ok = ready != nullptr;
+  }
+  if (ok && retire) {
+    stop = ::CreateEventW(&sa, TRUE, FALSE, nullptr);
+    ok = stop != nullptr;
+  }
+  if (ok && retire) {
+    // Hold the actual copy through retirement, so no later name lookup deletes
+    // a different file. The image loader needs delete sharing.
+    shadow_file = ::CreateFileW(shadow.c_str(), DELETE | FILE_READ_ATTRIBUTES,
+                                FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                                FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    ok = shadow_file != INVALID_HANDLE_VALUE;
+  }
+  if (!ok) {
     error = ::GetLastError();
-    ::CloseHandle(parent);
+    release();
     ::DeleteFileW(shadow.c_str());
     return false;
   }
@@ -187,12 +238,14 @@ bool GuardProcess::Start(const std::wstring &executable,
   const bool reserved = !resource_reservation ||
       ::DuplicateHandle(::GetCurrentProcess(), resource_reservation, ::GetCurrentProcess(),
                         &reservation, 0, TRUE, DUPLICATE_SAME_ACCESS);
-  HANDLE inherited[] = {parent, ready, reservation};
-  const SIZE_T inherited_bytes = reservation ? sizeof(inherited) : 2 * sizeof(HANDLE);
-  bool ok = reserved && initialized &&
+  HANDLE inherited[] = {parent, ready, stop, reservation};
+  SIZE_T inherited_count = 2;
+  if (stop) inherited[inherited_count++] = stop;
+  if (reservation) inherited[inherited_count++] = reservation;
+  ok = reserved && initialized &&
             ::UpdateProcThreadAttribute(
                 startup.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
-                inherited, inherited_bytes, nullptr, nullptr);
+                inherited, inherited_count * sizeof(HANDLE), nullptr, nullptr);
   PROCESS_INFORMATION pi{};
   if (ok) {
     std::wstring command =
@@ -200,6 +253,8 @@ bool GuardProcess::Start(const std::wstring &executable,
         pm::jobs::QuoteArgument(session.session_id()) + L" " +
         std::to_wstring(reinterpret_cast<ULONG_PTR>(parent)) + L" " +
         std::to_wstring(reinterpret_cast<ULONG_PTR>(ready));
+    if (stop)
+      command += L" " + std::to_wstring(reinterpret_cast<ULONG_PTR>(stop));
     const std::wstring temp = pm::runtime::SessionManager::QuerySystemTempDir();
     ok = ::CreateProcessW(shadow.c_str(), command.data(), nullptr, nullptr,
                           TRUE, EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW,
@@ -212,7 +267,6 @@ bool GuardProcess::Start(const std::wstring &executable,
     ::DeleteProcThreadAttributeList(startup.lpAttributeList);
   if (reservation)
     ::CloseHandle(reservation);
-  ::CloseHandle(parent);
   if (ok) {
     ::CloseHandle(pi.hThread);
     HANDLE waits[] = {pi.hProcess, ready};
@@ -223,57 +277,23 @@ bool GuardProcess::Start(const std::wstring &executable,
       ::TerminateProcess(pi.hProcess, error);
       ::WaitForSingleObject(pi.hProcess, INFINITE);
       ::CloseHandle(pi.hProcess);
-    } else
+    } else {
       process_ = pi.hProcess;
+      stop_ = stop;
+      shadow_ = retire ? shadow_file : nullptr;
+      stop = nullptr;
+      shadow_file = INVALID_HANDLE_VALUE;
+    }
   }
-  ::CloseHandle(ready);
+  release();
   if (!ok)
     ::DeleteFileW(shadow.c_str());
   return ok;
 }
 bool CleanupSession(pm::runtime::SessionManager &session, DWORD &error) {
-  error = ERROR_SUCCESS;
-  pm::runtime::SessionLock lock(session.session_mutex_name());
-  if (!lock.ok()) {
-    error = lock.error();
-    return false;
-  }
-  auto loaded = session.manifest().LoadFromDisk();
-  bool ok = loaded.ok;
-  if (!ok)
-    error = loaded.win32_error;
-  if (ok && session.manifest().session_state() !=
-                pm::runtime::SessionState::Cleaned) {
-    // Validate ALL names and types before invoking any rollback. Do not allow a
-    // forged manifest to reference another session's or an unrelated named Job.
-    for (const auto &op : session.manifest().operations()) {
-      const bool session_job = op.type == pm::runtime::OperationType::KillJob &&
-          op.job_name == pm::jobs::JobManager::MakeName(session.session_id(), op.app_id);
-      const bool registry = pm::registry::RegistryManager::IsRegistryOperation(op, session.session_dir());
-      if (!session_job && !registry && !pm::junctions::JunctionManager::IsJunctionOperation(op)) {
-        error = ERROR_NOT_SUPPORTED;
-        ok = false;
-        break;
-      }
-    }
-    if (ok) {
-      pm::runtime::RollbackHandlers handlers;
-      handlers.on_kill_job = [](const auto &op, DWORD &err) {
-        if (pm::runtime::ManifestManager::IsTerminalAcceptableState(op.state)) {
-          err = ERROR_SUCCESS;
-          return true;
-        }
-        return pm::jobs::JobManager::TerminateAndWait(op.job_name, err);
-      };
-      handlers.on_remove_junction = pm::junctions::JunctionManager::Rollback;
-      handlers.on_restore_reg = pm::registry::RegistryManager::Rollback;
-      handlers.on_release_reg_backup = pm::registry::RegistryManager::ReleaseBackup;
-      const auto summary = session.manifest().ExecutePendingRollbacks(handlers);
-      ok = summary.all_succeeded;
-      if (!ok)
-        error = ERROR_CAN_NOT_COMPLETE;
-    }
-  }
-  return ok;
+  const auto result = cleanup::CleanupEngine::Run(
+      session, cleanup::Mode::Critical, cleanup::Artifacts::KeepManifest);
+  error = result.error;
+  return result.ok;
 }
 } // namespace pm::guard

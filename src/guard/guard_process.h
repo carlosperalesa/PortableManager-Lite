@@ -1,5 +1,5 @@
 #pragma once
-#include "runtime/session_manager.h"
+#include "cleanup/cleanup_module.h"
 #include <string>
 #include <windows.h>
 
@@ -13,14 +13,19 @@ public:
   GuardProcess(const GuardProcess &) = delete;
   GuardProcess &operator=(const GuardProcess &) = delete;
   // Copies the SAME PM executable into the active session. Only the PM
-  // synchronization handle, readiness event and optional resource reservation
-  // are inherited (STARTUPINFOEX handle allowlist).
+  // synchronization handle, readiness/retirement events and an optional resource
+  // reservation are inherited through the STARTUPINFOEX allowlist.
   bool Start(const std::wstring &pm_executable,
              pm::runtime::SessionManager &session, DWORD &error,
-             HANDLE resource_reservation = nullptr);
+             HANDLE resource_reservation = nullptr,
+             cleanup::Artifacts artifacts = cleanup::Artifacts::Remove);
   HANDLE handle() const noexcept { return process_; }
+  // Only after durable restoration. Stop the idle guard and remove its own image.
+  bool Retire(DWORD& error);
 
 private:
+  HANDLE stop_ = nullptr;
+  HANDLE shadow_ = nullptr;
   HANDLE process_ = nullptr;
 };
 // Verifies that PM's origin executable, parent directory and volume remain
