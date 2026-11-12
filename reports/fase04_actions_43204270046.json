@@ -1,0 +1,15 @@
+{
+  "phase": 4,
+  "run_id": 43204270046,
+  "url": "https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43204270046",
+  "head_sha": "433a6698db298e88971f9510d1ff77133b0f4fae",
+  "status": "failed",
+  "cross_compile_linux": "passed",
+  "windows": {
+    "native_compile": "passed",
+    "regression_0b_through_3": "passed",
+    "phase4_passed": 0,
+    "phase4_failed": 9,
+    "observed": "La preparación de Junctions devolvió ERROR_INVALID_NAME (123) en el runner. Los casos de ciclo de vida fallaron al esperar a que el propietario sintético completara la preparación."
+  }
+}

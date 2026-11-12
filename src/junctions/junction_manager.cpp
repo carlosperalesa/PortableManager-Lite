@@ -41,7 +41,8 @@ bool Equal(std::wstring_view a, std::wstring_view b) {
 }
 
 bool Within(std::wstring_view child, std::wstring_view parent) {
-    return child.size() > parent.size() && child[parent.size()] == L'\\' &&
+    return !parent.empty() && child.size() > parent.size() &&
+           (parent.back() == L'\\' || child[parent.size()] == L'\\') &&
            Equal(child.substr(0, parent.size()), parent);
 }
 
@@ -115,10 +116,31 @@ std::wstring FileId(const BY_HANDLE_FILE_INFORMATION& info) {
     return text;
 }
 
-// Pin every ancestor before descending. Reject ancestor junctions and aliases
-// such as a short path or a substituted drive before using the full path.
-bool PinPath(const std::wstring& path, std::vector<Handle>& chain, DWORD& error,
-             DWORD sharing = FILE_SHARE_READ) {
+bool ReadLongName(const std::wstring& path, std::wstring& name, DWORD& error) {
+    wchar_t buffer[MAX_PATH]{};
+    const DWORD length = ::GetLongPathNameW(path.c_str(), buffer, std::size(buffer));
+    if (!length) return Fail(error);
+    if (length >= std::size(buffer)) return Fail(error, ERROR_FILENAME_EXCED_RANGE);
+    name.assign(buffer, length);
+    return true;
+}
+
+bool MatchesFinalName(HANDLE handle, const std::wstring& long_name, DWORD& error) {
+    wchar_t canonical[MAX_PATH + 5]{};
+    const DWORD length = ::GetFinalPathNameByHandleW(handle, canonical, std::size(canonical),
+                                                     FILE_NAME_NORMALIZED);
+    if (!length) return Fail(error);
+    if (length >= std::size(canonical) ||
+        !Equal(std::wstring_view(canonical, length), L"\\\\?\\" + long_name))
+        return Fail(error, ERROR_INVALID_NAME);
+    return true;
+}
+
+// Pin every ancestor before descending. Windows may supply short names in
+// environment paths such as TEMP. Expand them without accepting a reparse
+// ancestor or a substituted drive as a different physical path.
+bool PinPath(const std::wstring& path, std::vector<Handle>& chain, std::wstring& long_name,
+             DWORD& error, DWORD sharing = FILE_SHARE_READ) {
     for (std::size_t end = 3;;) {
         const auto prefix = path.substr(0, end);
         Handle dir;
@@ -133,13 +155,8 @@ bool PinPath(const std::wstring& path, std::vector<Handle>& chain, DWORD& error,
         if (end == std::wstring::npos) end = path.size();
     }
 
-    wchar_t canonical[MAX_PATH + 5]{};
-    const DWORD n = ::GetFinalPathNameByHandleW(chain.back().get(), canonical,
-                                               std::size(canonical), FILE_NAME_NORMALIZED);
-    if (!n) return Fail(error);
-    if (n >= std::size(canonical) || !Equal(std::wstring_view(canonical, n), L"\\\\?\\" + path))
-        return Fail(error, ERROR_INVALID_NAME);
-    return true;
+    return ReadLongName(path, long_name, error) &&
+           MatchesFinalName(chain.back().get(), long_name, error);
 }
 
 bool Rename(HANDLE source, const std::wstring& to, DWORD& error) {
@@ -288,11 +305,16 @@ bool JunctionManager::Prepare(runtime::SessionManager& session, const PathResolv
     }
 
     std::vector<Handle> host_chain, target_chain;
-    // Permit regular writes to the app data. The host chain and managed entries
-    // are independently pinned for the duration of the transaction.
-    if (!PinPath(Parent(exclusive_host_path), host_chain, error) ||
-        !PinPath(op.junction_target, target_chain, error, FILE_SHARE_READ | FILE_SHARE_WRITE))
-        return false;
+    std::wstring host_parent, portable_target, portable_root;
+    if (!PinPath(Parent(exclusive_host_path), host_chain, host_parent, error) ||
+        !PinPath(op.junction_target, target_chain, portable_target, error,
+                 FILE_SHARE_READ | FILE_SHARE_WRITE) ||
+        !ReadLongName(resolver.root_dir(), portable_root, error)) return false;
+    op.junction_target = std::move(portable_target);
+    const auto host_name = host_parent + L"\\" + std::wstring(leaf);
+    if (Equal(host_name, portable_root) || Within(host_name, portable_root) ||
+        Within(portable_root, host_name) || !Within(op.junction_target, portable_root))
+        return Fail(error, ERROR_INVALID_NAME);
 
     BY_HANDLE_FILE_INFORMATION info{};
     if (!ReadInfo(host_chain.back().get(), info, error)) return false;
@@ -310,13 +332,9 @@ bool JunctionManager::Prepare(runtime::SessionManager& session, const PathResolv
     if (original) {
         if (!ReadInfo(original.get(), info, error)) return false;
         if (!PlainDirectory(info)) return Fail(error, ERROR_DIRECTORY);
-        wchar_t canonical[MAX_PATH + 5]{};
-        const DWORD length = ::GetFinalPathNameByHandleW(original.get(), canonical,
-                                                        std::size(canonical), FILE_NAME_NORMALIZED);
-        if (!length) return Fail(error);
-        if (length >= std::size(canonical) ||
-            !Equal(std::wstring_view(canonical, length), L"\\\\?\\" + exclusive_host_path))
-            return Fail(error, ERROR_INVALID_NAME);
+        // The leaf itself must be its actual name so restoring it by name
+        // cannot accidentally publish the original at a former short alias.
+        if (!MatchesFinalName(original.get(), host_name, error)) return false;
         op.original_existed = true;
         op.original_file_id = FileId(info);
     }
@@ -346,7 +364,8 @@ bool JunctionManager::Rollback(const ManifestOperation& op, DWORD& error) {
     error = ERROR_SUCCESS;
     if (!IsJunctionOperation(op)) return Fail(error, ERROR_INVALID_DATA);
     std::vector<Handle> host_chain;
-    if (!PinPath(Parent(op.target_host_path), host_chain, error)) return false;
+    std::wstring host_parent;
+    if (!PinPath(Parent(op.target_host_path), host_chain, host_parent, error)) return false;
     BY_HANDLE_FILE_INFORMATION info{};
     if (!ReadInfo(host_chain.back().get(), info, error)) return false;
     if (op.host_parent_file_id != FileId(info)) return Fail(error, ERROR_INVALID_DATA);

@@ -4,7 +4,7 @@ La implementación está en `feat/fase04-junctions`, sobre la Fase 3 aprobada y 
 
 ## Alcance
 
-`JunctionManager::Prepare` recibe una carpeta exclusiva del anfitrión ya atribuida a una aplicación y un directorio existente de datos relativo a `Data/apps/<id>`. El llamador arranca PMGuard antes de preparar la redirección, registra el Job después y usa `CleanupSession` ante un fallo. El módulo comprueba las rutas, rechaza puntos de reanálisis en los antecesores y exige NTFS para el directorio del anfitrión. La unidad de datos de PM puede ser distinta.
+`JunctionManager::Prepare` recibe una carpeta exclusiva del anfitrión ya atribuida a una aplicación y un directorio existente de datos relativo a `Data/apps/<id>`. El llamador arranca PMGuard antes de preparar la redirección, registra el Job después y usa `CleanupSession` ante un fallo. El módulo comprueba las rutas, expande nombres cortos en rutas de entorno, rechaza puntos de reanálisis en los antecesores y exige NTFS para el directorio del anfitrión. La unidad de datos de PM puede ser distinta.
 
 El manifiesto de la sesión activa registra `REMOVE_JUNCTION` antes de crear un directorio provisional hermano con GUID. Guarda su identidad de archivo antes de configurar la Junction. Luego verifica el punto de montaje, renombra la carpeta original a `.pmbkp` si existía y publica la Junction con un renombrado sin reemplazo. Tanto PM como PMGuard usan el mismo rollback bajo el mutex de sesión, después de terminar los Jobs.
 
@@ -18,12 +18,13 @@ La selección automática de carpetas, las aplicaciones reales y el motor de lim
 
 ```powershell
 pwsh -NoProfile -File tools/bootstrap-toolchain.ps1
-pwsh -NoProfile -File build.ps1 -ReportJsonPath reports/rebuild_junctions.json
+pwsh -NoProfile -File build.ps1 -ReportJsonPath reports/rebuild_junctions_windows_final.json
 ```
 
 El script verifica el PE AMD64, el indicador `SWAPRUN:CD` y las importaciones. Ejecuta las regresiones 0B, 1, 2 y 3, y genera un JSON de Fase 4 con el estado de cada escenario. La suite usa carpetas sintéticas de `%TEMP%` y arranca el ejecutable de PMGuard en las pruebas de ciclo de vida.
 
-- Informe de la compilación y las pruebas nativas [reports/rebuild_junctions.json](../reports/rebuild_junctions.json).
+- Windows local pasó 9/9 escenarios y las regresiones 0B a 3. La suite de Junctions también pasó 9/9 con un nombre corto 8.3 real en TEMP. Informe de la compilación y las pruebas nativas [reports/rebuild_junctions_windows_final.json](../reports/rebuild_junctions_windows_final.json).
 - GitHub Actions adjunta el informe del runner Windows y ejecuta la compilación cruzada en Linux.
+- La primera ejecución de Actions detectó ERROR_INVALID_NAME al preparar Junctions en Windows. Se conserva el resultado y el informe local previo. [Ejecución 43204270046](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43204270046) · [JSON](../reports/fase04_actions_43204270046.json) · [Informe local previo](../reports/rebuild_junctions.json).
 
 Fase 5 pendiente de aprobación del cierre de Fase 4.

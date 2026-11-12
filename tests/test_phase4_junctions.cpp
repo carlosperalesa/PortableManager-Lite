@@ -163,7 +163,8 @@ void Preconditions() {
     const auto original = Hash(f.host / L"original.txt");
     Check(::MoveFileExW(f.target.c_str(), f.detached.c_str(), 0), "hide target before prepare");
     DWORD error = 0;
-    Check(!f.Prepare(session, error) && error == ERROR_PATH_NOT_FOUND, "reject missing target");
+    const bool prepared_missing = f.Prepare(session, error);
+    Check(!prepared_missing && error == ERROR_PATH_NOT_FOUND, "reject missing target", error);
     Check(::MoveFileExW(f.detached.c_str(), f.target.c_str(), 0), "restore synthetic target");
     Check(!JunctionManager::Prepare(session, pm::core::PathResolver(f.portable.native()),
                                     L"other", f.host.native(), kData, error), "reject other app data");
@@ -342,8 +343,14 @@ int wmain(int argc, wchar_t* argv[]) {
     if (argc != 3) return 2;
     std::ofstream report(fs::path(argv[2]), std::ios::binary);
     if (!report) return 2;
+    const auto temp = SessionManager::QuerySystemTempDir();
+    wchar_t expanded[MAX_PATH]{};
+    const DWORD length = ::GetLongPathNameW(temp.c_str(), expanded, MAX_PATH);
+    const bool temp_short_name = length && length < MAX_PATH && temp != std::wstring_view(expanded, length);
+    std::cout << "TEMP long-name expansion: " << (temp_short_name ? "changed" : "unchanged") << '\n';
     unsigned passed = 0, failed = 0;
-    report << "{\n  \"scenarios\": [\n";
+    report << "{\n  \"temp_long_name_expansion_changed\": "
+           << (temp_short_name ? "true" : "false") << ",\n  \"scenarios\": [\n";
     auto run = [&](const char* name, auto scenario) {
         if (passed + failed) report << ",\n";
         bool ok = false;
