@@ -1,0 +1,26 @@
+﻿{
+    "timestamp_utc":  "2026-11-12T03:04:08.1254457Z",
+    "session_id":  "ed12c050-cbf9-4e98-938e-841b03d1c1e5",
+    "job_name":  "Local\\PM_Job_36_ed12c050-cbf9-4e98-938e-841b03d1c1e5_synthetic",
+    "pids":  {
+                 "owner_pid":  4076,
+                 "guard_pid":  12256,
+                 "worker_pid":  10744,
+                 "leaf_pid":  10184,
+                 "outsider_pid":  11356
+             },
+    "usb_still_mounted":  false,
+    "origin_loss_detected":  true,
+    "owner_terminated":  true,
+    "guard_terminated":  true,
+    "worker_terminated":  true,
+    "leaf_terminated":  true,
+    "job_drained":  true,
+    "outsider_survived":  true,
+    "manifest_cleaned":  true,
+    "job_rolled_back":  true,
+    "single_cleanup_verified":  true,
+    "controller_diagnostics":  "[CHECK] controller_physical-usb_ed12c050-cbf9-4e98-938e-841b03d1c1e5 step=initialize_session status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_ed12c050-cbf9-4e98-938e-841b03d1c1e5 step=create_job status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_ed12c050-cbf9-4e98-938e-841b03d1c1e5 step=start_guard status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_ed12c050-cbf9-4e98-938e-841b03d1c1e5 step=launch_tree status=passed actual=0 expected=0 last_error=18\n[CHECK] controller_physical-usb_ed12c050-cbf9-4e98-938e-841b03d1c1e5 step=tree_ready status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_ed12c050-cbf9-4e98-938e-841b03d1c1e5 step=activate_session status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_ed12c050-cbf9-4e98-938e-841b03d1c1e5 step=publish_pids status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_ed12c050-cbf9-4e98-938e-841b03d1c1e5 step=wait_origin_loss status=passed actual=1 expected=1 last_error=0\n[CHECK] controller_physical-usb_ed12c050-cbf9-4e98-938e-841b03d1c1e5 step=cleanup_origin_loss_first status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_ed12c050-cbf9-4e98-938e-841b03d1c1e5 step=cleanup_origin_loss_repeat status=passed actual=0 expected=0 last_error=0\n",
+    "manifest_content":  "; PortableManager Lite — Transient Host Restoration Manifest\r\n[Session]\r\nFormatSignature=PM_SESSION_MANIFEST_V1\r\nSessionId=ed12c050-cbf9-4e98-938e-841b03d1c1e5\r\nState=CLEANED\r\nOperationCount=1\r\n\r\n[Op.op_0001]\r\nIndex=0\r\nOpId=op_0001\r\nOpType=KILL_JOB\r\nOpState=ROLLED_BACK\r\nOriginalExisted=0\r\nAppId=synthetic\r\nTargetPath=\r\nBackupPath=\r\nRegKeyPath=\r\nJobName=Local\\PM_Job_36_ed12c050-cbf9-4e98-938e-841b03d1c1e5_synthetic\r\nLastError=0\r\n\r\n[Footer]\r\nEndMarker=EOF_OK\r\n",
+    "status":  "passed"
+}

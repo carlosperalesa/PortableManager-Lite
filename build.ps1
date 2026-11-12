@@ -140,8 +140,8 @@ $test3Sources = @(
 ) + $coreSources + $runtimeSources
 & $ClangPP -std=c++20 -O2 -Wall -Wextra -Werror `
     -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNOMINMAX `
-    -municode -static "-I$IncludeDir" $test3Sources -o $Phase3TestExe `
-    -lkernel32 -ladvapi32 -lole32
+    -municode -static "-Wl,-Xlink=-swaprun:cd" "-I$IncludeDir" $test3Sources -o $Phase3TestExe `
+    -lkernel32 -luser32 -ladvapi32 -lole32
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Phase3TestExe)) {
     throw "Fallo al compilar test_phase3_guard.exe (ExitCode=$LASTEXITCODE)"
 }
@@ -219,7 +219,7 @@ $clangVer    = ((& $ClangPP --version) | Select-Object -First 1).Trim()
 
 if (-not [string]::IsNullOrWhiteSpace($ReportJsonPath)) {
     $reportObj = [ordered]@{
-        phase         = "Fase 3 — JobObjects y PMGuard; regresion 0B, 1 y 2"
+        phase         = "Fase 3 $([char]0x2014) JobObjects y PMGuard; regresion 0B, 1 y 2"
         timestamp_utc = (Get-Date).ToUniversalTime().ToString("o")
         toolchain     = [ordered]@{
             name             = "llvm-mingw 20261104 (UCRT x86_64)"

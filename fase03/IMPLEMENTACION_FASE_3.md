@@ -93,10 +93,36 @@ de cierre y PMG comparten el estado persistido y el mutex para evitar doble limp
   de humo exige código 2 cuando faltan los handles. Las evidencias históricas
   permanecen intactas.
 
+## Detección de pérdida del volumen de origen con PM activo
+
+En `src/guard/guard_process.{h,cpp}` se implementan `IsOriginAccessible` y
+`WaitForReleaseOrOriginLoss` conforme a la arquitectura aprobada (`AGENTS.md` §3.5–3.6,
+`PMDocs/PortableManager-Lite-Diseno-v0.2.1.md` §23.4 y `v0.2.2` §23.3):
+
+1. `IsOriginAccessible(pm_executable)` verifica la existencia y accesibilidad del
+   ejecutable de origen, su directorio contenedor (`GetFileAttributesW`) y la raíz
+   del volumen (`GetVolumeInformationW`), sin mantener ningún handle de archivo,
+   directorio ni volumen abierto sobre el USB.
+2. `WaitForReleaseOrOriginLoss(pm_executable, release_event, timeout_ms, error)`
+   crea una ventana popup oculta de nivel superior y registra notificaciones de
+   interfaz de volumen (`RegisterDeviceNotificationW` con `DBT_DEVTYP_DEVICEINTERFACE`
+   sobre `GUID_DEVINTERFACE_VOLUME`), bloqueándose mediante `MsgWaitForMultipleObjects`
+   con tajadas pasivas de 200 ms (~0 % de CPU, sin servicios ni drivers, sin polling
+   de alta frecuencia).
+3. Si el volumen o ejecutable de origen desaparece mientras PM sigue vivo en memoria
+   (gracias a `/SWAPRUN:CD`), `WaitForReleaseOrOriginLoss` devuelve
+   `OriginWaitResult::OriginLost` y PM inicia inmediatamente el cierre crítico
+   mediante `CleanupSession(session, error)`.
+4. `PMGuard` permanece bloqueado en `WaitForSingleObject(parent, INFINITE)` mientras
+   PM esté vivo y actúa únicamente si PM desaparece inesperadamente antes o durante
+   el cierre crítico (recuperando el mutex incluso con `WAIT_ABANDONED` si PM cayó
+   en estado `CLEANING`). Si PM ya completó `CleanupSession` y persistió `CLEANED`,
+   `PMGuard` recarga el manifiesto y termina sin ejecutar una segunda limpieza.
+
 ## Pruebas preparadas para Windows
 
 La suite crea exclusivamente sesiones GUID y ejecutables auxiliares propios.
-Comprueba nueve grupos:
+Comprueba once grupos:
 
 1. PM activo: guard bloqueado, trabajadores vivos, CPU <=20 ms durante 1,2 s;
    cierre normal y repetición del cierre; un proceso sintético ajeno sobrevive.
@@ -105,12 +131,20 @@ Comprueba nueve grupos:
 3. Caída de PMG: el propietario conserva el trabajo y realiza su cierre.
 4. Eliminación de la copia de PM y de su carpeta de origen mientras PM está vivo,
    seguida de su caída; PMG opera desde su copia TEMP.
-5. Terminación simultánea de los hijos: PM y PMG permanecen vivos hasta el cierre.
-6. Muerte del trabajador al cerrar el último handle del Job.
-7. Fallo de terminación inyectado: ninguna restauración posterior; rechazo de
+5. Pérdida simulada del origen mientras PM permanece vivo (`origin_loss_while_pm_alive_triggers_critical_cleanup`):
+   PM detecta `OriginLost` sin señal externa, ejecuta el cierre crítico, termina el
+   Job (`ActiveProcesses == 0`), persiste `CLEANED`, evita doble limpieza con PMG
+   y preserva procesos ajenos.
+6. Caída abrupta de PM durante el cierre crítico (`pm_crash_during_critical_cleanup_guard_recovers`):
+   PM cae con `TerminateProcess` tras adquirir el mutex de sesión y persistir
+   `State=CLEANING`; PMG recupera el mutex (`WAIT_ABANDONED`), termina los procesos
+   del Job, persiste `CLEANED` y preserva procesos ajenos.
+7. Terminación simultánea de los hijos: PM y PMG permanecen vivos hasta el cierre.
+8. Muerte del trabajador al cerrar el último handle del Job.
+9. Fallo de terminación inyectado: ninguna restauración posterior; rechazo de
    operaciones futuras; reintento con adaptador explícito controlado por la prueba.
-8. Rechazo de lanzamiento después de limpiar la sesión.
-9. Identificador inválido, colisión de nombre de Job y ejecutable inexistente.
+10. Rechazo de lanzamiento después de limpiar la sesión.
+11. Identificador inválido, colisión de nombre de Job y ejecutable inexistente.
 
 Los procesos reales del usuario nunca se terminan. Las sesiones fallidas se
 preservan para diagnóstico; las exitosas eliminan solo sus archivos conocidos.

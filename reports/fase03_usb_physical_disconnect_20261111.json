@@ -1,0 +1,26 @@
+﻿{
+    "timestamp_utc":  "2026-11-12T02:59:56.4516191Z",
+    "session_id":  "59f825c2-2f0a-488a-85af-96be0aea3a0b",
+    "job_name":  "Local\\PM_Job_36_59f825c2-2f0a-488a-85af-96be0aea3a0b_synthetic",
+    "pids":  {
+                 "owner_pid":  16316,
+                 "guard_pid":  11832,
+                 "worker_pid":  8696,
+                 "leaf_pid":  14052,
+                 "outsider_pid":  16296
+             },
+    "usb_still_mounted":  false,
+    "origin_loss_detected":  false,
+    "owner_terminated":  true,
+    "guard_terminated":  true,
+    "worker_terminated":  true,
+    "leaf_terminated":  true,
+    "job_drained":  true,
+    "outsider_survived":  false,
+    "manifest_cleaned":  false,
+    "job_rolled_back":  false,
+    "single_cleanup_verified":  false,
+    "controller_diagnostics":  "[CHECK] controller_physical-usb_59f825c2-2f0a-488a-85af-96be0aea3a0b step=initialize_session status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_59f825c2-2f0a-488a-85af-96be0aea3a0b step=create_job status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_59f825c2-2f0a-488a-85af-96be0aea3a0b step=start_guard status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_59f825c2-2f0a-488a-85af-96be0aea3a0b step=launch_tree status=passed actual=0 expected=0 last_error=18\n[CHECK] controller_physical-usb_59f825c2-2f0a-488a-85af-96be0aea3a0b step=tree_ready status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_59f825c2-2f0a-488a-85af-96be0aea3a0b step=activate_session status=passed actual=0 expected=0 last_error=0\n[CHECK] controller_physical-usb_59f825c2-2f0a-488a-85af-96be0aea3a0b step=publish_pids status=passed actual=0 expected=0 last_error=0\n",
+    "manifest_content":  "; PortableManager Lite — Transient Host Restoration Manifest\r\n[Session]\r\nFormatSignature=PM_SESSION_MANIFEST_V1\r\nSessionId=59f825c2-2f0a-488a-85af-96be0aea3a0b\r\nState=ACTIVE\r\nOperationCount=1\r\n\r\n[Op.op_0001]\r\nIndex=0\r\nOpId=op_0001\r\nOpType=KILL_JOB\r\nOpState=APPLIED\r\nOriginalExisted=0\r\nAppId=synthetic\r\nTargetPath=\r\nBackupPath=\r\nRegKeyPath=\r\nJobName=Local\\PM_Job_36_59f825c2-2f0a-488a-85af-96be0aea3a0b_synthetic\r\nLastError=0\r\n\r\n[Footer]\r\nEndMarker=EOF_OK\r\n",
+    "status":  "failed"
+}

@@ -128,6 +128,7 @@ add_executable(test_phase3_guard
     ${PM_GUARD_SOURCES}
 )
 target_include_directories(test_phase3_guard PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(test_phase3_guard PRIVATE kernel32 advapi32 ole32)
+target_link_options(test_phase3_guard PRIVATE "-Wl,-Xlink=-swaprun:cd")
+target_link_libraries(test_phase3_guard PRIVATE kernel32 user32 advapi32 ole32)
 add_test(NAME Phase3_GuardTest COMMAND test_phase3_guard $<TARGET_FILE:pm> "${CMAKE_CURRENT_BINARY_DIR}/phase3_windows_runtime.json")
 set_tests_properties(Phase3_GuardTest PROPERTIES TIMEOUT 120)
