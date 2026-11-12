@@ -267,7 +267,8 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         return result;
     }
     std::array<Folder, 2> folders{{
-        {L"Roaming", candidates->roaming, {}}, {L"Local", candidates->local, {}}
+        {L"Roaming", candidates->roaming, {}, false, false, {}},
+        {L"Local", candidates->local, {}, false, false, {}}
     }};
     bool registry_approved = false;
     bool approved = false;
