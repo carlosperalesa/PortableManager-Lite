@@ -162,7 +162,10 @@ bool Guid(std::wstring_view value) {
 }
 
 void TestEnvironment(const fs::path& root) {
-    Check(::SetEnvironmentVariableW(L"APPDATA", (root / L"roaming").c_str()) &&
+    // Give the manifest a synthetic profile using the same path spelling as
+    // the fixture. The runner's TEMP can contain an 8.3 alias for USERPROFILE.
+    Check(::SetEnvironmentVariableW(L"USERPROFILE", root.c_str()) &&
+          ::SetEnvironmentVariableW(L"APPDATA", (root / L"roaming").c_str()) &&
           ::SetEnvironmentVariableW(L"LOCALAPPDATA", (root / L"local").c_str()) &&
           ::SetEnvironmentVariableW(L"TEMP", (root / L"temp").c_str()) &&
           ::SetEnvironmentVariableW(L"TMP", (root / L"temp").c_str()), "set synthetic process environment");
@@ -214,6 +217,8 @@ int Controller(const fs::path& root, std::wstring_view mode) {
     if (result.error || result.rollback_error)
         std::fprintf(stderr, "Learning result: error=%lu rollback=%lu\n", result.error, result.rollback_error);
     Check(result.host_restored, "restore host");
+    if (mode != L"failure")
+        Check(result.error == ERROR_SUCCESS && !result.recipe_path.empty(), "publish learning recipe");
     if (mode == L"normal") {
         const auto pid = static_cast<DWORD>(std::stoul(Read(root / L"descendant.txt")));
         const Handle descendant(::OpenProcess(SYNCHRONIZE, FALSE, pid));
@@ -232,7 +237,6 @@ int Controller(const fs::path& root, std::wstring_view mode) {
         Check(fs::exists(data / L"registry.reg"), "retain captured data on recipe failure");
         return 0;
     }
-    Check(result.error == ERROR_SUCCESS && !result.recipe_path.empty(), "publish learning recipe");
     const auto recipe = Read(root / L"portable" / result.recipe_path);
     Check(recipe.find("Previous=keep") != std::string::npos, "retain previous recipe");
     Check(recipe.find("RoamingHost=%APPDATA%\\") != std::string::npos &&

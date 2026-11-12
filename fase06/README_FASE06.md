@@ -53,7 +53,9 @@ En Windows local pasaron los seis escenarios sintéticos y las regresiones
 0B–5. La inspección PE confirmó AMD64 y `SWAPRUN:CD`. El JSON registra el
 commit probado, el SHA-256 del binario y el resultado de cada escenario.
 
-Las pruebas usan carpetas sintéticas y un subárbol HKCU con GUID propio.
+Las pruebas usan un perfil y directorios temporales sintéticos y un subárbol
+HKCU con GUID propio. Las variables del perfil se fijan para el proceso
+auxiliar y sus hijos.
 Las aplicaciones reales, las ACL personalizadas de Registro y la desconexión
 física USB quedan pendientes de validación. La atribución de candidatos y
 la aplicación posterior de recetas requieren un llamador con evidencia de
