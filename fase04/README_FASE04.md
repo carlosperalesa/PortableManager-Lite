@@ -1,6 +1,6 @@
 # Fase 04 — Directory Junctions
 
-La implementación está en `feat/fase04-junctions`, sobre la Fase 3 aprobada y fusionada en `main` como `94ac3f0`. La aprobación y la fusión de esta fase quedan pendientes del propietario.
+La Fase 4 fue aprobada por el propietario y fusionada en `main` como `5ca03b7a91672ea3933011f946ce6e3b2a0f7265`. [PR #3](https://github.com/carlosperalesa/PortableManager-Lite/pull/3)
 
 ## Alcance
 
@@ -26,5 +26,3 @@ El script verifica el PE AMD64, el indicador `SWAPRUN:CD` y las importaciones. E
 - Windows local pasó 9/9 escenarios y las regresiones 0B a 3. La suite de Junctions también pasó 9/9 con un nombre corto 8.3 real en TEMP. Informe de la compilación y las pruebas nativas [reports/rebuild_junctions_windows_final.json](../reports/rebuild_junctions_windows_final.json).
 - GitHub Actions adjunta el informe del runner Windows y ejecuta la compilación cruzada en Linux.
 - La primera ejecución de Actions detectó ERROR_INVALID_NAME al preparar Junctions en Windows. Se conserva el resultado y el informe local previo. [Ejecución 43204270046](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43204270046) · [JSON](../reports/fase04_actions_43204270046.json) · [Informe local previo](../reports/rebuild_junctions.json).
-
-Fase 5 pendiente de aprobación del cierre de Fase 4.

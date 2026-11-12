@@ -480,6 +480,8 @@ ManifestStatusResult ManifestManager::SaveToDisk() const {
         }
         text.append(L"BackupPath=").append(op.backup_host_path).append(L"\r\n");
         text.append(L"RegKeyPath=").append(op.reg_key_path).append(L"\r\n");
+        if (!op.registry_backup_sha256.empty())
+            text.append(L"RegistryBackupSHA256=").append(op.registry_backup_sha256).append(L"\r\n");
         text.append(L"JobName=").append(op.job_name).append(L"\r\n");
         text.append(L"LastError=").append(std::to_wstring(op.last_error)).append(L"\r\n");
     }
@@ -605,6 +607,7 @@ ManifestStatusResult ManifestManager::LoadFromDisk() {
         }
 
         op.reg_key_path = doc.GetValue(sec, L"RegKeyPath");
+        op.registry_backup_sha256 = doc.GetValue(sec, L"RegistryBackupSHA256");
         if (op.type == OperationType::RestoreReg && op.reg_key_path.empty()) {
             op.reg_key_path = op.target_host_path;
         }
@@ -893,14 +896,7 @@ RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers&
                     } else if (handlers.on_restore_reg) {
                         step_ok = handlers.on_restore_reg(op, step_err);
                     } else {
-                        step_ok = true;
-                    }
-
-                    // Directiva Sección 2:
-                    // - No eliminar el respaldo .reg hasta confirmar la restauración.
-                    // - Si la restauración falla, conservar el .reg y marcar FAILED.
-                    if (step_ok && op.original_existed && !op.backup_host_path.empty()) {
-                        ::DeleteFileW(op.backup_host_path.c_str());
+                        step_err = ERROR_NOT_SUPPORTED;
                     }
                 }
                 break;
@@ -935,6 +931,19 @@ RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers&
             ++summary.failed_count;
             summary.failed_op_ids.push_back(op.id);
             return summary;
+        }
+        // A crash before saving ROLLED_BACK must leave the original available
+        // for a retry. A crash afterwards only needs to release the backup.
+        if (step_ok && !was_skipped && op.type == OperationType::RestoreReg && op.original_existed) {
+            DWORD release_error = ERROR_SUCCESS;
+            const bool released = handlers.on_release_reg_backup
+                ? handlers.on_release_reg_backup(op, release_error)
+                : (::DeleteFileW(op.backup_host_path.c_str()) ||
+                   (release_error = ::GetLastError()) == ERROR_FILE_NOT_FOUND);
+            if (!released) {
+                ++summary.failed_count;
+                summary.failed_op_ids.push_back(op.id);
+            }
         }
         // Never restore resources while a controlled process might still use them.
         if (!step_ok && op.type == OperationType::KillJob) return summary;

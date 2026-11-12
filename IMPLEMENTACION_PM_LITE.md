@@ -1,7 +1,7 @@
 # Estado de Implementación Nativa (C++20) — PortableManager Lite
 
 **Fecha:** 12 de noviembre de 2026
-**Fase actual:** Directory Junctions (Fase 4), implementada en rama de tarea y pendiente de aprobación.
+**Fase actual:** Registro Win32 (Fase 5), pendiente de revisión del propietario.
 
 ---
 
@@ -20,8 +20,8 @@
     - Suite ampliada a **23 escenarios** (16 base + 7 de auditoría final) con caídas reales de procesos hijos (`TerminateProcess`) y claves sintéticas en `HKCU` en [`tests/test_phase2_runtime.cpp`](tests/test_phase2_runtime.cpp).
   - Evidencia registrada en [reports/rebuild_runtime.json](reports/rebuild_runtime.json) (histórico), [reports/rebuild_runtime_audit.json](reports/rebuild_runtime_audit.json) (auditoría) y consolidada en [`fase02/`](fase02).
 - [x] **Fase 3:** JobManager y PMGuard aprobados y fusionados en main (PR #2, commit 94ac3f0). [CI de main](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43148647984).
-- [ ] **Fase 4:** JunctionManager, protocolo write-ahead y rollback común PM/PMGuard. [Informe de Fase 4](fase04/README_FASE04.md).
-- [ ] **Fase 5:** Registro Win32 (`RegistryManager`, carpeta `fase05/`).
+- [x] **Fase 4:** JunctionManager aprobado y fusionado en `main` como `5ca03b7`. [Informe de Fase 4](fase04/README_FASE04.md).
+- [ ] **Fase 5:** Respaldo y restauración de Registro Win32 mediante `RegistryManager`. [Alcance y pruebas](fase05/README_FASE05.md).
 - [ ] **Fase 6:** Aprendizaje Ligero (`LearningEngine`, carpeta `fase06/`).
 - [ ] **Fase 7:** Motor de Limpieza (`CleanupEngine`, carpeta `fase07/`).
 - [ ] **Fase 8:** Integración Nativa (carpeta `fase08/`).

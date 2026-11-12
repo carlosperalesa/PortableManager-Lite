@@ -55,6 +55,7 @@ set(PM_RUNTIME_SOURCES
 set(PM_GUARD_SOURCES
     src/jobs/job_manager.cpp
     src/junctions/junction_manager.cpp
+    src/registry/registry_manager.cpp
     src/guard/guard_process.cpp
 )
 
@@ -78,6 +79,7 @@ target_link_libraries(pm PRIVATE
     shlwapi
     version
     ole32
+    bcrypt
 )
 
 enable_testing()
@@ -130,7 +132,7 @@ add_executable(test_phase3_guard
 )
 target_include_directories(test_phase3_guard PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_options(test_phase3_guard PRIVATE "-Wl,-Xlink=-swaprun:cd")
-target_link_libraries(test_phase3_guard PRIVATE kernel32 user32 advapi32 ole32)
+target_link_libraries(test_phase3_guard PRIVATE kernel32 user32 advapi32 ole32 bcrypt)
 add_test(NAME Phase3_GuardTest COMMAND test_phase3_guard $<TARGET_FILE:pm> "${CMAKE_CURRENT_BINARY_DIR}/phase3_windows_runtime.json")
 set_tests_properties(Phase3_GuardTest PROPERTIES TIMEOUT 120)
 
@@ -144,3 +146,14 @@ target_include_directories(test_phase4_junctions PRIVATE ${CMAKE_CURRENT_SOURCE_
 target_link_libraries(test_phase4_junctions PRIVATE kernel32 user32 advapi32 ole32 bcrypt)
 add_test(NAME Phase4_JunctionsTest COMMAND test_phase4_junctions $<TARGET_FILE:pm> "${CMAKE_CURRENT_BINARY_DIR}/phase4_windows_runtime.json")
 set_tests_properties(Phase4_JunctionsTest PROPERTIES TIMEOUT 120)
+
+add_executable(test_phase5_registry
+    tests/test_phase5_registry.cpp
+    ${PM_CORE_SOURCES}
+    ${PM_RUNTIME_SOURCES}
+    ${PM_GUARD_SOURCES}
+)
+target_include_directories(test_phase5_registry PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(test_phase5_registry PRIVATE kernel32 user32 advapi32 ole32 bcrypt)
+add_test(NAME Phase5_RegistryTest COMMAND test_phase5_registry $<TARGET_FILE:pm> "${CMAKE_CURRENT_BINARY_DIR}/phase5_windows_runtime.json")
+set_tests_properties(Phase5_RegistryTest PROPERTIES TIMEOUT 120)

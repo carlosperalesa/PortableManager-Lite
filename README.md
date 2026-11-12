@@ -1,6 +1,6 @@
 # PortableManager Lite (PM Lite) — Núcleo Nativo C++20
 
-**Estado actual:** Fases 0B a 3 aprobadas. La Fase 3 se fusionó en main en el PR #2. [Fase 4 — Directory Junctions](fase04/README_FASE04.md) está implementada y pendiente de aprobación.
+**Estado actual:** Fases 0B a 4 aprobadas. La Fase 4 se fusionó en `main` en el PR #3. [Fase 5 — Registro Win32](fase05/README_FASE05.md) queda pendiente de revisión del propietario.
 **Toolchain oficial:** LLVM-MinGW `20261104` (Clang `23.1.5`, UCRT, Windows `x86_64`) portable en `tools/toolchains/llvm-mingw/`.
 
 ---

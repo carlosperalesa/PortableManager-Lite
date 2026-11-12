@@ -1,6 +1,7 @@
 #include "guard/guard_process.h"
 #include "junctions/junction_manager.h"
 #include "jobs/job_manager.h"
+#include "registry/registry_manager.h"
 #include "runtime/session_lock.h"
 #include <dbt.h>
 #include <vector>
@@ -238,7 +239,8 @@ bool CleanupSession(pm::runtime::SessionManager &session, DWORD &error) {
     for (const auto &op : session.manifest().operations()) {
       const bool session_job = op.type == pm::runtime::OperationType::KillJob &&
           op.job_name == pm::jobs::JobManager::MakeName(session.session_id(), op.app_id);
-      if (!session_job && !pm::junctions::JunctionManager::IsJunctionOperation(op)) {
+      const bool registry = pm::registry::RegistryManager::IsRegistryOperation(op, session.session_dir());
+      if (!session_job && !registry && !pm::junctions::JunctionManager::IsJunctionOperation(op)) {
         error = ERROR_NOT_SUPPORTED;
         ok = false;
         break;
@@ -254,6 +256,8 @@ bool CleanupSession(pm::runtime::SessionManager &session, DWORD &error) {
         return pm::jobs::JobManager::TerminateAndWait(op.job_name, err);
       };
       handlers.on_remove_junction = pm::junctions::JunctionManager::Rollback;
+      handlers.on_restore_reg = pm::registry::RegistryManager::Rollback;
+      handlers.on_release_reg_backup = pm::registry::RegistryManager::ReleaseBackup;
       const auto summary = session.manifest().ExecutePendingRollbacks(handlers);
       ok = summary.all_succeeded;
       if (!ok)

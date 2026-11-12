@@ -19,7 +19,7 @@ d:\Data\
 │   ├── guard\          # Modo --guard <SessionID>, espera bloqueante (WaitForSingleObject), Mutex de sesión
 │   ├── jobs\           # JobManager (CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, TerminateJobObject)
 │   ├── junctions\      # JunctionManager (FSCTL_SET_REPARSE_POINT, IO_REPARSE_TAG_MOUNT_POINT, RemoveDirectoryW)
-│   ├── registry\       # RegistryManager (RegCopyTreeW, RegDeleteTreeW, KEY_ALL_ACCESS / WRITE_DAC)
+│   ├── registry\       # RegistryManager (respaldo .reg, RegDeleteTreeW, verificación)
 │   ├── learning\       # LearningEngine (GetFileVersionInfoW, VerQueryValueW, candidatos acotados, recetas INI)
 │   ├── applications\   # Lanzamiento PAF/ZIP, evaluación de Prioridades 1/2/3, clasificación por colores
 │   └── cleanup\        # CleanupEngine (NORMAL, FAST, CRITICAL y generación de %TEMP%\pmlog)
@@ -51,7 +51,7 @@ d:\Data\
    - `JunctionManager`: renombrado `.pmbkp`, creación y lectura de puntos de reanálisis `IO_REPARSE_TAG_MOUNT_POINT` (`0xA0000003`) mediante `DeviceIoControl`, y eliminación segura del reparse point con `RemoveDirectoryW` tras validar `FILE_ATTRIBUTE_REPARSE_POINT` y el destino esperado.
 
 5. **`src/registry/` (Fase 5):**
-   - `RegistryManager`: respaldo en clave hermana `.pmbkp` bajo `HKCU` con `RegCopyTreeW` (usando `KEY_ALL_ACCESS` / `WRITE_DAC`), borrado previo de la clave sucia con `RegDeleteTreeW` al restaurar, verificación de tipos/valores/subclaves y eliminación del respaldo solo tras verificar.
+   - `RegistryManager`: respaldo de subárboles exclusivos de HKCU mediante `reg.exe export` en la sesión temporal, validación de alcance e integridad, borrado previo con `RegDeleteTreeW` e importación tras cerrar los Jobs. El respaldo se retira tras verificar la restauración y persistir el resultado. [Detalles](fase05/README_FASE05.md).
 
 6. **`src/learning/` (Fase 6):**
    - `LearningEngine`: inspección de recursos PE (`version.dll`), captura de baseline en candidatos acotados (`%APPDATA%\<Publisher>\<App>`, `%LOCALAPPDATA%\<App>`, `HKCU\Software\<Publisher>\<App>`), preservación de cambios ambiguos y generación de receta relativa.
