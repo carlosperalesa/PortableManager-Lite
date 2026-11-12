@@ -101,22 +101,41 @@ DWORD PinPortableDirectory(const PathResolver& resolver, std::wstring_view relat
     }
 }
 
-DWORD HasOutput(const std::wstring& path, bool& found) {
-    found = false;
+// A bounded metadata-only inventory. Do not read or copy file contents.
+// Never traverse reparse-point children, shared paths, or arbitrary roots.
+DWORD ScanOutput(const std::wstring& directory, const std::wstring& prefix,
+                 std::vector<std::wstring>& entries, unsigned depth = 0) {
+    if (depth >= 32) return ERROR_BUFFER_OVERFLOW;
     WIN32_FIND_DATAW entry{};
-    const HANDLE search = ::FindFirstFileW((path + L"\\*").c_str(), &entry);
+    HANDLE search = ::FindFirstFileW((directory + L"\\*").c_str(), &entry);
     if (search == INVALID_HANDLE_VALUE) {
-        const auto error = ::GetLastError();
-        return error == ERROR_FILE_NOT_FOUND ? ERROR_SUCCESS : error;
+        const DWORD code = ::GetLastError();
+        return code == ERROR_FILE_NOT_FOUND ? ERROR_SUCCESS : code;
     }
     DWORD error = ERROR_SUCCESS;
     do {
         const std::wstring_view name(entry.cFileName);
         if (name == L"." || name == L"..") continue;
-        found = true;
-        break;
+        if (name.find_first_of(L"\\r\\n=[]") != std::wstring_view::npos ||
+            (entry.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+            error = ERROR_INVALID_DATA;
+            break;
+        }
+        if (entries.size() >= 512) {
+            error = ERROR_BUFFER_OVERFLOW;
+            break;
+        }
+        const std::wstring relative = prefix.empty() ? std::wstring(name)
+                                                      : prefix + L"\\" + std::wstring(name);
+        const bool is_dir = (entry.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+        entries.push_back((is_dir ? L"DIR:" : L"FILE:") + relative);
+        if (is_dir) {
+            error = ScanOutput(directory + L"\\" + std::wstring(name), relative, entries, depth + 1);
+            if (error != ERROR_SUCCESS) break;
+        }
     } while (::FindNextFileW(search, &entry));
-    if (!found && ::GetLastError() != ERROR_NO_MORE_FILES) error = ::GetLastError();
+    if (error == ERROR_SUCCESS && ::GetLastError() != ERROR_NO_MORE_FILES)
+        error = ::GetLastError();
     ::FindClose(search);
     return error;
 }
@@ -138,6 +157,7 @@ struct Folder {
     std::wstring relative;
     bool approved = false;
     bool learned = false;
+    std::vector<std::wstring> affected_entries;
 };
 
 DWORD Publish(const PathResolver& resolver, const LearningRequest& request,
@@ -149,9 +169,10 @@ DWORD Publish(const PathResolver& resolver, const LearningRequest& request,
         PinnedDirectories pinned;
         const DWORD error = PinPortableDirectory(resolver, folder.relative, false, pinned);
         if (error != ERROR_SUCCESS) return error;
-        const DWORD scanned = HasOutput(resolver.ResolvePmRelativePath(folder.relative).resolved_path,
-                                        folder.learned);
+        const DWORD scanned = ScanOutput(resolver.ResolvePmRelativePath(folder.relative).resolved_path,
+                                         L"", folder.affected_entries);
         if (scanned != ERROR_SUCCESS) return scanned;
+        folder.learned = !folder.affected_entries.empty();
     }
     if (!registry_changed &&
         std::none_of(folders.begin(), folders.end(), [](const Folder& folder) { return folder.learned; }))
@@ -181,11 +202,16 @@ DWORD Publish(const PathResolver& resolver, const LearningRequest& request,
     std::wstring message;
     for (const auto& folder : folders) {
         if (!folder.learned) continue;
-        const auto relative = resolver.ToPersistentRelativePath(folder.relative);
         const std::wstring label(folder.label);
-        if (!relative.ok || !doc.SetValue(section, label + L"Host", folder.token, message) ||
-            !doc.SetRelativePathValue(section, label + L"DataPath", relative.resolved_path, message))
+        if (!doc.SetValue(section, label + L"Host", folder.token, message) ||
+            !doc.SetValue(section, label + L"Cleanup", L"REMOVE_JUNCTION_RESTORE_ORIGINAL", message))
             return ERROR_INVALID_DATA;
+        unsigned index = 0;
+        for (const auto& affected : folder.affected_entries) {
+            if (!doc.SetValue(section, label + L"Item" + std::to_wstring(++index),
+                              affected, message))
+                return ERROR_INVALID_DATA;
+        }
     }
     if (registry_changed &&
         (!doc.SetValue(section, L"RegistryKey", candidates.registry, message) ||
