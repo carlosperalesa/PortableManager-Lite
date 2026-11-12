@@ -10,11 +10,12 @@ public:
     static bool Prepare(runtime::SessionManager& session, std::wstring_view exclusive_key,
                         DWORD& error, bool require_existing_parent = false);
 
-    // Called after the Job drains. Only exports a subtree absent at baseline.
-    // The export stays in the local session until PM publishes it to portable storage.
-    static bool CaptureNewData(const runtime::SessionManager& session,
-                               const runtime::ManifestOperation& op,
-                               std::wstring& snapshot, DWORD& error);
+    // Observe whether an attributed subtree differs from its pre-launch
+    // baseline. Any temporary comparison export stays in %TEMP% and is
+    // discarded; never copies application settings to portable storage.
+    static bool HasChanges(const runtime::SessionManager& session,
+                           const runtime::ManifestOperation& op,
+                           bool& changed, DWORD& error);
 
     static bool IsRegistryOperation(const runtime::ManifestOperation& op,
                                     std::wstring_view session_dir);
