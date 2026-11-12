@@ -1,6 +1,6 @@
 # PortableManager Lite (PML Lite) — Núcleo Nativo C++20
 
-**Estado actual:** Fases 0B a 7 aprobadas. La [integración de Fase 8](docs/fase08/README_FASE08.md) incluye catálogo, instalación, mantenimiento y PMD. Consulta los cierres de [Fase 6](docs/fase06/README_FASE06.md) y [Fase 7](docs/fase07/README_FASE07.md).
+**Estado actual:** Fases 0B a 8 aprobadas. La [integración de Fase 8](docs/fase08/README_FASE08.md) incluye catálogo, instalación, mantenimiento y PMD, y fue fusionada en `main` mediante [PR #9](https://github.com/carlosperalesa/PortableManager-Lite/pull/9). Quedan pendientes las validaciones manuales finales (retirada física del USB, instalador PAF real y PMD en varios monitores). Consulta los cierres de [Fase 6](docs/fase06/README_FASE06.md), [Fase 7](docs/fase07/README_FASE07.md) y [Fase 8](docs/fase08/README_FASE08.md).
 **Toolchain oficial:** LLVM-MinGW `20261104` (Clang `23.1.5`, UCRT, Windows `x86_64`) portable en `tools/toolchains/llvm-mingw/`.
 
 ---

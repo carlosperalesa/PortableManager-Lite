@@ -1,7 +1,7 @@
 # Estado de Implementación Nativa (C++20) — PortableManager Lite
 
 **Fecha:** 12 de noviembre de 2026
-**Fase actual:** Fase 8 — Integración Nativa.
+**Fase actual:** Fase 8 — Integración Nativa aprobada y fusionada. Pendiente la validación manual final.
 
 ---
 
@@ -24,4 +24,4 @@
 - [x] **Fase 5:** Respaldo y restauración de Registro Win32 mediante `RegistryManager`, aprobado y fusionado en `main` como `f79b947`. [Alcance y pruebas](fase05/README_FASE05.md).
 - [x] **Fase 6:** Aprendizaje Ligero mediante `LearningEngine`; implementación adaptada para generar solo recetas operativas de limpieza, sin cosecha de configuraciones. [PR #5 fusionado](https://github.com/carlosperalesa/PortableManager-Lite/pull/5), [CI 43246078395](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43246078395) superada. [Alcance y pruebas](fase06/README_FASE06.md).
 - [x] **Fase 7:** Motor de Limpieza (`CleanupEngine`) aprobado y fusionado en `main` mediante [PR #7](https://github.com/carlosperalesa/PortableManager-Lite/pull/7); CI del commit combinado [43263214086](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43263214086) superada. [Protocolo y verificación](fase07/README_FASE07.md).
-- [x] **Fase 8:** Integración nativa y PMD. [Alcance y verificación](fase08/README_FASE08.md).
+- [x] **Fase 8:** Integración nativa y PMD aprobada y fusionada en `main` mediante [PR #9](https://github.com/carlosperalesa/PortableManager-Lite/pull/9); CI del commit de fusión [43299672195](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43299672195) superada. [Alcance y verificación](fase08/README_FASE08.md).

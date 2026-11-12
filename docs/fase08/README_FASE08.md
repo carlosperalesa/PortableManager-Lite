@@ -1,5 +1,7 @@
 # Fase 08 — Integración nativa
 
+**Estado:** Fase 8 aprobada y fusionada en `main` mediante [PR #9](https://github.com/carlosperalesa/PortableManager-Lite/pull/9), commit `3be874dd62cd592e09fd15c5a37bb6f15166085b`. El [PR #8](https://github.com/carlosperalesa/PortableManager-Lite/pull/8) se cerró sin fusionar porque su contenido está incluido en el PR #9.
+
 Esta es la última fase numerada del plan de reconstrucción. Integra el
 catálogo de aplicaciones, instalación, lanzamiento, aprendizaje, cierre,
 mantenimiento y la interfaz PortableManager Desktop (PMD) en `pml.exe`.
@@ -98,7 +100,11 @@ caída, actualización, navegación básica en PMD, mantenimiento, sesión compa
 reposición de PMG y agotamiento de reintentos. GitHub
 Actions ejecuta 0B–8 en Windows y compila para Windows x64 desde Ubuntu.
 El JSON combinado se publica como `reports/ci_windows_native.json` en el
-artefacto de Windows. La retirada física final queda `not_run`.
+artefacto de Windows. La [CI 43298927022](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43298927022)
+validó el último commit del PR (`96e2e9a`) y la [CI 43299672195](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43299672195)
+validó el commit de fusión en `main`. Ambas superaron 8/8 escenarios de
+Fase 8, las regresiones 0B–7 en Windows y la compilación cruzada desde Linux.
+La suite local también pasó completa. La retirada física final queda `not_run`.
 
 Las pruebas con un instalador PAF real y la revisión visual en múltiples
 monitores quedan fuera de la suite sintética.
