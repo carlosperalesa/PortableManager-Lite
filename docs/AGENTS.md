@@ -4,6 +4,8 @@ Este archivo contiene las directivas permanentes para cualquier agente
 que trabaje en este repositorio (Codex, Copilot u otro). Debe leerse
 antes de inspeccionar, planificar o modificar código.
 
+Para la precedencia y las decisiones vigentes del proyecto, consultar el [AGENTS.md de la raíz](../AGENTS.md). Las directivas de este archivo se aplican a la documentación de `docs/` bajo esa precedencia.
+
 ## 1. Identidad y objetivo del proyecto
 
 **PortableManager Lite (PM)** es un lanzador y gestor portable, ligero y
@@ -40,7 +42,7 @@ Orden de precedencia:
     conversación o en el registro de decisiones.
 2.  Directivas de este `AGENTS.md`, siempre que no contradigan una
     decisión posterior del propietario.
-3.  Documentación funcional y técnica vigente de la raíz.
+3.  Documentación funcional y técnica vigente en [docs/](README.md).
 4.  Documentación consolidada de la fase correspondiente.
 5.  Informes JSON y evidencias de pruebas.
 6.  Documentación histórica o versiones anteriores.
@@ -325,29 +327,29 @@ positivo. No marcar una fase como aprobada solo porque compile.
 
 La estructura documental obligatoria utiliza carpetas con dos dígitos:
 
--   `fase01/`
--   `fase02/`
--   `fase03/`
--   `fase04/`
--   `fase05/`
--   `fase06/`
--   `fase07/`
--   `fase08/`
+-   `docs/fase01/`
+-   `docs/fase02/`
+-   `docs/fase03/`
+-   `docs/fase04/`
+-   `docs/fase05/`
+-   `docs/fase06/`
+-   `docs/fase07/`
+-   `docs/fase08/`
 
 Reglas:
 
-- No crear carpetas paralelas como `fase2/` cuando corresponde `fase02/`.
+- No crear carpetas paralelas como `docs/fase2/` cuando corresponde `docs/fase02/`.
 - Antes de mover o renombrar una carpeta existente, inspeccionar su contenido y preservar todos los archivos.
 - El código fuente permanece en `src/`; no duplicar código dentro de las carpetas de fase.
-- Cada carpeta de fase conserva su README, alcance, decisiones específicas, informes JSON, evidencias, resultados y ejemplos relevantes.
+- Cada carpeta de fase conserva su README, alcance, decisiones específicas, evidencias históricas y ejemplos. Los scripts de prueba generan sus informes en `reports/` o en la ruta de salida que indique su ejecución.
 - Los informes JSON históricos deben preservarse intactos. Las nuevas ejecuciones generan archivos nuevos.
-- Los documentos generales de la raíz describen el estado vigente del proyecto.
+- Los documentos generales de `docs/` describen el estado vigente del proyecto.
 - Al cerrar una fase, actualizar los documentos generales y consolidar los resultados de esa fase en su carpeta.
 - No mantener copias divergentes del mismo documento sin indicar cuál es la fuente vigente.
 - Registrar claramente qué está aprobado, pendiente, bloqueado o no probado.
 
 Estructura técnica habitual: - `src/` - `tests/` - `reports/` -
-`tools/` - `PMDocs/` - `fase01/` ... `fase08/`
+`tools/` - `docs/PMDocs/` - `docs/fase01/` ... `docs/fase08/`
 
 Respetar la estructura real del repositorio; no reorganizarlo
 masivamente sin autorización.
@@ -371,7 +373,7 @@ Para cada fase:
 8.  Revisar errores, advertencias y seguridad.
 9.  Generar un JSON de resultados con evidencia verificable.
 10. Actualizar la documentación general.
-11. Consolidar documentación y evidencias en `faseNN/`.
+11. Consolidar documentación y evidencias en `docs/faseNN/`.
 12. Presentar resumen de archivos cambiados, pruebas ejecutadas,
     resultados, riesgos y pendientes.
 
@@ -440,7 +442,7 @@ Toda entrega debe incluir:
 6.  Ruta del JSON de evidencia.
 7.  Estado de regresión.
 8.  Riesgos, limitaciones y pruebas pendientes.
-9.  Documentación consolidada en `faseNN/`.
+9.  Documentación consolidada en `docs/faseNN/`.
 10. Confirmación explícita de que no se inició la siguiente fase.
 
 No usar expresiones como "todo funciona" o "fase aprobada" sin evidencia

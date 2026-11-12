@@ -5,8 +5,8 @@
 # cachés y archivos personales locales, CONSERVANDO intactos en el repositorio:
 # - Código fuente C++20 y antecedentes C# (src/, tests/, tools/toolchain_probe/*.cpp)
 # - CMakeLists.txt, cmake/ y scripts reproducibles (build.ps1, build_msvc.ps1)
-# - Documentación general, PMDocs/ y carpetas de fase (fase01/ .. fase08/)
-# - Informes JSON de resultados y evidencias (reports/*.json, fase01/*.json, fase02/*.json)
+# - Documentación general, especificaciones y carpetas de fase en docs/
+# - Informes JSON de resultados y evidencias (reports/*.json, docs/faseNN/*.json)
 # - AGENTS.md y decisiones técnicas.
 # ==============================================================================
 

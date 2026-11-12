@@ -1,6 +1,6 @@
 # PortableManager Lite (PM Lite) — Núcleo Nativo C++20
 
-**Estado actual:** Fases 0B a 6 aprobadas. [Fase 6 — Aprendizaje Ligero](fase06/README_FASE06.md) fue corregida para generar recetas operativas de limpieza sin copia de configuraciones y fusionada en `main` mediante [PR #5](https://github.com/carlosperalesa/PortableManager-Lite/pull/5). Fase 7 aún no iniciada.
+**Estado actual:** Fases 0B a 6 aprobadas. [Fase 6 — Aprendizaje Ligero](docs/fase06/README_FASE06.md) fue corregida para generar recetas operativas de limpieza sin copia de configuraciones y fusionada en `main` mediante [PR #5](https://github.com/carlosperalesa/PortableManager-Lite/pull/5). Fase 7 aún no iniciada.
 **Toolchain oficial:** LLVM-MinGW `20261104` (Clang `23.1.5`, UCRT, Windows `x86_64`) portable en `tools/toolchains/llvm-mingw/`.
 
 ---
@@ -29,9 +29,9 @@ Para entornos con CMake, se incluye [`CMakeLists.txt`](CMakeLists.txt) y el arch
 
 ---
 
-## 3. Estructura del Proyecto y Organización Documental por Fase (`fase01/` .. `fase08/`)
+## 3. Estructura del Proyecto y Organización Documental por Fase (`docs/fase01/` .. `docs/fase08/`)
 
-Siguiendo la directiva permanente de organización documental, cada fase dispone de su carpeta propia de dos dígitos en la raíz (`fase01/` a `fase08/`):
+Siguiendo la directiva permanente de organización documental, cada fase dispone de su carpeta documental de dos dígitos bajo [`docs/`](docs/README.md) (`docs/fase01/` a `docs/fase08/`):
 
 ```text
  .\
@@ -39,8 +39,11 @@ Siguiendo la directiva permanente de organización documental, cada fase dispone
 ├── CMakeLists.txt                    # Configuración CMake (Clang/LLVM-MinGW y MSVC)
 ├── cmake\
 │   └── llvm-mingw-toolchain.cmake    # Toolchain file CMake para LLVM-MinGW portable
-├── fase01\                           # Consolidado documental y resultados de Fase 1 (Core y Rutas)
-├── fase02\                           # Consolidado documental, auditoría, JSON y ejemplos de Fase 2 (Runtime)
+├── docs\                            # Diseño, arquitectura, decisiones y documentación de fases
+│   ├── PMDocs\                      # Especificaciones funcionales y técnicas
+│   ├── fase01\                      # Core y Rutas
+│   ├── fase02\                      # Runtime y Manifiesto, con ejemplos
+│   └── fase03\ … fase08\             # Documentación de fases
 ├── tools\
 │   ├── toolchains\llvm-mingw\        # Toolchain portable LLVM-MinGW 20261104 (Clang 23.1.5 UCRT x64)
 │   └── toolchain_probe\              # Prueba aislada de compatibilidad Win32 / C++20
@@ -69,15 +72,17 @@ Siguiendo la directiva permanente de organización documental, cada fase dispone
 
 ## 4. Documentación Principal
 
-- [IMPLEMENTACION_PM_LITE.md](IMPLEMENTACION_PM_LITE.md) — Estado global de implementación por fases.
-- [IMPLEMENTACION_FASE_0.md](IMPLEMENTACION_FASE_0.md) — Informe de Fase 0 y Fase 0B (`passed`).
-- [fase02/README_FASE02.md](fase02/README_FASE02.md) — Documentación consolidada, ejemplos e informe de auditoría de Fase 2.
-- [fase02/INFORME_DE_AUDITORIA.md](fase02/INFORME_DE_AUDITORIA.md) — Informe de Auditoría Final de Fase 2.
-- [EVALUACION_TOOLCHAIN_PORTABLE.md](EVALUACION_TOOLCHAIN_PORTABLE.md) — Evaluación técnica de LLVM-MinGW.
-- [DECISIONES_TECNICAS.md](DECISIONES_TECNICAS.md) — Decisiones arquitectónicas y precedencia normativa.
-- [ARQUITECTURA_NATIVE.md](ARQUITECTURA_NATIVE.md) — Diseño modular C++20 / Win32.
-- [PLAN_DE_PRUEBAS.md](PLAN_DE_PRUEBAS.md) — Matriz de pruebas por fase.
-- [RESULTADOS_RECONSTRUCCION.md](RESULTADOS_RECONSTRUCCION.md) — Estado consolidado de las fases de reconstrucción.
+El [índice documental y de auditoría](docs/README.md) enlaza el diseño, la arquitectura, el estado de las fases y sus evidencias.
+
+- [IMPLEMENTACION_PM_LITE.md](docs/IMPLEMENTACION_PM_LITE.md) — Estado global de implementación por fases.
+- [IMPLEMENTACION_FASE_0.md](docs/IMPLEMENTACION_FASE_0.md) — Informe de Fase 0 y Fase 0B (`passed`).
+- [fase02/README_FASE02.md](docs/fase02/README_FASE02.md) — Documentación consolidada, ejemplos e informe de auditoría de Fase 2.
+- [fase02/INFORME_DE_AUDITORIA.md](docs/fase02/INFORME_DE_AUDITORIA.md) — Informe de Auditoría Final de Fase 2.
+- [EVALUACION_TOOLCHAIN_PORTABLE.md](docs/EVALUACION_TOOLCHAIN_PORTABLE.md) — Evaluación técnica de LLVM-MinGW.
+- [DECISIONES_TECNICAS.md](docs/DECISIONES_TECNICAS.md) — Decisiones arquitectónicas y precedencia normativa.
+- [ARQUITECTURA_NATIVE.md](docs/ARQUITECTURA_NATIVE.md) — Diseño modular C++20 / Win32.
+- [PLAN_DE_PRUEBAS.md](docs/PLAN_DE_PRUEBAS.md) — Matriz de pruebas por fase.
+- [RESULTADOS_RECONSTRUCCION.md](docs/RESULTADOS_RECONSTRUCCION.md) — Estado consolidado de las fases de reconstrucción.
 - [docs/README_COMPILACION.md](docs/README_COMPILACION.md) — Detalles del proceso de compilación e inspección PE.
 - [docs/CODEX_CLOUD.md](docs/CODEX_CLOUD.md) — Preparación de Codex Cloud y CI en Windows.
 - [tools/toolchain.lock.json](tools/toolchain.lock.json) — Versión y hashes SHA-256 fijados del toolchain.
@@ -85,7 +90,7 @@ Siguiendo la directiva permanente de organización documental, cada fase dispone
 ### Fase 3 — cierre aprobado
 
 El alcance, protocolo de handles, pruebas sintéticas y limitaciones están en
-[fase03/README_FASE03.md](fase03/README_FASE03.md). `pm.exe --job-probe` permite
+[fase03/README_FASE03.md](docs/fase03/README_FASE03.md). `pm.exe --job-probe` permite
 comprobar el ciclo Job/Guard con un hijo sintético del propio PM en Windows.
 Fase 3 (9/9 grupos) y las regresiones 0B/1/2 pasaron en Actions Windows
 [43130358371](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130358371).
@@ -95,7 +100,7 @@ El propietario aprobó el cierre y el PR #2 se fusionó en main.
 ### Fase 4 — JunctionManager
 
 El alcance, la restauración de respaldos y los resultados de las pruebas están
-en [fase04/README_FASE04.md](fase04/README_FASE04.md).
+en [fase04/README_FASE04.md](docs/fase04/README_FASE04.md).
 
 ### Preparación automática del toolchain portable
 
