@@ -31,6 +31,8 @@ Ante caída de PM o pérdida física del USB, PMGuard termina los Jobs y restaur
 
 El commit anterior `396e734` pasó seis escenarios sintéticos y las regresiones 0B–5 en Windows, junto a la compilación cruzada Linux; ese resultado corresponde al **comportamiento anterior** y no valida esta nueva definición.
 
-La implementación existente aún puede crear `Data/apps/<id>/<SessionID>/`, exportar valores nuevos del Registro y escribir referencias de datos en la receta. Debe **refactorizarse** para limitarse a descubrimiento y reglas de limpieza, manteniendo el funcionamiento de los subsistemas aprobados. Se necesitan nuevas pruebas para observación de recursos realmente modificados, ausencia de cosecha, restauración exacta de claves preexistentes, exclusión de cambios ambiguos y cierre crítico sin USB.
+La implementación se ha modificado en el PR #5 para sustituir la captura de datos HKCU por comparación temporal de estados y para registrar en la receta únicamente los nombres de archivos/carpetas observados y las reglas inversas de Junctions y Registro. **No se copia ningún archivo .reg aprendido al USB** ni se escribe `RegistryDataPath` en la receta. Los archivos que la propia aplicación escribe mediante una Junction permanecen en la carpeta portable redirigida como parte de la estrategia de portabilidad existente; no son un respaldo generado por la receta.
 
-No cerrar ni fusionar el PR #5 hasta que código, pruebas y CI cumplan estas directrices.
+La nueva CI y las regresiones deben aprobarse para aceptar este cambio. Siguen sin ejecutarse pruebas con aplicaciones reales, ACL personalizadas y desconexión física de USB específica de esta fase.
+
+No cerrar ni fusionar el PR #5 hasta confirmar todas las pruebas del HEAD final.
