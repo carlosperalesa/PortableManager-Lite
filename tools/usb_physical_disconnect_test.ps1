@@ -16,7 +16,7 @@ if ($Action -eq "Prepare") {
     if (-not $vol -or $vol.DriveType -ne 2) {
         throw "La unidad E: no esta disponible o no es una unidad extraible (DriveType=2)."
     }
-    $usbPm = Join-Path $UsbTestDir "pm.exe"
+    $usbPm = Join-Path $UsbTestDir "pml.exe"
     $usbController = Join-Path $UsbTestDir "test_phase3_guard.exe"
     if (-not (Test-Path $usbPm) -or -not (Test-Path $usbController)) {
         throw "Faltan ejecutables de prueba en $UsbTestDir."

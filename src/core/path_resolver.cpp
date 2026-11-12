@@ -300,7 +300,7 @@ PathResolutionResult PathResolver::ResolveHostTokenPath(std::wstring_view tokeni
         !EqualsIgnoreCase(token_name, L"LOCALAPPDATA") &&
         !EqualsIgnoreCase(token_name, L"TEMP") &&
         !EqualsIgnoreCase(token_name, L"USERPROFILE")) {
-        return {false, L"", L"Token de entorno no autorizado para recetas de PM."};
+        return {false, L"", L"Token de entorno no autorizado para wrappers de PML."};
     }
 
     const std::wstring token_str(token_name);

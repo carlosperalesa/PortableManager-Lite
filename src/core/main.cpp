@@ -77,10 +77,6 @@ int wmain(int argc, wchar_t *argv[]) {
         cfg_mgr.config_doc().SetRelativePathValue(L"General", L"DataDir",
                                                   L"Data", err);
       }
-      if (!cfg_mgr.config_doc().HasKey(L"General", L"RecipesDir")) {
-        cfg_mgr.config_doc().SetRelativePathValue(L"General", L"RecipesDir",
-                                                  L"Data/recipes", err);
-      }
 
       auto save_cfg = cfg_mgr.SaveConfigIniIfModified(true);
       if (!save_cfg.ok) {

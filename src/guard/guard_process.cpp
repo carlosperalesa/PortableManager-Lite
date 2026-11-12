@@ -181,7 +181,7 @@ bool GuardProcess::Start(const std::wstring &executable,
     error = ERROR_INVALID_STATE;
     return false;
   }
-  const std::wstring shadow = session.session_dir() + L"\\pm-guard.exe";
+  const std::wstring shadow = session.session_dir() + L"\\" + kShadowFilename;
   if (!::CopyFileW(executable.c_str(), shadow.c_str(), TRUE)) {
     error = ::GetLastError();
     return false;

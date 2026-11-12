@@ -326,7 +326,7 @@ void Lifecycle(const std::wstring& self, const std::wstring& pm, bool kill_guard
         Finalize(session);
         throw;
     }
-    ::DeleteFileW((fs::path(session.session_dir()) / L"pm-guard.exe").c_str());
+    ::DeleteFileW((fs::path(session.session_dir()) / L"pml.exe").c_str());
     Finalize(session);
 }
 } // namespace

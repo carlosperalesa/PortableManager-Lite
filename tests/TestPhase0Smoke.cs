@@ -18,7 +18,7 @@ namespace PortableManager.Tests
 
             if (args == null || args.Length < 1)
             {
-                Console.Error.WriteLine("Uso: test_phase0_smoke.exe <ruta_a_pm.exe> [ruta_json_salida]");
+                Console.Error.WriteLine("Uso: test_phase0_smoke.exe <ruta_a_pml.exe> [ruta_json_salida]");
                 return 2;
             }
 
@@ -59,7 +59,7 @@ namespace PortableManager.Tests
                 return 1;
             }
 
-            // 2. Ejecutar pm.exe --smoke-test desde CWD = %TEMP% y comprobar GetModuleFileNameW
+            // 2. Ejecutar pml.exe --smoke-test desde CWD = %TEMP% y comprobar GetModuleFileNameW
             int rcSmoke;
             string outSmoke;
             string errSmoke;
@@ -74,7 +74,7 @@ namespace PortableManager.Tests
                 return 1;
             }
 
-            // 3. Ejecutar pm.exe --guard <SessionID> desde CWD = %TEMP%
+            // 3. Ejecutar pml.exe --guard <SessionID> desde CWD = %TEMP%
             int rcGuardOk;
             string outGuardOk;
             string errGuardOk;
@@ -88,7 +88,7 @@ namespace PortableManager.Tests
                 return 1;
             }
 
-            // 4. Ejecutar pm.exe --guard sin SessionID (debe rechazar con código != 0)
+            // 4. Ejecutar pml.exe --guard sin SessionID (debe rechazar con código != 0)
             int rcGuardEmpty;
             string outGuardEmpty;
             string errGuardEmpty;

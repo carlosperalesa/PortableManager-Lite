@@ -7,6 +7,11 @@ del anfitrión y PMGuard.\
 **No incluye:** interfaz gráfica definitiva, bóveda Secure,
 sincronización Cloud ni virtualización universal.
 
+> **Nota de vigencia.** Esta versión conserva el diseño histórico de PM Lite.
+> Para el contrato vigente de PML, `pml.exe --guard`, PMD y `wrapper.ini` por
+> instalación, consultar [arquitectura nativa](ARQUITECTURA_NATIVE.md),
+> [Fase 6](fase06/README_FASE06.md) y [Fase 7](fase07/README_FASE07.md).
+
 ## 1. Principios rectores
 
 PortableManager Lite es un lanzador de aplicaciones portables con un

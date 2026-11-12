@@ -40,7 +40,9 @@ public:
         bool simulate_interruption = false) noexcept;
 
     // Lee el contenido completo de un archivo como texto UTF-8 (eliminando BOM UTF-8 si existiera).
-    static AtomicReadResult ReadUtf8Text(std::wstring_view target_path) noexcept;
+    // require_plain_file rejects reparse points and hard links at the leaf.
+    static AtomicReadResult ReadUtf8Text(std::wstring_view target_path,
+                                         bool require_plain_file = false) noexcept;
 
     // Garantiza que exista la cadena de directorios padre de target_path.
     static bool EnsureParentDirectories(std::wstring_view target_path, DWORD& out_error) noexcept;

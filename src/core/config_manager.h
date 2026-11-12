@@ -119,7 +119,7 @@ public:
     // o si el archivo aún no existe en disco y force_if_missing == true.
     ConfigOperationResult SaveAppsIniIfModified(bool force_if_missing = false);
 
-    // Métodos genéricos para cargar/guardar cualquier INI relativo a PM (ej. Data/recipes/<id>.ini).
+    // Métodos genéricos para cargar/guardar cualquier INI relativo a PM (ej. App/<app>/wrapper.ini).
     ConfigOperationResult LoadRelativeIni(
         std::wstring_view relative_ini_path,
         IniDocument& out_doc,

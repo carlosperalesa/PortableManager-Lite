@@ -1,6 +1,7 @@
 #include "core/config_manager.h"
 #include "guard/guard_entry.h"
 #include "guard/guard_process.h"
+#include "junctions/junction_manager.h"
 #include "jobs/job_manager.h"
 #include "learning/learning_engine.h"
 #include "runtime/session_manager.h"
@@ -118,10 +119,11 @@ struct Fixture {
     std::wstring company = SessionManager::GenerateSessionGuid();
     std::wstring product = SessionManager::GenerateSessionGuid();
     fs::path root = fs::path(SessionManager::QuerySystemTempDir()) / (L"pm6-" + company);
-    fs::path executable = root / L"fixture.exe";
     fs::path roaming = root / L"roaming" / company / product;
     fs::path local = root / L"local" / company / product;
     fs::path portable = root / L"portable";
+    fs::path installation = portable / L"App" / L"fixture";
+    fs::path executable = installation / L"bin" / L"fixture.exe";
     std::wstring reg_parent = L"Software\\" + company;
     std::wstring reg = reg_parent + L"\\" + product;
     bool own_root = false;
@@ -142,6 +144,7 @@ struct Fixture {
         fs::create_directories(local.parent_path());
         fs::create_directories(portable / L"Data" / L"apps" / L"fixture");
         fs::create_directory(root / L"temp");
+        fs::create_directories(executable.parent_path());
         Write(roaming / L"original.txt", "host original");
         Write(portable / L"Data" / L"apps" / L"fixture" / L"older.txt", "older data");
         HKEY key = nullptr;
@@ -172,11 +175,11 @@ void TestEnvironment(const fs::path& root) {
 }
 
 LearningRequest Request(const fs::path& root, std::wstring_view mode) {
-    const auto exe = (root / L"fixture.exe").wstring();
+    const auto exe = (root / L"portable" / L"App" / L"fixture" / L"bin" / L"fixture.exe").wstring();
     const auto candidates = LearningEngine::Inspect(exe);
     Check(candidates && Guid(candidates->company) && Guid(candidates->product) &&
           root.filename().wstring() == L"pm6-" + candidates->company, "bind synthetic executable to root");
-    LearningRequest request{exe,
+    LearningRequest request{L"App/fixture", exe,
         L"--write " + pm::jobs::QuoteArgument(root.wstring()) + L" " + std::wstring(mode),
         L"fixture", {candidates->roaming, candidates->local, candidates->registry}, 12000};
     if (mode == L"ambiguous") {
@@ -217,8 +220,10 @@ int Controller(const fs::path& root, std::wstring_view mode) {
     if (result.error || result.rollback_error)
         std::fprintf(stderr, "Learning result: error=%lu rollback=%lu\n", result.error, result.rollback_error);
     Check(result.host_restored, "restore host");
-    if (mode != L"failure")
-        Check(result.error == ERROR_SUCCESS && !result.recipe_path.empty(), "publish learning recipe");
+    const bool publish_fails = mode == L"failure" || mode == L"hardlink";
+    if (!publish_fails)
+        Check(result.error == ERROR_SUCCESS && result.wrapper_path == L"App\\fixture\\wrapper.ini",
+              "publish at installation root, above the executable subdirectory");
     if (mode == L"normal") {
         const auto pid = static_cast<DWORD>(std::stoul(Read(root / L"descendant.txt")));
         const Handle descendant(::OpenProcess(SYNCHRONIZE, FALSE, pid));
@@ -230,27 +235,28 @@ int Controller(const fs::path& root, std::wstring_view mode) {
     Check(!fs::exists(session_dir), "cleaned session temporaries removed");
     const auto data = root / L"portable" / result.data_path;
     Check(Read(data / L"roaming" / L"learned.txt") == "roaming output", "keep learned roaming data");
-    if (mode == L"failure") {
-        Check(result.error != ERROR_SUCCESS && result.recipe_path.empty(), "report recipe failure");
-        Check(!fs::exists(data / L"registry.reg"), "never copy registry settings on recipe failure");
+    if (publish_fails) {
+        Check(result.error != ERROR_SUCCESS && result.wrapper_path.empty(), "report wrapper failure");
+        Check(!fs::exists(data / L"registry.reg"), "never copy registry settings on wrapper failure");
         return 0;
     }
-    const auto recipe = Read(root / L"portable" / result.recipe_path);
-    Check(recipe.find("Previous=keep") != std::string::npos, "retain previous recipe");
-    Check(recipe.find("RoamingHost=%APPDATA%\\") != std::string::npos &&
-          recipe.find("RoamingCleanup=REMOVE_JUNCTION_RESTORE_ORIGINAL") != std::string::npos &&
-          recipe.find("RoamingItem1=FILE:learned.txt") != std::string::npos &&
-          recipe.find("RoamingDataPath") == std::string::npos &&
-          recipe.find(":\\") == std::string::npos, "cleanup-only relative recipe");
+    const auto wrapper = Read(root / L"portable" / result.wrapper_path);
+    if (mode != L"existing")
+        Check(wrapper.find("Previous=keep") != std::string::npos, "retain previous wrapper");
+    Check(wrapper.find("RoamingHost=%APPDATA%\\") != std::string::npos &&
+          wrapper.find("RoamingCleanup=REMOVE_JUNCTION_RESTORE_ORIGINAL") != std::string::npos &&
+          wrapper.find("RoamingItem1=FILE:learned.txt") != std::string::npos &&
+          wrapper.find("RoamingDataPath") == std::string::npos &&
+          wrapper.find(":\\") == std::string::npos, "cleanup-only relative wrapper");
     if (mode == L"ambiguous") {
-        Check(recipe.find("LocalHost") == std::string::npos && recipe.find("RegistryKey") == std::string::npos,
+        Check(wrapper.find("LocalHost") == std::string::npos && wrapper.find("RegistryKey") == std::string::npos,
               "exclude ambiguous output");
     } else {
         Check(Read(data / L"local" / L"learned.txt") == "local output", "keep learned local data");
         Check(!fs::exists(data / L"registry.reg") &&
-              recipe.find("RegistryDataPath") == std::string::npos &&
-              recipe.find("RegistryKey=HKCU\\Software\\") != std::string::npos &&
-              recipe.find("RegistryCleanup=RESTORE_REG") != std::string::npos,
+              wrapper.find("RegistryDataPath") == std::string::npos &&
+              wrapper.find("RegistryKey=HKCU\\Software\\") != std::string::npos &&
+              wrapper.find("RegistryCleanup=RESTORE_REG") != std::string::npos,
               "record modified registry resource but never copy settings");
     }
     return 0;
@@ -260,11 +266,17 @@ void Scenario(std::wstring_view mode) {
     Fixture fixture;
     fixture.Prepare();
     if (mode == L"existing") SetKey(fixture.reg, 7);
-    const auto recipes = fixture.portable / L"Data" / L"recipes";
-    if (mode == L"failure") Write(recipes, "obstruction");
-    else {
-        fs::create_directory(recipes);
-        Write(recipes / L"fixture.ini", "[Previous]\r\nPrevious=keep\r\n");
+    const auto wrapper = fixture.installation / L"wrapper.ini";
+    const auto sibling = fixture.portable / L"App" / L"other" / L"wrapper.ini";
+    fs::create_directory(sibling.parent_path());
+    Write(sibling, "[Other]\r\nSentinel=keep\r\n");
+    if (mode == L"failure") {
+        fs::create_directory(wrapper);
+    } else if (mode == L"hardlink") {
+        Check(::CreateHardLinkW(wrapper.c_str(), sibling.c_str(), nullptr) != FALSE,
+              "create synthetic wrapper hard link");
+    } else if (mode != L"existing") {
+        Write(wrapper, "[Previous]\r\nPrevious=keep\r\n");
     }
     const auto args = L"--case " + pm::jobs::QuoteArgument(fixture.root.wstring()) + L" " + std::wstring(mode);
     auto child = Spawn(PathResolver::QueryExecutablePath(), args);
@@ -312,12 +324,20 @@ void Scenario(std::wstring_view mode) {
             Check(false, "PMGuard completed rollback");
         }
         Check(sessions == 1, "verify the interrupted session");
-        Check(Read(recipes / L"fixture.ini") == "[Previous]\r\nPrevious=keep\r\n", "critical exit leaves recipe untouched");
+        Check(Read(wrapper) == "[Previous]\r\nPrevious=keep\r\n", "critical exit leaves wrapper untouched");
     } else {
         const auto exit_code = Wait(child.get());
         if (exit_code != 0) dump_errors();
         Check(exit_code == 0, "learning controller");
     }
+    Check(Read(sibling) == "[Other]\r\nSentinel=keep\r\n" &&
+          !fs::exists(fixture.portable / L"Data" / L"recipes") &&
+          !fs::exists(fixture.executable.parent_path() / L"wrapper.ini"),
+          "leave other installations untouched and use only the installation root");
+    if (mode == L"hardlink")
+        Check(fs::equivalent(wrapper, sibling), "refuse to replace a linked wrapper");
+    if (mode == L"failure")
+        Check(fs::is_directory(wrapper), "preserve obstructing directory");
     Check(Read(fixture.roaming / L"original.txt") == "host original" &&
           !fs::exists(fixture.roaming / L"learned.txt") &&
           !fs::exists(fixture.roaming.wstring() + L".pmbkp"), "restore original roaming folder");
@@ -357,6 +377,52 @@ void Metadata() {
     request.exclusive_paths[0] = L"%TEMP%\\shared";
     Check(LearningEngine::Run(resolver, request).error == ERROR_INVALID_NAME, "reject arbitrary approval");
 }
+void UnsafeInstallation() {
+    Fixture fixture;
+    fixture.Prepare();
+    const PathResolver resolver(fixture.portable.wstring());
+    auto request = Request(fixture.root, L"normal");
+    const auto rejected = [&](DWORD error) {
+        const auto result = LearningEngine::Run(resolver, request);
+        Check(result.error == error && result.session_id.empty() && result.wrapper_path.empty(),
+              "reject unsafe installation before changing the host");
+    };
+    request.app_dir = L"App/other/../fixture";
+    rejected(ERROR_INVALID_NAME);
+    request.app_dir = L"../outside";
+    rejected(ERROR_INVALID_NAME);
+    request.app_dir = fixture.installation.wstring();
+    rejected(ERROR_INVALID_NAME);
+    request.app_dir = L"App/other";
+    rejected(ERROR_INVALID_NAME);
+    request.app_dir = L"App/fixture";
+    request.executable = (fixture.installation / L"bin" / L".." / L"bin" / L"fixture.exe").wstring();
+    rejected(ERROR_INVALID_NAME);
+
+    SessionManager session((fixture.root / L"temp").wstring());
+    Check(session.InitializeNewSession().ok, "initialize synthetic junction session");
+    const auto alias = fixture.portable / L"App" / L"alias";
+    DWORD error = ERROR_SUCCESS;
+    const auto other_root = fixture.root / L"junction-target";
+    const auto target = other_root / L"Data" / L"apps" / L"fixture";
+    fs::create_directories(target);
+    fs::copy_file(fixture.executable, target / L"fixture.exe");
+    const PathResolver other_resolver(other_root.wstring());
+    const bool created = pm::junctions::JunctionManager::Prepare(
+        session, other_resolver, L"fixture", alias.wstring(), L"Data\\apps\\fixture", error);
+    ::SetLastError(error);
+    Check(created, "create synthetic installation junction");
+    request.app_dir = L"App/alias";
+    request.executable = (alias / L"fixture.exe").wstring();
+    const auto result = LearningEngine::Run(resolver, request);
+    const bool cleaned = pm::guard::CleanupSession(session, error);
+    ::SetLastError(error);
+    Check(cleaned, "retire synthetic junction");
+    Check(result.error == ERROR_DIRECTORY && result.session_id.empty() &&
+          !fs::exists(target / L"wrapper.ini"),
+          "reject reparse point in the installation chain");
+}
+
 }
 
 int wmain(int argc, wchar_t** argv) {
@@ -394,10 +460,12 @@ int wmain(int argc, wchar_t** argv) {
             evidence << "    \"" << name << "\": \"" << status << "\"" << (last ? "\n" : ",\n");
         };
         run("pe_metadata_and_scope", Metadata);
+        run("reject_unsafe_installation_paths", UnsafeInstallation);
         run("learn_restore_and_publish", [] { Scenario(L"normal"); });
         run("preserve_ambiguous_changes", [] { Scenario(L"ambiguous"); });
         run("restore_existing_registry_without_exporting_host_values", [] { Scenario(L"existing"); });
-        run("restore_when_recipe_write_fails", [] { Scenario(L"failure"); });
+        run("restore_when_wrapper_write_fails", [] { Scenario(L"failure"); });
+        run("reject_hardlinked_wrapper_and_restore", [] { Scenario(L"hardlink"); });
         run("guard_recovers_after_pm_crash", [] { Scenario(L"crash"); }, true);
         evidence << "  },\n  \"status\": \"" << (failures ? "failed" : "passed") << "\"\n}\n";
         return failures ? 1 : 0;

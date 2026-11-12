@@ -12,6 +12,6 @@
 ## Vacíos en la documentación y evidencia
 
 - Los controles de privacidad, atribución y rollback están repartidos entre las directivas, el diseño y los informes de fase. Falta un modelo de amenazas independiente y un procedimiento operativo único para incidentes de restauración.
-- La arquitectura v1.1 y las decisiones posteriores están versionadas por separado. No hay un documento de arquitectura v1.2 en el árbol.
+- La arquitectura v1.1 conserva el diseño histórico. La arquitectura nativa registra el contrato vigente de PML, PMG, PMD y los wrappers.
 - La trazabilidad de requisitos a pruebas y resultados se reconstruye a partir de varios documentos. Falta una matriz única que incluya requisito, escenario, resultado y SHA de la ejecución.
-- El cierre y las evidencias de Fases 7 y 8 están pendientes en esta base de `main`. La desconexión física acreditada en Fase 3 corresponde a esa implementación y ejecución.
+- Fase 8 permanece pendiente de autorización. La desconexión física acreditada en Fase 3 corresponde a esa implementación y ejecución.

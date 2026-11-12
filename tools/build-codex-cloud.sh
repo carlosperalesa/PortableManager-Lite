@@ -7,12 +7,12 @@ test -x "$T/bin/clang++" || { echo "Run tools/bootstrap-codex-cloud.sh first." >
 test -x "$T/bin/llvm-readobj"
 cmake -S "$ROOT" -B "$BUILD" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$ROOT/cmake/llvm-mingw-linux-toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$BUILD" --parallel
-PM="$BUILD/pm.exe"
-test -f "$PM"
-HEADERS="$("$T/bin/llvm-readobj" --file-headers "$PM")"
+PML="$BUILD/pml.exe"
+test -f "$PML"
+HEADERS="$("$T/bin/llvm-readobj" --file-headers "$PML")"
 grep -q IMAGE_FILE_MACHINE_AMD64 <<<"$HEADERS"
 grep -q IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP <<<"$HEADERS"
-IMPORTS="$("$T/bin/llvm-readobj" --coff-imports "$PM")"
+IMPORTS="$("$T/bin/llvm-readobj" --coff-imports "$PML")"
 if grep -Eiq "Name: (libc\+\+|libstdc\+\+|libunwind|libgcc|libwinpthread)" <<<"$IMPORTS"; then echo "External toolchain DLL import found." >&2; exit 1; fi
 echo "CROSS_COMPILE_PASSED: Windows x64 PE built and inspected."
 echo "WINDOWS_RUNTIME_TESTS_NOT_RUN: execute on windows-latest."

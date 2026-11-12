@@ -118,6 +118,9 @@ El LED global y la clasificación de un icono de app son independientes. Contrae
 
 ## 22. Motor de portabilidad para aplicaciones ZIP
 
+> Sección histórica. Para el alcance de aprendizaje y la ubicación vigente
+> de `wrapper.ini`, consultar la [sección 22 del diseño v0.2.2](PMDocs/PortableManager-Lite-Diseno-v0.2.2.md).
+
 ### 22.1 Responsabilidades
 
 - **Aplicaciones PortableApps PAF:** confiar su ciclo de portabilidad/restauración al **lanzador oficial**. PM puede observar procesos y comprobar resultados de forma **no destructiva**, sin duplicar las recetas del lanzador.

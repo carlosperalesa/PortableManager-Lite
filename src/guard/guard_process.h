@@ -5,6 +5,7 @@
 
 
 namespace pm::guard {
+inline constexpr wchar_t kShadowFilename[] = L"pml.exe";
 enum class OriginWaitResult { Released, OriginLost, TimedOut, Failed };
 class GuardProcess {
 public:

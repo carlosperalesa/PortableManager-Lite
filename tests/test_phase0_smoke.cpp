@@ -86,7 +86,7 @@ std::string WideToUtf8(std::wstring_view w) {
 
 int wmain(int argc, wchar_t* argv[]) {
     if (argc < 2) {
-        std::fwprintf(stderr, L"Uso: test_phase0_smoke.exe <ruta_a_pm.exe>\n");
+        std::fwprintf(stderr, L"Uso: test_phase0_smoke.exe <ruta_a_pml.exe>\n");
         return 2;
     }
 

@@ -8,13 +8,13 @@ Para la precedencia y las decisiones vigentes del proyecto, consultar el [AGENTS
 
 ## 1. Identidad y objetivo del proyecto
 
-**PortableManager Lite (PM)** es un lanzador y gestor portable, ligero y
+**PortableManager Lite (PML)** es un lanzador y gestor portable, ligero y
 orientado a la privacidad. Su responsabilidad principal es ejecutar
 aplicaciones portables y devolver el anfitrión al estado que tenía antes
-de la sesión, eliminando los residuos que PM pueda identificar y
+de la sesión, eliminando los residuos que PML pueda identificar y
 administrar.
 
-PM no es un virtualizador, una sandbox general, un antivirus ni un
+PML no es un virtualizador, una sandbox general, un antivirus ni un
 auditor exhaustivo de aplicaciones. No debe convertirse en un sistema
 pesado.
 
@@ -22,9 +22,9 @@ pesado.
 
 1.  Privacidad y mínima escritura en el anfitrión.
 2.  Restauración del estado previo del anfitrión.
-3.  Limpieza de los residuos administrados por PM.
+3.  Limpieza de los residuos administrados por PML.
 4.  Conservación de los datos propios de las aplicaciones en el
-    almacenamiento de PM.
+    almacenamiento de PML.
 5.  Sencillez, mantenibilidad y bajo consumo de recursos.
 6.  Compatibilidad y comodidad de uso.
 
@@ -60,32 +60,32 @@ demuestran por sí solos que la implementación actual siga funcionando.
 
 ## 3. Principios arquitectónicos inamovibles
 
-### 3.1 Rutas y portabilidad de PM
+### 3.1 Rutas y portabilidad de PML
 
--   La raíz de PM es el directorio que contiene `pm.exe`, obtenido
+-   La raíz de PML es el directorio que contiene `pml.exe`, obtenido
     mediante `GetModuleFileNameW`.
 -   Nunca determinar la raíz usando el directorio de trabajo actual
     (CWD).
--   PM debe funcionar igual desde un pendrive, disco externo o carpeta
+-   PML debe funcionar igual desde un pendrive, disco externo o carpeta
     de un disco local.
--   Toda ruta persistente de configuración de PM debe ser relativa a la
-    raíz de `pm.exe`.
+-   Toda ruta persistente de configuración de PML debe ser relativa a la
+    raíz de `pml.exe`.
 -   No guardar letras de unidad ni rutas absolutas del anfitrión en
     `config.ini` o `apps.ini`.
 -   Las rutas absolutas del anfitrión solo se permiten en artefactos
     operativos temporales, como el manifiesto de sesión en `%TEMP%`,
     cuando sean necesarias para restaurar el anfitrión incluso si el
-    almacenamiento de PM deja de estar disponible.
+    almacenamiento de PML deja de estar disponible.
 -   Validar rutas, normalizar separadores y bloquear escapes de
     directorio no autorizados.
 
 ### 3.2 Datos de las aplicaciones
 
 -   Los datos internos de las aplicaciones pertenecen al usuario.
--   La prioridad es mantener esos datos en el almacenamiento de PM.
--   PM no garantiza la integridad de los datos internos de una
+-   La prioridad es mantener esos datos en el almacenamiento de PML.
+-   PML no garantiza la integridad de los datos internos de una
     aplicación después de un cierre forzado.
--   PM es responsable de cerrar los procesos que controla y
+-   PML es responsable de cerrar los procesos que controla y
     limpiar/restaurar el anfitrión; no de corregir el funcionamiento
     interno de cada aplicación.
 -   No copiar perfiles de usuario al anfitrión como estrategia de
@@ -94,6 +94,9 @@ demuestran por sí solos que la implementación actual siga funcionando.
     ejecución.
 -   No diagnosticar ni reparar automáticamente una aplicación que no
     funciona.
+
+El aprendizaje guarda las reglas operativas de cada aplicación en su propio
+`wrapper.ini` dentro del directorio real de instalación validado.
 
 ### 3.3 Estrategias de portabilidad para ZIP
 
@@ -104,7 +107,7 @@ Aplicar este orden:
 2.  Variables de entorno específicas del proceso mediante
     `CreateProcessW`, cuando la aplicación las respete.
 3.  Renombrado de carpetas exclusivas existentes a `.pmbkp` y Directory
-    Junction directa hacia los datos de la aplicación dentro de PM.
+    Junction directa hacia los datos de la aplicación dentro de PML.
 
 No introducir una cuarta estrategia sin aprobación expresa.
 
@@ -112,7 +115,7 @@ Antes de crear una Junction: - Identificar con suficiente certeza la
 carpeta exclusiva de la aplicación. - Registrar si existía
 originalmente. - No sobrescribir un `.pmbkp` existente. - Registrar la
 intención en el manifiesto antes de modificar el anfitrión. - Verificar
-que el punto de reanálisis y el destino corresponden a PM antes de
+que el punto de reanálisis y el destino corresponden a PML antes de
 eliminarlo. - Eliminar únicamente la Junction propia; nunca seguirla
 para borrar el destino. - Restaurar el `.pmbkp` si existía.
 
@@ -122,33 +125,34 @@ automáticamente.
 ### 3.4 PortableApps / PAF
 
 -   PortableApps y sus lanzadores gestionan sus propias aplicaciones.
--   PM no debe duplicar mecanismos que ya resuelve correctamente el
+-   PML no debe duplicar mecanismos que ya resuelve correctamente el
     lanzador PAF.
--   PM debe invocar el lanzador correspondiente y respetar sus
+-   PML debe invocar el lanzador correspondiente y respetar sus
     parámetros y ciclo de vida.
 -   Las aplicaciones PAF que limpian correctamente el anfitrión pueden
     clasificarse como verdes según la evidencia.
--   PM conserva la responsabilidad de su verificación general y de la
+-   PML conserva la responsabilidad de su verificación general y de la
     respuesta crítica prioritaria.
 
-### 3.5 PM y PMGuard (PMG)
+### 3.5 PML y PMGuard (PMG)
 
 -   PMG es una instancia de sombra del mismo ejecutable, invocada en
-    modo `--guard` y ejecutada desde `%TEMP%`.
--   PMG utiliza el manifiesto y las recetas operativas que PM ya
-    escribe; no mantiene una configuración paralela.
--   PMG solo ejecuta la limpieza de emergencia cuando PM ha desaparecido
+    modo `--guard` como `%TEMP%\PortableManager\Session\<SessionID>\pml.exe`.
+-   PML distribuye un solo ejecutable, `pml.exe`.
+-   PMG restaura desde `session.ini` y los respaldos operativos locales.
+    Puede completar el rollback con el dispositivo y el wrapper inaccesibles.
+-   PMG solo ejecuta la limpieza de emergencia cuando PML ha desaparecido
     inesperadamente.
--   Si PM sigue activo, PMG no limpia.
--   Si PMG termina mientras PM sigue activo, PM continúa siendo
+-   Si PML sigue activo, PMG no limpia.
+-   Si PMG termina mientras PML sigue activo, PML continúa siendo
     responsable de la limpieza.
--   PM y PMG nunca pueden ejecutar simultáneamente las mismas
+-   PML y PMG nunca pueden ejecutar simultáneamente las mismas
     operaciones de limpieza.
 -   Utilizar exclusión mutua y comprobar el estado real de la sesión.
--   PMG debe esperar bloqueado por el proceso PM; no implementar polling
+-   PMG debe esperar bloqueado por el proceso PML; no implementar polling
     continuo.
 -   PMG no es un servicio de Windows ni un componente indispensable para
-    el funcionamiento normal de PM.
+    el funcionamiento normal de PML.
 -   La limpieza crítica tiene prioridad sobre el cierre cooperativo de
     PAF o de cualquier ZIP.
 
@@ -160,15 +164,15 @@ Mantener flujos reutilizables y sencillos.
     limpieza y restauración.
 -   Cierre rápido: aplica el mecanismo aprobado para terminar los
     procesos controlados y ejecutar la misma restauración.
--   Cierre crítico: caída inesperada de PM, desconexión física de la
-    fuente de PM o pérdida inesperada del origen. Debe cerrar los
+-   Cierre crítico: caída inesperada de PML, desconexión física de la
+    fuente de PML o pérdida inesperada del origen. Debe cerrar los
     procesos controlados y ejecutar la limpieza/restauración crítica sin
     depender del USB.
--   No terminar procesos ajenos a PM.
+-   No terminar procesos ajenos a PML.
 -   No inventar una recuperación posterior de sesiones antiguas.
--   No hacer que un nuevo arranque de PM descubra y restaure
+-   No hacer que un nuevo arranque de PML descubra y restaure
     automáticamente sesiones huérfanas.
--   Si PM y PMG desaparecen simultáneamente o se corta la electricidad,
+-   Si PML y PMG desaparecen simultáneamente o se corta la electricidad,
     no prometer recuperación posterior garantizada.
 
 El orden de limpieza debe respetar las dependencias: terminar primero
@@ -187,7 +191,7 @@ seguro.
     el último estado escrito.
 -   Nunca sobrescribir ni eliminar respaldos que puedan ser necesarios
     para restaurar.
--   PMG puede abrir la sesión activa que PM le indicó.
+-   PMG puede abrir la sesión activa que PML le indicó.
 -   No implementar recuperación automática de sesiones huérfanas en
     futuros arranques.
 
@@ -234,14 +238,19 @@ No modificar HKLM ni claves reales de aplicaciones durante las pruebas.
     contenido de archivos.
 -   No crear el archivo si la limpieza termina correctamente.
 
-## 4. Clasificación visual de aplicaciones
+## 4. PortableManager Desktop (PMD) y clasificación visual
+
+PMD reúne toda la presentación gráfica de PML, incluida la píldora, el
+escritorio semitransparente, los menús y las ventanas. Se integrará como
+módulo del mismo ejecutable. El núcleo y el modo `--guard` son independientes
+de PMD. PMS (Secure) y PMC (Cloud) son nombres reservados para trabajo futuro.
 
 -   Blanco/gris: aplicación todavía no verificada.
 -   Verde: no deja residuos en el anfitrión según las pruebas
     realizadas.
--   Amarillo: requiere la limpieza estándar de PM y, después de ella, el
+-   Amarillo: requiere la limpieza estándar de PML y, después de ella, el
     anfitrión queda restaurado.
--   Rojo: deja residuos que PM no puede identificar, limpiar o restaurar
+-   Rojo: deja residuos que PML no puede identificar, limpiar o restaurar
     de forma segura.
 
 Una aplicación no es roja simplemente por ser desconocida o por no haber
@@ -251,12 +260,12 @@ del usuario.
 
 ## 5. Alcance funcional conocido
 
-PM debe evolucionar hacia un lanzador y gestor portable que permita:
+PML debe evolucionar hacia un lanzador y gestor portable que permita:
 
 -   Instalar aplicaciones portables.
 -   Registrar y gestionar aplicaciones.
 -   Lanzarlas mediante su ejecutable o lanzador correspondiente.
--   Cerrarlas con el sistema de limpieza de PM.
+-   Cerrarlas con el sistema de limpieza de PML.
 -   Restablecer los datos de una aplicación.
 -   Archivar una aplicación conservando sus datos.
 -   Desinstalarla y ejecutar la limpieza correspondiente.
@@ -283,7 +292,7 @@ Directivas:
 - Utilizar Win32 API para las funciones nativas de Windows.
 - No utilizar C# para el ejecutable final.
 - No incorporar Python al runtime final. Los scripts Python existentes pueden mantenerse como herramientas auxiliares de auditoría.
-- Mantener el toolchain dentro de `tools/toolchains/`; no incluirlo en la distribución final de PM.
+- Mantener el toolchain dentro de `tools/toolchains/`; no incluirlo en la distribución final de PML.
 - Mantener compilación reproducible y sin dependencias innecesarias.
 - Conservar las opciones de compilación aprobadas en la Fase 0B (`-static`, `-municode` y `/SWAPRUN:CD` mediante LLD, además de las advertencias configuradas).
 - No afirmar que LLVM-MinGW `-static` es idéntico a MSVC `/MT`.

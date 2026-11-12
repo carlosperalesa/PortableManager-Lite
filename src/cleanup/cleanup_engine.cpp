@@ -185,7 +185,7 @@ Result Execute(SessionManager& session, Mode mode, Artifacts artifacts,
         }
     }
     DWORD error = ERROR_SUCCESS;
-    const auto shadow_path = session.session_dir() + L"\\pm-guard.exe";
+    const auto shadow_path = session.session_dir() + L"\\" + guard::kShadowFilename;
     if (guard && !guard->Retire(error)) {
         pending.push_back({L"REMOVE_GUARD_SHADOW", shadow_path, error});
     } else if (managed_shadow && ::GetFileAttributesW(shadow_path.c_str()) != INVALID_FILE_ATTRIBUTES) {
