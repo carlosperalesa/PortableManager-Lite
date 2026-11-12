@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(PortableManagerLite VERSION 0.2.2 LANGUAGES CXX)
+project(PortableManagerLite VERSION 0.2.2 LANGUAGES CXX RC)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "PortableManager Lite requiere compilacion para arquitectura x64.")
@@ -10,16 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    add_compile_options(
-        -Wall
-        -Wextra
-        -Werror
-        -municode
-        -DUNICODE
-        -D_UNICODE
-        -DWIN32_LEAN_AND_MEAN
-        -DNOMINMAX
-    )
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror;-municode>")
     add_link_options(
         -municode
         -static
@@ -27,19 +18,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     )
 elseif(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-    add_compile_options(
-        /W4
-        /WX
-        /utf-8
-        /permissive-
-        /EHsc
-        /DUNICODE
-        /D_UNICODE
-        /DWIN32_LEAN_AND_MEAN
-        /DNOMINMAX
-    )
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/W4;/WX;/utf-8;/permissive-;/EHsc>")
     add_link_options(/SWAPRUN:CD)
 endif()
+add_compile_definitions(UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 set(PM_CORE_SOURCES
     src/core/path_resolver.cpp
@@ -61,6 +43,7 @@ set(PM_GUARD_SOURCES
 
 add_executable(pm
     ${PM_GUARD_SOURCES}
+    src/learning/learning_engine.cpp
     src/core/main.cpp
     src/guard/guard_entry.cpp
     ${PM_CORE_SOURCES}
@@ -157,3 +140,17 @@ target_include_directories(test_phase5_registry PRIVATE ${CMAKE_CURRENT_SOURCE_D
 target_link_libraries(test_phase5_registry PRIVATE kernel32 user32 advapi32 ole32 bcrypt)
 add_test(NAME Phase5_RegistryTest COMMAND test_phase5_registry $<TARGET_FILE:pm> "${CMAKE_CURRENT_BINARY_DIR}/phase5_windows_runtime.json")
 set_tests_properties(Phase5_RegistryTest PROPERTIES TIMEOUT 120)
+
+add_executable(test_phase6_learning
+    tests/test_phase6_learning.cpp
+    tests/phase6_fixture.rc
+    src/learning/learning_engine.cpp
+    src/guard/guard_entry.cpp
+    ${PM_CORE_SOURCES}
+    ${PM_RUNTIME_SOURCES}
+    ${PM_GUARD_SOURCES}
+)
+target_include_directories(test_phase6_learning PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(test_phase6_learning PRIVATE kernel32 user32 advapi32 ole32 bcrypt version)
+add_test(NAME Phase6_LearningTest COMMAND test_phase6_learning "${CMAKE_CURRENT_BINARY_DIR}/phase6_windows_runtime.json")
+set_tests_properties(Phase6_LearningTest PROPERTIES TIMEOUT 120)

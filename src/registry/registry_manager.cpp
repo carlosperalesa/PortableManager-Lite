@@ -291,7 +291,8 @@ bool RegistryManager::IsRegistryOperation(const ManifestOperation& op, std::wstr
            op.registry_backup_sha256.find_first_not_of(L"0123456789abcdef") == std::wstring::npos;
 }
 
-bool RegistryManager::Prepare(SessionManager& session, std::wstring_view exclusive_key, DWORD& error) {
+bool RegistryManager::Prepare(SessionManager& session, std::wstring_view exclusive_key, DWORD& error,
+                              bool require_existing_parent) {
     error = ERROR_SUCCESS;
     if (!SafeKey(exclusive_key) || session.session_dir().empty()) return Fail(error, ERROR_INVALID_NAME);
     runtime::SessionLock lock(session.session_mutex_name());
@@ -316,6 +317,7 @@ bool RegistryManager::Prepare(SessionManager& session, std::wstring_view exclusi
     std::wstring leaf_name;
     if (!InspectKey(op.reg_key_path, false, parent, leaf, leaf_name, error)) return false;
     if (leaf_name.empty()) return Fail(error, ERROR_PATH_NOT_FOUND);
+    if (require_existing_parent && !parent) return Fail(error, ERROR_PATH_NOT_FOUND);
     op.original_existed = static_cast<bool>(leaf);
     Handle directory, backup;
     if (op.original_existed) {
@@ -334,6 +336,27 @@ bool RegistryManager::Prepare(SessionManager& session, std::wstring_view exclusi
     // The application makes the actual changes. A durable intent is sufficient
     // to cover an interruption at any point after the application is launched.
     return intent.ok || Fail(error, intent.win32_error);
+}
+
+bool RegistryManager::CaptureNewData(const SessionManager& session, const ManifestOperation& op,
+                                     std::wstring& snapshot, DWORD& error) {
+    snapshot.clear();
+    error = ERROR_SUCCESS;
+    if (!SessionManager::IsValidSessionId(op.id) || !IsRegistryOperation(op, session.session_dir()))
+        return Fail(error, ERROR_INVALID_DATA);
+    if (op.original_existed) return true;
+    Key parent, leaf;
+    std::wstring leaf_name;
+    if (!InspectKey(op.reg_key_path, false, parent, leaf, leaf_name, error)) return false;
+    if (!leaf) return true;
+    Handle directory, file;
+    if (!PinSessionDirectory(session.session_dir(), directory, error)) return false;
+    const auto path = session.session_dir() + L"\\learned-" + op.id + L".reg";
+    std::wstring digest;
+    if (!Export(op.reg_key_path, path, error) ||
+        !ReadBackup(op, path, 0, file, digest, error)) return false;
+    snapshot = path;
+    return true;
 }
 
 bool RegistryManager::Rollback(const ManifestOperation& op, DWORD& error) {

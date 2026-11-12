@@ -8,7 +8,13 @@ public:
     // The caller attributes the complete subtree to one application and starts
     // PMGuard first. Prepare must succeed before creating its Job or launching it.
     static bool Prepare(runtime::SessionManager& session, std::wstring_view exclusive_key,
-                        DWORD& error);
+                        DWORD& error, bool require_existing_parent = false);
+
+    // Called after the Job drains. Only exports a subtree absent at baseline.
+    // The export stays in the local session until PM publishes it to portable storage.
+    static bool CaptureNewData(const runtime::SessionManager& session,
+                               const runtime::ManifestOperation& op,
+                               std::wstring& snapshot, DWORD& error);
 
     static bool IsRegistryOperation(const runtime::ManifestOperation& op,
                                     std::wstring_view session_dir);
