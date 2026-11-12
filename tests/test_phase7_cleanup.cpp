@@ -383,7 +383,7 @@ void Emergency(bool crash) {
     Check(guard.value && ::WaitForSingleObject(guard.value, 0) == WAIT_TIMEOUT &&
           fs::exists(fixture.session_dir / L"session.ini"), "guard stays idle while PM is active");
     const auto shadow = fixture.session_dir / L"pml.exe";
-    std::wstring image(32768, L'\\0');
+    std::wstring image(32768, wchar_t{});
     DWORD length = static_cast<DWORD>(image.size());
     Check(::QueryFullProcessImageNameW(guard.value, 0, image.data(), &length) != FALSE,
           "query PMG executable");
