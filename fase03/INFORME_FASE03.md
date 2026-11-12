@@ -15,6 +15,7 @@ está conservada en `reports/rebuild_guard_cloud_20261112.json`; sus estados
 | [43129753101](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43129753101) | `bfab116` | Diagnósticos por paso: cuatro grupos fallan con 4 procesos frente a 2; pérdida de origen falla por timeout del evento `_tree`. |
 | [43130025527](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130025527) | `08a4f43` | Inventario independiente de cada uno de los cinco grupos: dos auxiliares y dos `conhost.exe`; todos fallan el recuento exacto. |
 | [43130358371](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130358371) | `46ab7b9` | Linux PASS; compilación nativa PASS; regresiones 0B/1/2 PASS; Fase 3: **9/9 PASS**. |
+| [43147406760](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43147406760) | `33d1d0d` | Linux PASS; Windows nativo PASS (`SWAPRUN:CD`, 0 DLL externas); regresiones 0B/1/2 PASS; Fase 3: **11/11 PASS**. |
 
 Los logs y artefactos se consultaron directamente desde GitHub. El archivo de
 artefactos de la ejecución original tiene SHA-256

@@ -12,9 +12,9 @@ pendiente. PR #2 en borrador; Fase 4 no iniciada.
 - La fuente vigente del estado general sigue siendo la documentación de la raíz.
 
 La validación actual está en [INFORME_FASE03.md](INFORME_FASE03.md) y en
-[la ejecución 43130358371](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130358371).
+las ejecuciones de GitHub Actions [43130358371](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130358371) (9/9 PASS) y [43147406760](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43147406760) (11/11 PASS con detección de pérdida de origen).
 Evidencias consolidadas:
-- GitHub Actions Windows (`windows-2022`): `../reports/fase03_actions_43130358371.json`.
+- GitHub Actions Windows (`windows-2022`): `../reports/fase03_actions_43130358371.json` y [`../reports/fase03_actions_43147406760.json`](../reports/fase03_actions_43147406760.json).
 - Ejecución local inicial Windows 11 desde disco interno (9/9 PASS): [`../reports/fase03_windows_local_20261111.json`](../reports/fase03_windows_local_20261111.json) y copia en [`fase03_windows_local_20261111.json`](fase03_windows_local_20261111.json).
 - Auditoría inicial USB en unidad `E:` (5/9 PASS, 4/9 FAIL por `ERROR_VIRUS_INFECTED = 225` de Windows Defender): [`../reports/fase03_usb_audit_20261111.json`](../reports/fase03_usb_audit_20261111.json) y copia en [`fase03_usb_audit_20261111.json`](fase03_usb_audit_20261111.json).
 - Ejecución local final con detección de pérdida del origen y recuperación durante cierre crítico (11/11 PASS en disco interno + regresiones 0B/1/2 PASS): [`../reports/fase03_windows_final_20261111.json`](../reports/fase03_windows_final_20261111.json) y copia en [`fase03_windows_final_20261111.json`](fase03_windows_final_20261111.json).
