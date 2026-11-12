@@ -55,6 +55,10 @@ aplicaciones del anfitrión desde PMD requiere confirmación.
   de la misma incidencia. Una vez agotado, el aviso queda rojo hasta reiniciar PML.
 - El escudo arriba a la derecha de PMD está verde cuando el guardián está listo.
   El escudo y el LED de la píldora están rojos mientras PMG falta o se recupera.
+  El LED también pasa a rojo ante la pérdida del origen y el cierre de
+  emergencia. En los demás casos muestra el color habitual de reposo; no hay
+  colores adicionales para operaciones en curso o errores, que se informan
+  con un diálogo.
   El cierre crítico puede dejar en `pmlog` la copia de PMG aún mapeada por Windows.
 - La clasificación inicial es gris. El operador puede guardar el color
   acreditado en el catálogo. Una aplicación roja pide confirmación en PMD

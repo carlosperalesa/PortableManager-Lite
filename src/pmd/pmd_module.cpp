@@ -173,6 +173,7 @@ private:
     void Launch(const App& app, std::wstring arguments);
     void Close(Mode mode);
     void CloseWhenReady();
+    void LoseOrigin();
     void Finish(Worker* worker);
     void UpdateClipboard();
     void PickPackage(std::wstring id = {});
@@ -211,7 +212,7 @@ private:
     bool closing_ = false;
     Mode close_mode_ = Mode::Normal;
     bool modal_ = false;
-    bool error_ = false;
+    bool origin_lost_ = false;
     int status_ = 0;
 };
 
@@ -347,7 +348,9 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             ::GetClientRect(hwnd_, &rect);
             ::FillRect(dc, &rect, static_cast<HBRUSH>(::GetStockObject(BLACK_BRUSH)));
             if (view_ == View::Pill) {
-                const auto color = (error_ || !session_.protected_by_guard()) ? RGB(238, 81, 84) : closing_ || busy_ ? RGB(247, 185, 65) : RGB(92, 223, 164);
+                // Documented LED states only: red on origin loss or while PMG is
+                // missing or recovering; the usual idle color otherwise.
+                const auto color = (origin_lost_ || !session_.protected_by_guard()) ? RGB(238, 81, 84) : RGB(92, 223, 164);
                 const auto led = ::CreateSolidBrush(color);
                 const auto brush = ::SelectObject(dc, led);
                 const auto pen = ::SelectObject(dc, ::GetStockObject(NULL_PEN));
@@ -425,7 +428,7 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
         case WM_DISPLAYCHANGE: Layout(); return 0;
         case WM_CLIPBOARDUPDATE: UpdateClipboard(); return 0;
         case WM_TIMER:
-            if (!closing_ && !guard::IsOriginAccessible(origin_)) Close(Mode::Critical);
+            if (!closing_ && !guard::IsOriginAccessible(origin_)) LoseOrigin();
             return 0;
         case WM_CLOSE: Close(Mode::Normal); return 0;
         case WM_QUERYENDSESSION: Close(Mode::Critical); return TRUE;
@@ -736,7 +739,7 @@ void Desktop::Finish(Worker* worker) {
     workers_.erase(found);
     if (result.error == ERROR_DEVICE_NOT_CONNECTED) {
         if (result.rollback_error) status_ = 1;
-        Close(Mode::Critical);
+        LoseOrigin();
         return;
     }
     if (result.error || result.rollback_error) Report(result.rollback_error ? result.rollback_error : result.error);
@@ -762,8 +765,13 @@ void Desktop::CloseWhenReady() {
     if (closing_ && workers_.empty() && !busy_) ::DestroyWindow(hwnd_);
 }
 
+void Desktop::LoseOrigin() {
+    origin_lost_ = true;
+    Close(Mode::Critical);
+    ::InvalidateRect(hwnd_, nullptr, TRUE);
+}
+
 void Desktop::Report(DWORD error) {
-    error_ = error != ERROR_SUCCESS;
     if (error && closing_) status_ = 1;
     if (error && !closing_) {
         const bool was_modal = modal_;
