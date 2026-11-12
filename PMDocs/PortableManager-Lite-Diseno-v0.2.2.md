@@ -81,14 +81,19 @@ Para aplicaciones no-PAF (ZIP/directorios), PM evalúa en orden estricto:
 
 ---
 
-## 22. Aprendizaje Ligero de Aplicaciones (Validación Fase 4)
+## 22. Aprendizaje Ligero de Aplicaciones (Fase 6; decisión del propietario 2026-11-12)
 
-PM incorpora un mecanismo heurístico ligero para generar recetas de aplicaciones ZIP desconocidas:
-1. **Inspección de metadatos PE:** Extracción de cadenas `CompanyName` y `ProductName` mediante la API estándar de Windows `version.dll` (`GetFileVersionInfoW` / `VerQueryValueW`).
-2. **Identificación de candidatos:** Generación de rutas candidatas exclusivas en `%APPDATA%\<Company>\<Product>`, `%LOCALAPPDATA%\<Company>\<Product>` y `HKCU\Software\<Company>\<Product>`.
-3. **Línea base previa y respaldo:** Si existen datos del anfitrión en dichas rutas exclusivas, se respaldan como `.pmbkp`.
-4. **Cosecha y receta:** Al cerrar la aplicación, los datos modificados se mueven a `Data/apps/<id-estable>/` en el USB y se genera una receta `.ini` con **rutas 100% relativas a variables estándar**.
-5. **No interferencia:** Modificaciones concurrentes en carpetas no exclusivas o compartidas (ej. `%TEMP%`, `HKCU\Software\Microsoft\...`) **no se tocan ni se eliminan**, preservando la integridad del anfitrión.
+**Propósito exclusivo:** identificar qué archivos, carpetas y claves de Registro del anfitrión afecta una aplicación portable, para generar **recetas operativas de limpieza y restauración**. La receta describe recursos y acciones inversas; **no es una copia de seguridad de la configuración de la aplicación** y no ordena cosechar perfiles al USB.
+
+1. **Identificación de candidatos:** usar metadatos PE (`CompanyName`, `ProductName` con `GetFileVersionInfoW` / `VerQueryValueW`) para acotar la inspección, por ejemplo, a `%APPDATA%\\<Company>\\<Product>`, `%LOCALAPPDATA%\\<Company>\\<Product>` y `HKCU\\Software\\<Company>\\<Product>`. Los metadatos y las rutas candidatas no demuestran por sí mismos propiedad ni modificación.
+2. **Observación y línea base:** antes de ejecutar, registrar existencia y estado de los recursos atribuibles. Identificar mediante observación/diferencias qué recursos fueron efectivamente creados, modificados o eliminados. No considerar un candidato como residuo sin evidencia.
+3. **Receta de limpieza:** registrar exclusivamente las ubicaciones afectadas, sus tipos, la condición previa y la operación inversa segura; usar variables estándar y referencias relativas cuando se persista una receta portable. No guardar rutas absolutas del anfitrión en la configuración persistente.
+4. **Respaldo operativo:** si un recurso del anfitrión existía, respaldarlo **temporalmente solo para restaurarlo** (`.pmbkp` para carpetas exclusivas; `.reg` en la sesión para claves HKCU admitidas). Al finalizar, terminar primero los Jobs, retirar los recursos creados por la aplicación y restaurar exactamente los originales. Conservar respaldos si falla la restauración.
+5. **Datos de la aplicación:** la configuración portable es responsabilidad de cada aplicación o del mecanismo de portabilidad ya aprobado (modo nativo, variables de entorno del proceso o Junction hacia los datos que la aplicación administra). LearningEngine no copia, cosecha ni archiva configuraciones como parte de generar recetas.
+6. **No interferencia y cierre crítico:** no tocar recursos compartidos, ajenos o de atribución ambigua. En pérdida del USB o caída crítica, omitir toda escritura al dispositivo y restaurar el anfitrión usando el manifiesto y los respaldos operativos accesibles en `%TEMP%`; el cierre nunca debe depender de leer una receta en el USB.
+7. **Separación de responsabilidades:** el manifiesto temporal de sesión contiene operaciones concretas write-ahead para la recuperación inmediata; las recetas persistentes son descripciones de recursos observados para limpiezas posteriores. Una receta no sustituye el manifiesto ni habilita una limpieza destructiva sin revalidación.
+
+Esta definición sustituye el antiguo apartado de «cosecha y receta» por decisión explícita del propietario. No se autoriza una función de copia de seguridad de aplicaciones.
 
 ---
 
@@ -99,7 +104,7 @@ PM implementa tres modos deterministas de finalización:
 ### 23.1 Cierre Normal (`NORMAL`)
 - El usuario solicita salir de PM o de la aplicación.
 - Cierre cooperativo (`WM_CLOSE` / `WM_QUIT`) a las ventanas principales de los procesos del Job Object.
-- Cosecha y persistencia de datos y perfiles al USB.
+- No realizar cosecha ni respaldo de configuraciones de aplicaciones; cerrar los Jobs y ejecutar limpieza/restauración con el manifiesto operativo.
 - Desmantelamiento de Junctions (`RemoveDirectoryW`).
 - Restauración transaccional de claves de registro desde respaldo `.pmbkp`.
 - Restauración de carpetas `.pmbkp` del anfitrión.
@@ -109,7 +114,7 @@ PM implementa tres modos deterministas de finalización:
 - El usuario ordena cierre forzado o expulsión inminente.
 - Envío de señal de cierre con temporizador estricto (timeout de 200 ms).
 - Si los procesos no terminan en el tiempo límite, llamada inmediata a `TerminateJobObject(hJob, 0)`.
-- Cosecha rápida de datos esenciales al USB.
+- No realizar cosecha de datos; priorizar la terminación del Job y la restauración del anfitrión.
 - Restauración prioritaria del anfitrión (Junctions y Registro).
 
 ### 23.3 Cierre Crítico de Emergencia (`CRITICAL`)
