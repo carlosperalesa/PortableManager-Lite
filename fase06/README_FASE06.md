@@ -1,62 +1,36 @@
 # Fase 06 — Aprendizaje Ligero (LearningEngine)
 
-Implementación para revisión. [Informe de Windows](../reports/rebuild_learning.json).
+**Estado: adecuación pendiente; no aprobada ni fusionada.**
 
-## Candidatos y atribución
+## Decisión vinculante del propietario (2026-11-12)
 
-`LearningEngine::Inspect` lee `CompanyName` y `ProductName` con las API de
-versión de Win32. Exige componentes portables de hasta 80 caracteres ASCII y
-valores coherentes entre las traducciones disponibles. Propone tres destinos
-con el sufijo `<Company>\<Product>`, uno bajo cada raíz admitida
-`%APPDATA%`, `%LOCALAPPDATA%` y `HKCU\Software`.
+Las recetas de aprendizaje sirven **únicamente para identificar los archivos, las carpetas y las claves de Registro que una aplicación portable efectivamente afecta, y describir las operaciones necesarias para revertir esos cambios durante la limpieza**.
 
-`LearningEngine::Run` recibe el identificador estable de la aplicación y los
-candidatos exactos cuya exclusividad ha verificado el llamador. El llamador
-debe garantizar la identidad del ejecutable y del recurso resuelto, así como
-la ausencia de escritores externos en ese recurso durante la sesión. El motor
-deja intactos los candidatos ambiguos y exige que los directorios y claves
-padre existan antes de preparar una redirección o un respaldo.
+Una receta no constituye ni solicita una copia de seguridad de la aplicación; no guarda perfiles, configuraciones, ni datos de uso en `Data/apps/`. La aplicación es responsable de mantener su configuración mediante su propio modo portable, sus parámetros o las redirecciones autorizadas de PM.
 
-## Ejecución, restauración y datos
+Distinguir:
 
-- PM inicia PMGuard antes de preparar el anfitrión. Una reserva por compañía
-  y producto excluye otro aprendizaje del mismo candidato. PMGuard conserva
-  la reserva hasta que termina. La API está prevista para un proceso dedicado.
-- JunctionManager registra la línea base y renombra el original a `.pmbkp`
-  antes de redirigir la carpeta a un directorio nuevo en
-  `Data/apps/<id>/<SessionID>/`. RegistryManager registra la línea base y
-  respalda el subárbol existente en el directorio temporal de sesión. El
-  manifiesto usa las operaciones de las fases anteriores.
-- Al salir el ejecutable, JobManager termina los descendientes que queden
-  y espera a que el Job se vacíe. Si la clave exclusiva estaba ausente en
-  la línea base y existe al cierre, RegistryManager valida una exportación
-  temporal. Las claves preexistentes se restauran y sus valores se quedan
-  en el anfitrión.
-- PM y PMGuard comparten la restauración. PM restaura el anfitrión antes de
-  copiar la exportación validada al directorio portable y guardar
-  `Data/recipes/<id>.ini`. La receta añade una sección
-  `[Learning.<SessionID>]` y actualiza `[Learning]` → `LatestSession`.
-  Las secciones previas y los datos de otras sesiones se conservan.
-- En una caída, PMGuard restaura el anfitrión. Los archivos que la aplicación
-  ya escribió por las Junctions pueden quedar en el directorio de sesión,
-  sin receta. Si falla la publicación, el motor devuelve el error y conserva
-  la exportación temporal que haya completado.
+- **Receta persistente:** inventario de recursos observados (con variables de entorno y rutas portables relativas), tipo de modificación, existencia previa y regla inversa segura. No almacenar rutas absolutas del anfitrión ni contenidos personales.
+- **Manifiesto temporal de sesión:** instrucciones write-ahead concretas y estado de las operaciones para PM y PMGuard en `%TEMP%`. Es la fuente operativa para recuperar una sesión activa y no depende de una receta guardada en el USB.
+- **Respaldo operativo del anfitrión:** `.pmbkp` para directorios exclusivos y `.reg` bajo el directorio temporal de sesión, únicamente para restaurar el estado anterior del equipo. Conservarlos ante fallo; no publicarlos como datos de la aplicación.
+- **Datos internos de la aplicación:** permanecen bajo control de ella o de las estrategias de portabilidad ya autorizadas; LearningEngine no los cosecha para elaborar recetas.
 
-## Validación
+## Aprendizaje permitido
 
-`build.ps1` compila con el LLVM-MinGW portable y ejecuta la suite sintética
-de Fase 6 y las regresiones 0B–5. CMake compila el mismo código y declara
-las mismas suites para CTest. GitHub Actions cruza la compilación desde
-Linux y ejecuta las pruebas nativas en Windows.
+1. Examinar metadatos PE (`CompanyName`, `ProductName`) con `GetFileVersionInfoW` / `VerQueryValueW` para proponer candidatos acotados bajo `%APPDATA%`, `%LOCALAPPDATA%` y `HKCU\Software`.
+2. Acreditar exclusividad de recursos antes de modificar o restaurar. Los candidatos de metadatos no prueban por sí solos que se hayan tocado.
+3. Comparar el estado anterior con el posterior de forma segura y registrar solamente recursos efectivamente afectados, distinguiendo nuevos, modificados y eliminados; no atribuir escrituras de terceros.
+4. Documentar las operaciones inversas necesarias y revalidar recursos antes de ejecutarlas. Terminar y vaciar primero los Jobs, después retirar redirecciones y restaurar el anfitrión.
+5. Preservar cambios ambiguos o compartidos; nunca realizar limpieza destructiva basada solo en una inferencia.
 
-En Windows local pasaron los seis escenarios sintéticos y las regresiones
-0B–5. La inspección PE confirmó AMD64 y `SWAPRUN:CD`. El JSON registra el
-commit probado, el SHA-256 del binario y el resultado de cada escenario.
+## Cierre crítico
 
-Las pruebas usan un perfil y directorios temporales sintéticos y un subárbol
-HKCU con GUID propio. Las variables del perfil se fijan para el proceso
-auxiliar y sus hijos.
-Las aplicaciones reales, las ACL personalizadas de Registro y la desconexión
-física USB quedan pendientes de validación. La atribución de candidatos y
-la aplicación posterior de recetas requieren un llamador con evidencia de
-exclusividad.
+Ante caída de PM o pérdida física del USB, PMGuard termina los Jobs y restaura el anfitrión desde el manifiesto y los respaldos de sesión accesibles en `%TEMP%`. No intenta escribir, cosechar ni guardar configuraciones en el USB desconectado. Tampoco necesita leer las recetas persistentes durante la restauración de la sesión ya iniciada.
+
+## Estado del código y validación pendiente
+
+El commit anterior `396e734` pasó seis escenarios sintéticos y las regresiones 0B–5 en Windows, junto a la compilación cruzada Linux; ese resultado corresponde al **comportamiento anterior** y no valida esta nueva definición.
+
+La implementación existente aún puede crear `Data/apps/<id>/<SessionID>/`, exportar valores nuevos del Registro y escribir referencias de datos en la receta. Debe **refactorizarse** para limitarse a descubrimiento y reglas de limpieza, manteniendo el funcionamiento de los subsistemas aprobados. Se necesitan nuevas pruebas para observación de recursos realmente modificados, ausencia de cosecha, restauración exacta de claves preexistentes, exclusión de cambios ambiguos y cierre crítico sin USB.
+
+No cerrar ni fusionar el PR #5 hasta que código, pruebas y CI cumplan estas directrices.
