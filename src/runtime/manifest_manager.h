@@ -53,6 +53,7 @@ struct ManifestOperation {
     std::wstring junction_file_id;
     std::wstring original_file_id;
     std::wstring host_parent_file_id;
+    std::wstring registry_backup_sha256;
 };
 
 struct ManifestStatusResult {
@@ -81,6 +82,7 @@ struct RollbackHandlers {
     std::function<bool(const ManifestOperation&, DWORD& out_err)> on_remove_junction;
     std::function<bool(const ManifestOperation&, DWORD& out_err)> on_restore_bkp;
     std::function<bool(const ManifestOperation&, DWORD& out_err)> on_restore_reg;
+    std::function<bool(const ManifestOperation&, DWORD& out_err)> on_release_reg_backup;
     std::function<bool(const ManifestOperation&, DWORD& out_err)> on_delete_dir;
 };
 

@@ -1,0 +1,199 @@
+{
+  "phase": "Fase 5 — Registro Windows; regresion 0B a 4",
+  "timestamp_utc": "2026-11-12T12:25:59.7654872Z",
+  "toolchain": {
+    "name": "llvm-mingw 20261104 (UCRT x86_64)",
+    "compiler_version": "clang version 23.1.5 (https://github.com/llvm/llvm-project.git 392dfff97d29b59d77e5cac6d4b6ef2585fe7117)",
+    "relative_path": "tools/toolchains/llvm-mingw/bin/clang++.exe",
+    "compile_flags": [
+      "-std=c++20",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-municode",
+      "-static",
+      "-Wl,-Xlink=-swaprun:cd"
+    ]
+  },
+  "binaries": {
+    "pm_exe": {
+      "size_bytes": 963584,
+      "sha256": "643B653BA5C215415DD712375EDF638CC15DC5B53A2E269FAECEDFC1306A7910",
+      "machine": "IMAGE_FILE_MACHINE_AMD64 (0x8664)",
+      "characteristics": "0x422 (IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE | IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP)",
+      "swaprun_cd_0x400": true,
+      "imported_dlls": [
+        "KERNEL32.dll",
+        "USER32.dll",
+        "ADVAPI32.dll",
+        "ole32.dll",
+        "bcrypt.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll"
+      ],
+      "external_toolchain_dlls": []
+    },
+    "test_phase2_runtime_exe": {
+      "size_bytes": 983552,
+      "sha256": "C392881DE5DE6D1AE3AD788C83C9CE7C6247FCF43AC013E9E76628CDCF4FC4F6"
+    }
+  },
+  "phase3_runtime": {
+    "phase": 3,
+    "platform": "native_windows",
+    "scenarios": [
+      {
+        "name": "normal_once_active_guard_blocked_cpu_children_foreign",
+        "status": "passed"
+      },
+      {
+        "name": "abrupt_pm_death_children_terminated",
+        "status": "passed"
+      },
+      {
+        "name": "guard_death_pm_still_responsible",
+        "status": "passed"
+      },
+      {
+        "name": "source_folder_loss_then_pm_crash",
+        "status": "passed"
+      },
+      {
+        "name": "origin_loss_while_pm_alive_triggers_critical_cleanup",
+        "status": "passed"
+      },
+      {
+        "name": "pm_crash_during_critical_cleanup_guard_recovers",
+        "status": "passed"
+      },
+      {
+        "name": "simultaneous_children_exit",
+        "status": "passed"
+      },
+      {
+        "name": "kill_on_last_job_handle_close",
+        "status": "passed"
+      },
+      {
+        "name": "kill_failure_stops_restoration",
+        "status": "passed"
+      },
+      {
+        "name": "launch_after_cleanup_rejected",
+        "status": "passed"
+      },
+      {
+        "name": "invalid_id_duplicate_job_missing_executable",
+        "status": "passed"
+      }
+    ],
+    "status": "passed"
+  },
+  "phase3_evidence_path": "build/phase05-final/phase3_windows_20261112T092242445.json",
+  "phase4_runtime": {
+    "temp_long_name_expansion_changed": false,
+    "scenarios": [
+      {
+        "name": "original_exists_sha256",
+        "status": "passed"
+      },
+      {
+        "name": "original_absent",
+        "status": "passed"
+      },
+      {
+        "name": "orphaned_target_and_pending_intent",
+        "status": "passed"
+      },
+      {
+        "name": "inaccessible_target_and_existing_backup",
+        "status": "passed"
+      },
+      {
+        "name": "foreign_directory_preserved_and_retry",
+        "status": "passed"
+      },
+      {
+        "name": "same_target_foreign_junction_preserved",
+        "status": "passed"
+      },
+      {
+        "name": "interrupted_after_backup_rename",
+        "status": "passed"
+      },
+      {
+        "name": "pm_crash_guard_restores",
+        "status": "passed"
+      },
+      {
+        "name": "guard_crash_pm_restores",
+        "status": "passed"
+      }
+    ],
+    "passed": 9,
+    "failed": 0,
+    "status": "passed"
+  },
+  "phase4_evidence_path": "build/phase05-final/phase4_windows_20261112T092242450.json",
+  "phase5_runtime": {
+    "scenarios": [
+      {
+        "name": "restore_values_types_and_subkeys",
+        "status": "passed"
+      },
+      {
+        "name": "remove_originally_absent_key",
+        "status": "passed"
+      },
+      {
+        "name": "reject_unsafe_and_overlapping_keys",
+        "status": "passed"
+      },
+      {
+        "name": "reject_tampered_backup_and_retry",
+        "status": "passed"
+      },
+      {
+        "name": "preserve_backup_on_unsafe_dirty_tree_and_retry",
+        "status": "passed"
+      },
+      {
+        "name": "persist_rollback_before_releasing_backup",
+        "status": "passed"
+      },
+      {
+        "name": "job_stop_blocks_then_permits_registry_rollback",
+        "status": "passed"
+      },
+      {
+        "name": "pm_crash_guard_ends_job_and_restores_registry",
+        "status": "passed"
+      }
+    ],
+    "passed": 8,
+    "failed": 0,
+    "status": "passed"
+  },
+  "phase5_evidence_path": "build/phase05-final/phase5_windows_20261112T092242451.json",
+  "regression_suites": [
+    "test_phase0_smoke",
+    "test_phase1_core",
+    "test_phase2_runtime",
+    "test_phase3_guard",
+    "test_phase4_junctions"
+  ],
+  "regression_status": "passed",
+  "status": "passed",
+  "base_commit": "5ca03b7a91672ea3933011f946ce6e3b2a0f7265",
+  "environment": "Windows local",
+  "physical_usb_disconnect": "not_run"
+}

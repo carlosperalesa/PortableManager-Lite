@@ -27,7 +27,7 @@ jobs:
       - name: Bootstrap pinned portable LLVM-MinGW
         shell: pwsh
         run: ./tools/bootstrap-toolchain.ps1
-      - name: Build and run phase 4 and phase 0B through 3 regression suites
+      - name: Build and run phase 5 and phase 0B through 4 regression suites
         shell: pwsh
         run: ./build.ps1 -ReportJsonPath reports/ci_windows_native.json
       - name: Upload CI evidence

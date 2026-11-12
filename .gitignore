@@ -60,6 +60,7 @@ Desktop.ini
 *.tmp
 *.pmtmp.*
 *.pmbkp/
+*.reg
 *.signal
 pmlog
 /Data/logs/
