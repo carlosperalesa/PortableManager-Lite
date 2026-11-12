@@ -1,0 +1,175 @@
+{
+  "run_id": 43130025527,
+  "url": "https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130025527",
+  "head_sha": "08a4f4378d9a5caf5064ab83dabac90e60fac77b",
+  "artifact_id": 13904408347,
+  "status": "failed",
+  "native_phase3": {
+    "phase": 3,
+    "platform": "native_windows",
+    "scenarios": [
+      {
+        "name": "normal_once_active_guard_blocked_cpu_children_foreign",
+        "status": "failed"
+      },
+      {
+        "name": "abrupt_pm_death_children_terminated",
+        "status": "failed"
+      },
+      {
+        "name": "guard_death_pm_still_responsible",
+        "status": "failed"
+      },
+      {
+        "name": "source_folder_loss_then_pm_crash",
+        "status": "failed"
+      },
+      {
+        "name": "simultaneous_children_exit",
+        "status": "failed"
+      },
+      {
+        "name": "kill_on_last_job_handle_close",
+        "status": "passed"
+      },
+      {
+        "name": "kill_failure_stops_restoration",
+        "status": "passed"
+      },
+      {
+        "name": "launch_after_cleanup_rejected",
+        "status": "passed"
+      },
+      {
+        "name": "invalid_id_duplicate_job_missing_executable",
+        "status": "passed"
+      }
+    ],
+    "status": "failed"
+  },
+  "harness_diagnostics": [
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=create_events status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=spawn_outsider status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=spawn_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=owner_ready status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=read_pids status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=open_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=open_worker status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=open_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=query_active_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=query_job_pid_list status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=job_member_test_phase3_guard.exe status=passed actual=2612 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=job_member_conhost.exe status=passed actual=2020 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=job_member_test_phase3_guard.exe status=passed actual=3784 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=job_member_conhost.exe status=passed actual=4136 expected=0 last_error=0",
+    "[CHECK] normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=active_processes_before status=failed actual=4 expected=2 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=create_events status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=spawn_outsider status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=spawn_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=owner_ready status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=read_pids status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=open_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=open_worker status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=open_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=query_active_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=query_job_pid_list status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=job_member_test_phase3_guard.exe status=passed actual=6716 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=job_member_conhost.exe status=passed actual=1372 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=job_member_test_phase3_guard.exe status=passed actual=8012 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=job_member_conhost.exe status=passed actual=5776 expected=0 last_error=0",
+    "[CHECK] crash_18638299-802b-43de-8e66-4450aafb15b0 step=active_processes_before status=failed actual=4 expected=2 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=create_events status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=spawn_outsider status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=spawn_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=owner_ready status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=read_pids status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=open_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=open_worker status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=open_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=query_active_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=query_job_pid_list status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=job_member_test_phase3_guard.exe status=passed actual=8028 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=job_member_conhost.exe status=passed actual=4556 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=job_member_test_phase3_guard.exe status=passed actual=4228 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=job_member_conhost.exe status=passed actual=6832 expected=0 last_error=0",
+    "[CHECK] guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=active_processes_before status=failed actual=4 expected=2 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=create_events status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=spawn_outsider status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=spawn_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=owner_ready status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=read_pids status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=open_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=open_worker status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=open_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=query_active_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=query_job_pid_list status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=job_member_test_phase3_guard.exe status=passed actual=1252 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=job_member_conhost.exe status=passed actual=3292 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=job_member_test_phase3_guard.exe status=passed actual=2424 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=job_member_conhost.exe status=passed actual=6308 expected=0 last_error=0",
+    "[CHECK] crash_source_loss_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=active_processes_before status=failed actual=4 expected=2 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=create_events status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=spawn_outsider status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=spawn_owner status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=owner_ready status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=read_pids status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=open_guard status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=open_worker status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=open_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=query_active_job status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=query_job_pid_list status=passed actual=0 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=job_member_test_phase3_guard.exe status=passed actual=876 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=job_member_conhost.exe status=passed actual=6192 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=job_member_test_phase3_guard.exe status=passed actual=6524 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=job_member_conhost.exe status=passed actual=2624 expected=0 last_error=0",
+    "[CHECK] children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=active_processes_before status=failed actual=4 expected=2 last_error=0"
+  ],
+  "controller_diagnostics": {
+    "build/phase3_18638299-802b-43de-8e66-4450aafb15b0_controller.txt": [
+      "[CHECK] controller_crash_18638299-802b-43de-8e66-4450aafb15b0 step=initialize_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_18638299-802b-43de-8e66-4450aafb15b0 step=create_job status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_18638299-802b-43de-8e66-4450aafb15b0 step=start_guard status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_18638299-802b-43de-8e66-4450aafb15b0 step=launch_tree status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_18638299-802b-43de-8e66-4450aafb15b0 step=tree_ready status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_18638299-802b-43de-8e66-4450aafb15b0 step=activate_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_18638299-802b-43de-8e66-4450aafb15b0 step=publish_pids status=passed actual=0 expected=0 last_error=0"
+    ],
+    "build/phase3_51eb6461-7254-445e-bf09-21c9df35eacb_controller.txt": [
+      "[CHECK] controller_children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=initialize_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=create_job status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=start_guard status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=launch_tree status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=tree_ready status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=activate_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_children-dead_51eb6461-7254-445e-bf09-21c9df35eacb step=publish_pids status=passed actual=0 expected=0 last_error=0"
+    ],
+    "build/phase3_5ca270f7-53f3-47fd-95e3-8258726a8c96_controller.txt": [
+      "[CHECK] controller_normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=initialize_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=create_job status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=start_guard status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=launch_tree status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=tree_ready status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=activate_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_normal_5ca270f7-53f3-47fd-95e3-8258726a8c96 step=publish_pids status=passed actual=0 expected=0 last_error=0"
+    ],
+    "build/phase3_6288f1bd-46f6-46ca-ac0f-aaebdcf92253_controller.txt": [
+      "[CHECK] controller_crash_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=initialize_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=create_job status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=start_guard status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=launch_tree status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=tree_ready status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=activate_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_crash_6288f1bd-46f6-46ca-ac0f-aaebdcf92253 step=publish_pids status=passed actual=0 expected=0 last_error=0"
+    ],
+    "build/phase3_dbb5062a-bde3-40b3-8c91-ffbf17057343_controller.txt": [
+      "[CHECK] controller_guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=initialize_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=create_job status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=start_guard status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=launch_tree status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=tree_ready status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=activate_session status=passed actual=0 expected=0 last_error=0",
+      "[CHECK] controller_guard-dead_dbb5062a-bde3-40b3-8c91-ffbf17057343 step=publish_pids status=passed actual=0 expected=0 last_error=0"
+    ]
+  },
+  "finding": "All five lifecycle groups independently enumerate two test_phase3_guard.exe and two conhost.exe, then fail exact ActiveProcesses=2 assertion with actual=4. CREATE_NO_WINDOW allocates hidden consoles; use detached console mode for synthetic helpers without changing production default or expected counts."
+}

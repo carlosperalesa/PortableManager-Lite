@@ -1,110 +1,124 @@
-# Informe de implementación — Fase 03
+# Informe de corrección y validación — Fase 03
 
-Entrega del 12 de noviembre de 2026 (fecha del registro UTC). Rama nueva:
-`feat/fase03-jobobjects-pmguard`, creada desde
-`c3620e324f406eadfea5bb9c2178ab7dd67f259a` con árbol inicialmente limpio.
+Rama: `feat/fase03-jobobjects-pmguard`. PR: [#2, en borrador](https://github.com/carlosperalesa/PortableManager-Lite/pull/2), contra `main`.
 
-## Resultado conseguido
+**Estado vigente:** implementación y pruebas automatizadas `passed`; aprobación
+humana pendiente. No se hizo merge ni se inició Fase 4. La entrega cloud inicial
+está conservada en `reports/rebuild_guard_cloud_20261112.json`; sus estados
+`blocked` describen aquella sesión, no el resultado Windows actual.
 
-Implementados JobManager y PMGuard nativos en C++20 sobre las interfaces de
-sesión/manifiesto existentes. El lanzamiento está suspendido hasta asignar el
-proceso al Job; sus descendientes quedan controlados por Windows. El guard es
-una copia del mismo PM en TEMP, recibe solo dos handles heredados mediante una
-lista explícita y espera bloqueado al proceso PM. La limpieza comparte mutex y
-estado persistido, valida la pertenencia de los Jobs y rechaza operaciones de
-fases futuras. Se incluye `--job-probe` para diagnóstico sintético en Windows.
+## Ejecuciones consultadas y conservadas
 
-El rollback deja de continuar si falla KILL_JOB y comprueba los fallos de escritura
-antes de informar éxito. No se han incorporado dependencias ni reinstalado herramientas.
+| Actions | Commit de rama | Resultado y evidencia |
+|---|---|---|
+| [43126954771](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43126954771) | `34b665e` | Linux PASS; Windows compila; regresiones 0B/1/2 PASS; Fase 3: 4 PASS, 5 FAIL. |
+| [43129753101](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43129753101) | `bfab116` | Diagnósticos por paso: cuatro grupos fallan con 4 procesos frente a 2; pérdida de origen falla por timeout del evento `_tree`. |
+| [43130025527](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130025527) | `08a4f43` | Inventario independiente de cada uno de los cinco grupos: dos auxiliares y dos `conhost.exe`; todos fallan el recuento exacto. |
+| [43130358371](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130358371) | `46ab7b9` | Linux PASS; compilación nativa PASS; regresiones 0B/1/2 PASS; Fase 3: **9/9 PASS**. |
 
-**Estado de entrega:** implementación realizada y compilación cruzada verificada;
-validación de ejecución Windows bloqueada en esta sesión Linux. Fase 3 no se
-considera aprobada. Fases 0B, 1 y 2 conservan su aprobación histórica, sin afirmar
-que se hayan vuelto a ejecutar sus suites.
+Los logs y artefactos se consultaron directamente desde GitHub. El archivo de
+artefactos de la ejecución original tiene SHA-256
+`496bd1cce0f957bb2b07ac8ecc877df151d3f79528c8ad5783498baf25866a73`.
+Cada ejecución tiene un JSON nuevo `reports/fase03_actions_<run_id>.json` con
+metadatos y resultados extraídos de sus artefactos, sin sobrescribir informes.
+Los dos diagnósticos intermedios conservan también las líneas por paso y los
+registros de los controladores; el último conserva el agregado Windows completo.
 
-## Cambios revisables
+## Causa raíz por escenario
 
-Archivos creados:
+El informe original no identificaba el primer paso fallido; no permitía atribuir
+una causa a los cinco grupos solo por compartir código. Se instrumentaron primero
+y se enumeraron después los PID y nombres de imagen dentro de cada Job.
 
-- `src/jobs/job_manager.h`, `src/jobs/job_manager.cpp`.
-- `src/guard/guard_process.h`, `src/guard/guard_process.cpp`.
-- `src/runtime/session_lock.h`.
-- `tests/test_phase3_guard.cpp`.
-- `fase03/IMPLEMENTACION_FASE_3.md`, este informe y el JSON consolidado de Fase 3.
-- `reports/rebuild_guard_cloud_20261112.json`.
+| Escenario fallido | Causa reproducida y comprobada | Corrección |
+|---|---|---|
+| `normal_once_active_guard_blocked_cpu_children_foreign` | `active_processes_before`: 4, esperado 2. Inventario: dos `test_phase3_guard.exe` y dos `conhost.exe`. | Auxiliares sintéticos sin consola; se conserva la aserción exacta de 2 procesos. |
+| `abrupt_pm_death_children_terminated` | Mismo paso y composición, comprobados en su propio Job; no era todavía un fallo de limpieza crítica. | Misma configuración sintética; después se verifica la caída real PM y la limpieza del guard. |
+| `guard_death_pm_still_responsible` | Mismo paso y composición en su propio Job; no se había alcanzado la terminación intencional del guard. | Misma configuración sintética; después se verifica el cierre a cargo de PM. |
+| `source_folder_loss_then_pm_crash` | Además del inventario de 4 procesos reproducido en 43130025527, 43129753101 registra `tree_ready=258` (`WAIT_TIMEOUT`). El evento podía desaparecer al cerrar su último handle antes de abrirlo el controlador. | Modo sintético sin consola y creación/retención del evento antes de lanzar el árbol. |
+| `simultaneous_children_exit` | Mismo paso y composición en su propio Job; no se había llegado a la terminación simultánea. | Misma configuración sintética; después se verifica que PM/PMG sobreviven y el Job queda vacío. |
 
-Archivos modificados:
+`CREATE_NO_WINDOW` oculta una consola pero puede crear su `conhost.exe`, que también
+queda dentro del Job. La prueba confundía dos auxiliares con dos procesos totales.
+No se cambió el resultado esperado a cuatro ni se filtraron hosts para declarar
+vacío un Job que todavía tuviera procesos. En su lugar, los auxiliares usan
+`DETACHED_PROCESS`, que no asigna consola; el recuento sigue siendo 2 antes y 0 después.
 
-- `src/core/main.cpp`, `src/guard/guard_entry.h`, `src/guard/guard_entry.cpp`,
-  `src/jobs/jobs_module.h`, `src/runtime/manifest_manager.cpp`.
-- `tests/test_phase0_smoke.cpp`: el protocolo real ya no admite el antiguo stub.
-- `CMakeLists.txt`, `build.ps1`, `.github/workflows/portablemanager-ci.yml`.
-- `build_msvc.ps1`: exige CMake en lugar del fallback incompleto de fuentes.
-- `README.md`, `IMPLEMENTACION_PM_LITE.md`, `PLAN_DE_PRUEBAS.md`,
-  `RESULTADOS_RECONSTRUCCION.md`, `docs/CODEX_CLOUD.md`, `fase03/README_FASE03.md`.
+## Correcciones y archivos modificados en esta revisión
 
-No se modificaron AGENTS.md, los informes históricos ni los consolidados de
-fases anteriores. Los cambios quedan en el árbol de la rama nueva, sin commits,
-push ni fusión. Se mantiene la restricción de no hacer commits de la sesión.
+- `src/jobs/job_manager.h` y `.cpp`: opción tipada `ConsoleMode::Detached` para
+  procesos que no requieren consola. El valor predeterminado `Hidden` conserva
+  `CREATE_NO_WINDOW` para los llamadores existentes. Se mantienen creación
+  suspendida, asignación al Job antes de reanudar, ausencia de breakaway y
+  `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. No se aceptan flags arbitrarios del llamador.
+- `tests/test_phase3_guard.cpp`: auxiliares sin consola, evento `_tree` retenido
+  antes de lanzar, diagnóstico de cada paso con valor observado/esperado y último
+  error Win32, inventario de miembros del Job, códigos de salida y snapshots de
+  manifiesto/controlador anteriores a la contención de errores. Los artefactos
+  de CI recogen estos archivos. No se relajan umbrales ni estados esperados.
+- `AGENTS.md`: se añade el PATH autorizado sin sustituir directivas y se documentan
+  `clang++`, `x86_64-w64-mingw32-clang++`, `llvm-readobj`, `cmake` y `ninja`. Se comprobó
+  que el wrapper prefijado tiene target Windows y `clang++` sin target es host Linux.
+- Documentación vigente actualizada: `README.md`, `IMPLEMENTACION_PM_LITE.md`,
+  `RESULTADOS_RECONSTRUCCION.md`, `PLAN_DE_PRUEBAS.md`, `docs/CODEX_CLOUD.md` y
+  `fase03/{README_FASE03.md,IMPLEMENTACION_FASE_3.md,INFORME_FASE03.md}`.
+- Evidencia nueva: cuatro archivos `reports/fase03_actions_<run_id>.json`; la
+  documentación de `fase03/` enlaza esos informes como fuente única.
 
-## Compilación y verificaciones realizadas
+También se inspeccionaron `guard_process.cpp`, `guard_entry.cpp`,
+`manifest_manager.cpp` y `session_lock.h`. Los fallos reproducidos no justificaron
+cambiar su protocolo: el guard sigue esperando bloqueado la muerte PM; la limpieza
+común sigue protegida por mutex y recarga de manifiesto. La terminación se verifica
+con `ActiveProcesses == 0` antes de restaurar y el rollback se detiene si falla
+KILL_JOB. No se incorporaron dependencias ni recuperación de sesiones antiguas.
 
-Comando de compilación ejecutado con el toolchain existente:
+## Validación real obtenida
+
+Comando ejecutado en Codex Cloud antes de publicar la corrección:
 
 ```bash
-export PATH=/workspace/.pm-cloud-tools/bin:$PATH
+export PATH="/workspace/.pm-cloud-tools/bin:/workspace/PortableManager-Lite/tools/toolchains/llvm-mingw-linux/bin:$PATH"
 bash tools/build-codex-cloud.sh
 ```
 
-Resultado: código 0, `CROSS_COMPILE_PASSED`. Se compilaron `pm.exe`,
-`test_phase0_smoke.exe`, `test_phase1_core.exe`, `test_phase2_runtime.exe` y
-`test_phase3_guard.exe` con C++20, `-Wall -Wextra -Werror`, `-static`, `-municode`
-y `/SWAPRUN:CD` en el flujo CMake. No hubo errores ni advertencias de compilación.
+Resultado: código 0, `CROSS_COMPILE_PASSED`, sin errores ni advertencias bajo
+`-Wall -Wextra -Werror`, con C++20 y las opciones base aprobadas. No se reinstalaron
+herramientas locales ni se ejecutó ningún PE en Linux.
 
-La inspección independiente con `llvm-readobj --file-headers` y `--coff-imports`
-confirmó en los cinco artefactos AMD64, `IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP` y
-ninguna DLL externa del toolchain. Los tamaños, imports y SHA-256 están en el JSON.
+En Windows Server 2022, el workflow ejecutó `build.ps1` con el LLVM-MinGW fijado.
+Resultados del commit de código **`46ab7b90257d485de1e93aa85140f5e1451e8529`**:
 
-`ctest --test-dir build/codex-cloud -N` registra cuatro suites. Es una enumeración,
-no una ejecución. `git diff --check` y `bash -n tools/build-codex-cloud.sh` pasaron.
-No se ejecutaron PowerShell, CI remoto, EXE Windows ni pruebas físicas USB.
+| Validación | Resultado |
+|---|---|
+| Compilación cruzada e inspección PE Linux | PASS |
+| Compilación nativa Windows e inspección PE | PASS |
+| Fase 0B | PASS |
+| Fase 1 | PASS |
+| Fase 2 | PASS, 23 escenarios |
+| Fase 3 | PASS, nueve grupos |
 
-## Pruebas preparadas y regresión pendiente
+En los cinco ciclos reales se observaron dos procesos iniciales, cero finales,
+`CLEANED` persistido y supervivencia del proceso sintético ajeno. La medición del
+guard fue de 0 unidades de CPU (100 ns) durante 1.200 ms en cada ciclo; el umbral
+permanece en 200.000 unidades (20 ms). Esto no extrapola una garantía de CPU a
+cualquier equipo o carga. También pasaron los otros cuatro grupos: cierre del
+último handle, barrera ante fallo de terminación, rechazo de lanzamiento tras
+limpiar y errores de parámetros/colisiones/ejecutables inexistentes.
 
-La nueva suite contiene nueve grupos sintéticos: PM activo y CPU, cierre normal
-idempotente, caída PM, caída PMG, pérdida de origen seguida de caída PM, terminación
-de descendientes, protección por último handle del Job, barrera ante fallo de
-terminación, rechazo de lanzamiento después de limpiar y errores de parámetros/
-colisiones/ejecutables inexistentes. Algunos grupos reúnen varias comprobaciones.
-El detalle exacto está en `IMPLEMENTACION_FASE_3.md` y en el código de la suite.
+Artefacto Windows validado: `13905376318`, SHA-256 de archivo ZIP
+`07fc9f0f5b4efafbeb4c55104c19f8c09548c77c5a162d43da4643c8e838cdd0`.
+Evidencia consolidada nueva: `reports/fase03_actions_43130358371.json`, que incluye
+resultados nativos, hashes de fuentes/PM y diagnóstico completo. Las actualizaciones
+de informe posteriores al commit de código no alteran los fuentes validados.
 
-Todas las comprobaciones de ejecución están `blocked` por requerir Windows. Las
-regresiones 0B, 1 y 2 están compiladas pero su ejecución también queda `blocked`.
-El workflow Windows y `build.ps1` incluyen las cuatro suites y la captura de
-resultados nativos nuevos; no se ha afirmado que ese workflow haya corrido.
+## Límites y revisión pendiente
 
-Para validar en Windows con LLVM-MinGW ya disponible:
+No se hizo desconexión física USB: la prueba elimina únicamente el ejecutable y
+la carpeta de origen sintéticos. No se probaron aplicaciones reales, perfiles de
+usuario ni claves reales. La terminación simultánea de PM y PMG y el corte de
+energía no tienen recuperación garantizada. Permanecen los límites de finalización
+completa de temporales y `pmlog` reservados al CleanupEngine posterior.
 
-```powershell
-./build.ps1 -ReportJsonPath reports/rebuild_guard_windows_20261112_run01.json
-```
-
-Usar otra ruta si ya existe. El detalle de la suite de Fase 3 se genera en
-`build/phase3_windows_<timestamp>.json`. El script de entrega rechaza sobrescribir
-un informe existente. No aprobar la fase hasta revisar estos resultados.
-
-## Evidencia, límites y continuidad
-
-Evidencia nueva: `reports/rebuild_guard_cloud_20261112.json`, con copia exacta en
-`fase03/rebuild_guard_cloud_20261112.json`. Incluye rama, commit base, hashes de
-fuentes cambiados y artefactos, resultados de PE y estados `blocked` de ejecución.
-La documentación consolidada de esta entrega está en `fase03/`.
-
-El guard conserva su ejecutable TEMP y el manifiesto después de cerrar; la
-finalización completa de temporales y `pmlog` pertenece al CleanupEngine posterior.
-No hay recuperación automática de sesiones antiguas. No se promete restauración
-tras muerte simultánea de PM y PMG o pérdida eléctrica. La desaparición sintética
-del origen no certifica una extracción USB física ni implementa detección de
-extracción mientras PM sigue activo.
-
-**No se inició Fase 4 ni ninguna fase posterior.**
+El PR #2 permanece en borrador para revisión final. Las pruebas automatizadas
+pasaron; **la Fase 3 no se marca aprobada automáticamente**. `main` no se modificó
+y no se inició Fase 4.

@@ -115,13 +115,16 @@ Comprueba nueve grupos:
 Los procesos reales del usuario nunca se terminan. Las sesiones fallidas se
 preservan para diagnóstico; las exitosas eliminan solo sus archivos conocidos.
 La prueba de desaparición es sintética: no demuestra desconexión física USB.
-La medición CPU produce valores observados en stdout; todavía no se ejecutó.
+La medición CPU produce valores observados en stdout. En Actions 43130358371 se
+registraron 0 unidades de CPU durante 1.200 ms en los cinco ciclos.
 
 ## Límites pendientes de validación
 
 Esta sesión Linux solo permite compilación cruzada e inspección de PE. No se
 invoca ningún EXE Windows ni se usa Wine como sustituto de las pruebas nativas.
-Las pruebas nuevas y las regresiones están `blocked`, no `passed`.
+Las pruebas nuevas (9/9 grupos) y las regresiones 0B/1/2 se ejecutaron después
+en Actions Windows 43130358371 con resultado `passed`. El bloqueo correspondía
+únicamente a la ejecución local Linux, no a esa validación remota.
 
 El guard y el manifiesto TEMP se conservan al terminar el ciclo de Fase 3: no se
 implementa un mecanismo de autoeliminación del ejecutable que todavía está corriendo.
@@ -130,5 +133,16 @@ de limpieza posterior. No se promete recuperación tras muerte simultánea de PM
 PMG o corte eléctrico. No se añade detección de desconexión física con PM todavía
 vivo; se prueba que el guard sobrevive a la pérdida sintética del origen y la caída PM.
 
-La aprobación de Fase 3 depende de evidencia Windows y revisión del propietario.
+La evidencia Windows ya está disponible; la aprobación de Fase 3 depende de
+la revisión final del propietario.
 Fase 4 permanece `not_run`.
+
+## Corrección validada en Actions
+
+Ver `INFORME_FASE03.md` para el diagnóstico por escenario y la evidencia nueva.
+`ConsoleMode::Detached` permite lanzar los auxiliares sin consola ni conhost;
+el modo predeterminado de producción sigue siendo `Hidden`. Las aserciones siguen
+exigiendo exactamente dos procesos iniciales y cero al cerrar. El evento `_tree`
+se crea y retiene antes del lanzamiento para impedir que desaparezca antes de
+que el controlador lo espere. Los diagnósticos de prueba se archivan en CI, sin
+introducir logs persistentes en el runtime final de PM.

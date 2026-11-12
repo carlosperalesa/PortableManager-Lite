@@ -1,6 +1,6 @@
 # PortableManager Lite (PM Lite) — Núcleo Nativo C++20
 
-**Estado actual:** Fase 0B, Fase 1 y Fase 2 (con Auditoría Final de Fase 2) completadas y aprobadas (`passed`). **Fase 3 (JobObjects y PMGuard) implementada en rama de tarea; compilación cruzada verificada, ejecución Win32 y aprobación pendientes. Fase 4 no iniciada.**
+**Estado actual:** Fase 0B, Fase 1 y Fase 2 (con Auditoría Final de Fase 2) completadas y aprobadas (`passed`). **Fase 3 (JobObjects y PMGuard) implementada en rama de tarea; compilación cruzada y suites Win32 verificadas; aprobación humana pendiente. Fase 4 no iniciada.**
 **Toolchain oficial:** LLVM-MinGW `20261104` (Clang `23.1.5`, UCRT, Windows `x86_64`) portable en `tools/toolchains/llvm-mingw/`.
 
 ---
@@ -87,8 +87,9 @@ Siguiendo la directiva permanente de organización documental, cada fase dispone
 El alcance, protocolo de handles, pruebas sintéticas y limitaciones están en
 [fase03/README_FASE03.md](fase03/README_FASE03.md). `pm.exe --job-probe` permite
 comprobar el ciclo Job/Guard con un hijo sintético del propio PM en Windows.
-Las pruebas de ejecución de Fase 3 y la regresión 0B/1/2 deben validarse en Windows;
-la compilación cruzada no las reemplaza. Los informes históricos siguen intactos.
+Fase 3 (9/9 grupos) y las regresiones 0B/1/2 pasaron en Actions Windows
+[43130358371](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130358371).
+La fase sigue pendiente de revisión final; el PR #2 permanece en borrador. Los informes históricos siguen intactos.
 
 ### Preparación automática del toolchain portable
 
