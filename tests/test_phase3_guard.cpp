@@ -77,7 +77,7 @@ std::wstring SessionPath(const std::wstring &id) {
   return SessionManager::QuerySystemTempDir() +
          L"\\PortableManager\\Session\\" + id;
 }
-// Controller is a real PM-owner process. Its guard is the actual pm.exe shadow;
+// Controller is a real PM-owner process. Its guard is the actual pml.exe shadow;
 // its workers are this synthetic helper, never a user application.
 int Controller(int argc, wchar_t **argv) {
   if (argc != 5)
@@ -185,7 +185,7 @@ int Controller(int argc, wchar_t **argv) {
   // handles signal exit. Keep failed sessions and evidence for diagnosis.
   void RemoveSuccessfulSession(const std::wstring &id) {
     const std::wstring dir = SessionPath(id);
-    ::DeleteFileW((dir + L"\\pm-guard.exe").c_str());
+    ::DeleteFileW((dir + L"\\pml.exe").c_str());
     ::DeleteFileW((dir + L"\\test-info.txt").c_str());
     ::DeleteFileW((dir + L"\\controller-diagnostic.txt").c_str());
     ::DeleteFileW((dir + L"\\session.ini").c_str());
@@ -397,7 +397,7 @@ int Controller(int argc, wchar_t **argv) {
                                SessionManager::GenerateSessionGuid();
       if (!::CreateDirectoryW(dir.c_str(), nullptr))
         return false;
-      const std::wstring copy = dir + L"\\pm.exe";
+      const std::wstring copy = dir + L"\\pml.exe";
       if (!::CopyFileW(pm.c_str(), copy.c_str(), TRUE))
         return false;
       const bool ok = Lifecycle(copy, mode, true);

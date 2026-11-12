@@ -207,6 +207,23 @@ std::string IniDocument::SerializeUtf8() const {
     return WideToUtf8(buffer);
 }
 
+void IniDocument::RemoveSection(std::wstring_view section) {
+    bool inside = false;
+    const auto removed = std::erase_if(lines_, [&](const EntryLine& line) {
+        if (line.kind == LineKind::Section) inside = EqualsIgnoreCase(line.section_name, section);
+        return inside && (line.kind == LineKind::Section || line.kind == LineKind::KeyValue);
+    });
+    if (removed) dirty_ = true;
+}
+
+void IniDocument::RemoveKey(std::wstring_view section, std::wstring_view key) {
+    const auto removed = std::erase_if(lines_, [&](const EntryLine& line) {
+        return line.kind == LineKind::KeyValue && EqualsIgnoreCase(line.section_name, section) &&
+               EqualsIgnoreCase(line.key, key);
+    });
+    if (removed) dirty_ = true;
+}
+
 bool IniDocument::HasSection(std::wstring_view section) const noexcept {
     for (const EntryLine& e : lines_) {
         if (e.kind == LineKind::Section && EqualsIgnoreCase(e.section_name, section)) {

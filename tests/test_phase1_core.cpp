@@ -131,7 +131,7 @@ bool ContainsDriveLetterInLines(const std::string& ini_content) {
 
 int wmain(int argc, wchar_t* argv[]) {
     if (argc < 2) {
-        std::fwprintf(stderr, L"Uso: test_phase1_core.exe <ruta_a_pm.exe>\n");
+        std::fwprintf(stderr, L"Uso: test_phase1_core.exe <ruta_a_pml.exe>\n");
         return 2;
     }
 
@@ -175,8 +175,8 @@ int wmain(int argc, wchar_t* argv[]) {
         const std::wstring synth_pm_root = sandbox_root + L"\\SynthPmRoot";
         PathResolver resolver(synth_pm_root);
 
-        auto r1 = resolver.ResolvePmRelativePath(L"Data/recipes/./sub/../firefox.ini");
-        if (!r1.ok || r1.resolved_path != synth_pm_root + L"\\Data\\recipes\\firefox.ini") {
+        auto r1 = resolver.ResolvePmRelativePath(L"App/firefox/./sub/../wrapper.ini");
+        if (!r1.ok || r1.resolved_path != synth_pm_root + L"\\App\\firefox\\wrapper.ini") {
             return fail_and_cleanup(L"1.2 Fallo normalizacion de ruta relativa valida.", 11);
         }
 
@@ -338,7 +338,7 @@ int wmain(int argc, wchar_t* argv[]) {
 
         // Actualizar una clave existente y añadir una clave nueva en apps.ini
         if (!mgr1.config_doc().SetValue(L"General", L"Language", L"es-CL", set_err) ||
-            !mgr1.config_doc().SetRelativePathValue(L"General", L"RecipesDir", L"Data\\recipes", set_err)) {
+            !mgr1.config_doc().SetRelativePathValue(L"General", L"ExampleDir", L"Data\\example", set_err)) {
             return fail_and_cleanup(L"3.2 Fallo al actualizar valores validos en config.ini.", 35);
         }
 
@@ -369,7 +369,7 @@ int wmain(int argc, wchar_t* argv[]) {
 
         if (mgr2.config_doc().GetValue(L"General", L"Language") != L"es-CL" ||
             mgr2.config_doc().GetValue(L"General", L"UnknownLegacyFlag") != L"keep_me_intact_42" ||
-            mgr2.config_doc().GetValue(L"General", L"RecipesDir") != L"Data/recipes" ||
+            mgr2.config_doc().GetValue(L"General", L"ExampleDir") != L"Data/example" ||
             mgr2.config_doc().GetValue(L"FutureSection_v9", L"FutureSetting") != L"experimental_value" ||
             mgr2.apps_doc().GetValue(L"App.putty", L"Executable") != L"App/PuTTY/PUTTY.EXE") {
             return fail_and_cleanup(L"3.3 Valores o claves desconocidas no se preservaron tras reinicio.", 41);
@@ -388,7 +388,7 @@ int wmain(int argc, wchar_t* argv[]) {
     }
 
     // =========================================================================
-    // SUBPRUEBA 4: Integración con pm.exe en dos ubicaciones sintéticas distintas
+    // SUBPRUEBA 4: Integración con pml.exe en dos ubicaciones sintéticas distintas
     // =========================================================================
     {
         using pm::core::AtomicFile;
@@ -396,30 +396,30 @@ int wmain(int argc, wchar_t* argv[]) {
         const std::wstring loc_a = sandbox_root + L"\\Location_A_PendriveSim";
         const std::wstring loc_b = sandbox_root + L"\\Location_B_DeepFolder\\Sub\\PM";
         DWORD err = 0;
-        pm::core::AtomicFile::EnsureParentDirectories(loc_a + L"\\pm.exe", err);
-        pm::core::AtomicFile::EnsureParentDirectories(loc_b + L"\\pm.exe", err);
+        pm::core::AtomicFile::EnsureParentDirectories(loc_a + L"\\pml.exe", err);
+        pm::core::AtomicFile::EnsureParentDirectories(loc_b + L"\\pml.exe", err);
 
-        const std::wstring pm_a = loc_a + L"\\pm.exe";
-        const std::wstring pm_b = loc_b + L"\\pm.exe";
+        const std::wstring pm_a = loc_a + L"\\pml.exe";
+        const std::wstring pm_b = loc_b + L"\\pml.exe";
         if (!::CopyFileW(pm_exe_source.c_str(), pm_a.c_str(), FALSE) ||
             !::CopyFileW(pm_exe_source.c_str(), pm_b.c_str(), FALSE)) {
-            return fail_and_cleanup(L"4.1 No se pudo copiar pm.exe a las ubicaciones sinteticas.", 50);
+            return fail_and_cleanup(L"4.1 No se pudo copiar pml.exe a las ubicaciones sinteticas.", 50);
         }
 
         DWORD rc_a1 = 999, rc_a2 = 999, rc_b1 = 999;
         std::string out_a1, out_a2, out_b1;
         if (!RunProcessCapture(L"\"" + pm_a + L"\" --init-config", fake_cwd.c_str(), rc_a1, out_a1) || rc_a1 != 0 ||
             out_a1.find("WroteConfig=1") == std::string::npos) {
-            return fail_and_cleanup(L"4.2 Ejecucion de pm.exe --init-config en Location_A fallo.", 51);
+            return fail_and_cleanup(L"4.2 Ejecucion de pml.exe --init-config en Location_A fallo.", 51);
         }
         // Segunda ejecución sin cambios no debe reescribir config.ini (WroteConfig=0)
         if (!RunProcessCapture(L"\"" + pm_a + L"\" --init-config", fake_cwd.c_str(), rc_a2, out_a2) || rc_a2 != 0 ||
             out_a2.find("WroteConfig=0") == std::string::npos) {
-            return fail_and_cleanup(L"4.3 Segunda ejecucion de pm.exe --init-config reescribio innecesariamente.", 52);
+            return fail_and_cleanup(L"4.3 Segunda ejecucion de pml.exe --init-config reescribio innecesariamente.", 52);
         }
         if (!RunProcessCapture(L"\"" + pm_b + L"\" --init-config", fake_cwd.c_str(), rc_b1, out_b1) || rc_b1 != 0 ||
             out_b1.find("WroteConfig=1") == std::string::npos) {
-            return fail_and_cleanup(L"4.4 Ejecucion de pm.exe --init-config en Location_B fallo.", 53);
+            return fail_and_cleanup(L"4.4 Ejecucion de pml.exe --init-config en Location_B fallo.", 53);
         }
 
         const auto cfg_a = AtomicFile::ReadUtf8Text(loc_a + L"\\Data\\config.ini");

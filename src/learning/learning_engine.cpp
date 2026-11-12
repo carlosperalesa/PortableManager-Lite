@@ -1,7 +1,7 @@
 #include "learning/learning_engine.h"
 
 #include "core/config_manager.h"
-#include "guard/guard_process.h"
+#include "guard/guard_supervisor.h"
 #include "jobs/job_manager.h"
 #include "junctions/junction_manager.h"
 #include "registry/registry_manager.h"
@@ -24,10 +24,6 @@ struct CloseHandle {
 };
 using Handle = std::unique_ptr<void, CloseHandle>;
 using PinnedDirectories = std::vector<Handle>;
-
-bool Missing(DWORD error) {
-    return error == ERROR_PATH_NOT_FOUND || error == ERROR_FILE_NOT_FOUND;
-}
 
 std::wstring Lower(std::wstring value) {
     for (auto& ch : value) {
@@ -79,12 +75,17 @@ DWORD PinPortableDirectory(const PathResolver& resolver, std::wstring_view relat
     const auto target = resolver.ResolvePmRelativePath(relative);
     if (!target.ok || !DrivePath(target.resolved_path)) return ERROR_INVALID_NAME;
     const auto& path = target.resolved_path;
+    const auto tail = std::wstring_view(path).substr(3);
+    const auto normalized = PathResolver::NormalizePmRelativePath(tail);
+    if (!normalized.ok || normalized.resolved_path != tail) return ERROR_INVALID_NAME;
     const auto root_length = resolver.root_dir().size();
     for (std::size_t end = path.find(L'\\', 3);; end = path.find(L'\\', end + 1)) {
         const auto prefix = path.substr(0, end);
         if (create && prefix.size() > root_length &&
             !::CreateDirectoryW(prefix.c_str(), nullptr) && ::GetLastError() != ERROR_ALREADY_EXISTS)
             return ::GetLastError();
+        // MoveFileExW needs write sharing on the directory for atomic
+        // publication. Withhold delete sharing to pin each checked component.
         Handle dir(::CreateFileW(prefix.c_str(), FILE_READ_ATTRIBUTES,
                                 FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
                                 FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr));
@@ -99,6 +100,46 @@ DWORD PinPortableDirectory(const PathResolver& resolver, std::wstring_view relat
         pinned.push_back(std::move(dir));
         if (end == std::wstring::npos) return ERROR_SUCCESS;
     }
+}
+
+// Reject alternate path spellings that could hide traversal or an unsafe
+// component before checking the real directory chain with Win32 handles.
+bool IsCanonicalRelative(std::wstring_view path) {
+    const auto normalized = PathResolver::NormalizePmRelativePath(path);
+    return normalized.ok && normalized.resolved_path == path;
+}
+
+DWORD InspectInstallation(const PathResolver& resolver, const LearningRequest& request,
+                          const std::wstring& app_dir, std::wstring& executable,
+                          std::optional<Candidates>& candidates) {
+    const auto installation = resolver.ResolvePmRelativePath(app_dir);
+    if (!installation.ok || !IsCanonicalRelative(app_dir)) return ERROR_INVALID_NAME;
+    const auto prefix = installation.resolved_path + L"\\";
+    executable = request.executable;
+    std::replace(executable.begin(), executable.end(), L'/', L'\\');
+    if (executable.size() <= prefix.size() ||
+        ::CompareStringOrdinal(executable.data(), static_cast<int>(prefix.size()),
+                               prefix.data(), static_cast<int>(prefix.size()), TRUE) != CSTR_EQUAL)
+        return ERROR_INVALID_NAME;
+
+    const auto relative_exe = app_dir + L"\\" + executable.substr(prefix.size());
+    if (!IsCanonicalRelative(relative_exe)) return ERROR_INVALID_NAME;
+    executable = resolver.ResolvePmRelativePath(relative_exe).resolved_path;
+    PinnedDirectories pinned;
+    const auto directory = relative_exe.substr(0, relative_exe.rfind(L'\\'));
+    const DWORD pinned_error = PinPortableDirectory(resolver, directory, false, pinned);
+    if (pinned_error != ERROR_SUCCESS) return pinned_error;
+
+    HANDLE raw = ::CreateFileW(executable.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+                               OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    if (raw == INVALID_HANDLE_VALUE) return ::GetLastError();
+    const Handle file(raw);
+    BY_HANDLE_FILE_INFORMATION info{};
+    if (!::GetFileInformationByHandle(file.get(), &info)) return ::GetLastError();
+    if (info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))
+        return ERROR_INVALID_DATA;
+    candidates = LearningEngine::Inspect(executable);
+    return candidates ? ERROR_SUCCESS : ERROR_INVALID_PARAMETER;
 }
 
 // A bounded metadata-only inventory. Do not read or copy file contents.
@@ -160,10 +201,10 @@ struct Folder {
     std::vector<std::wstring> affected_entries;
 };
 
-DWORD Publish(const PathResolver& resolver, const LearningRequest& request,
+DWORD Publish(const PathResolver& resolver, const std::wstring& app_dir,
               const Candidates& candidates, std::array<Folder, 2>& folders,
               bool registry_changed, LearningResult& result) {
-    // A recipe contains cleanup metadata, never application settings.
+    // A wrapper contains cleanup metadata only.
     for (auto& folder : folders) {
         if (!folder.approved) continue;
         PinnedDirectories pinned;
@@ -178,28 +219,28 @@ DWORD Publish(const PathResolver& resolver, const LearningRequest& request,
         std::none_of(folders.begin(), folders.end(), [](const Folder& folder) { return folder.learned; }))
         return ERROR_SUCCESS;
 
-    runtime::SessionLock recipe_lock(L"Local\\PM_LearningRecipe_" + Lower(request.app_id));
-    if (!recipe_lock.ok()) return recipe_lock.error();
     PinnedDirectories pinned;
-    const DWORD error = PinPortableDirectory(resolver, L"Data\\recipes", true, pinned);
+    const DWORD error = PinPortableDirectory(resolver, app_dir, false, pinned);
     if (error != ERROR_SUCCESS) return error;
-    const auto recipe = L"Data\\recipes\\" + request.app_id + L".ini";
-    const auto full_recipe = resolver.ResolvePmRelativePath(recipe);
-    if (!full_recipe.ok) return ERROR_INVALID_NAME;
-    const auto attrs = ::GetFileAttributesW(full_recipe.resolved_path.c_str());
-    if (attrs == INVALID_FILE_ATTRIBUTES) {
-        const auto cause = ::GetLastError();
-        if (!Missing(cause)) return cause;
-    } else if (attrs & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) {
-        return ERROR_INVALID_DATA;
-    }
-    core::ConfigManager config(resolver);
+
+    // Serialize writers to the same directory even if the app IDs or path
+    // spellings differ. Hold the checked directory chain through publication.
+    BY_HANDLE_FILE_INFORMATION info{};
+    if (!::GetFileInformationByHandle(pinned.back().get(), &info)) return ::GetLastError();
+    const auto identity = std::to_wstring(info.dwVolumeSerialNumber) + L"_" +
+        std::to_wstring(info.nFileIndexHigh) + L"_" + std::to_wstring(info.nFileIndexLow);
+    runtime::SessionLock lock(L"Global\\PML_Wrapper_" + identity);
+    if (!lock.ok()) return lock.error();
+
+    const auto wrapper = app_dir + L"\\wrapper.ini";
+    const auto full_wrapper = resolver.ResolvePmRelativePath(wrapper);
+    const auto loaded = core::AtomicFile::ReadUtf8Text(full_wrapper.resolved_path, true);
+    if (!loaded.ok && loaded.win32_error != ERROR_FILE_NOT_FOUND) return loaded.win32_error;
     core::IniDocument doc;
-    const auto loaded = config.LoadRelativeIni(recipe, doc);
-    if (!loaded.ok) return loaded.win32_error;
+    std::wstring message;
+    if (!doc.ParseUtf8(loaded.content, message)) return ERROR_INVALID_DATA;
     const auto section = L"Learning." + result.session_id;
     if (doc.HasSection(section)) return ERROR_ALREADY_EXISTS;
-    std::wstring message;
     for (const auto& folder : folders) {
         if (!folder.learned) continue;
         const std::wstring label(folder.label);
@@ -219,8 +260,8 @@ DWORD Publish(const PathResolver& resolver, const LearningRequest& request,
         return ERROR_INVALID_DATA;
     if (!doc.SetValue(L"Learning", L"LatestSession", result.session_id, message))
         return ERROR_INVALID_DATA;
-    const auto saved = config.SaveRelativeIniIfModified(recipe, doc);
-    if (saved.ok) result.recipe_path = recipe;
+    const auto saved = core::AtomicFile::WriteUtf8Text(full_wrapper.resolved_path, doc.SerializeUtf8());
+    if (saved.ok) result.wrapper_path = wrapper;
     return saved.win32_error;
 }
 }
@@ -260,12 +301,17 @@ std::optional<Candidates> LearningEngine::Inspect(const std::wstring& executable
 
 LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningRequest& request) {
     LearningResult result;
-    const auto candidates = Inspect(request.executable);
-    if (!candidates || !SafeComponent(request.app_id) ||
-        !SessionManager::IsValidSessionId(request.app_id)) {
+    if (!SafeComponent(request.app_id) || !SessionManager::IsValidSessionId(request.app_id)) {
         result.error = ERROR_INVALID_PARAMETER;
         return result;
     }
+    auto app_dir = request.app_dir;
+    std::replace(app_dir.begin(), app_dir.end(), L'/', L'\\');
+    std::wstring executable;
+    std::optional<Candidates> candidates;
+    result.error = InspectInstallation(resolver, request, app_dir, executable, candidates);
+    if (result.error != ERROR_SUCCESS) return result;
+
     std::array<Folder, 2> folders{{
         {L"Roaming", candidates->roaming, {}, false, false, {}},
         {L"Local", candidates->local, {}, false, false, {}}
@@ -306,9 +352,14 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
     result.session_id = init.session_id;
     result.data_path = L"Data\\apps\\" + request.app_id + L"\\" + result.session_id;
     const auto origin = PathResolver::QueryExecutablePath();
-    guard::GuardProcess guard;
-    if (!guard.Start(origin, session, result.error, reservation.get())) {
-        const auto restored = cleanup::CleanupEngine::Run(session, cleanup::Mode::Critical);
+    guard::GuardSupervisor guard;
+    guard.Start(origin, session);
+    const HANDLE reservations[] = {reservation.get(), request.app_reservation};
+    result.error = guard.Protect(request.app_id, reservations);
+    if (result.error != ERROR_SUCCESS) {
+        guard.StopMonitoring();
+        const auto restored = cleanup::CleanupEngine::Run(
+            session, cleanup::Mode::Critical, cleanup::Artifacts::Remove, &guard.process());
         result.host_restored = restored.ok;
         result.rollback_error = restored.error;
         return result;
@@ -342,8 +393,8 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         const auto active = session.TransitionState(runtime::SessionState::Active);
         if (!active.ok) return active.win32_error;
         PROCESS_INFORMATION process{};
-        const auto cwd = request.executable.substr(0, request.executable.rfind(L'\\'));
-        if (!job.Launch(request.executable, request.arguments, cwd, process, error)) return error;
+        const auto cwd = executable.substr(0, executable.rfind(L'\\'));
+        if (!job.Launch(executable, request.arguments, cwd, process, error)) return error;
         Handle child(process.hProcess), thread(process.hThread);
         const auto waited = guard::WaitForReleaseOrOriginLoss(origin, child.get(), request.timeout_ms, error);
         if (waited == guard::OriginWaitResult::OriginLost) return ERROR_DEVICE_NOT_CONNECTED;
@@ -362,10 +413,15 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         }
         return ERROR_SUCCESS;
     };
-    result.error = run();
+    try {
+        result.error = run();
+    } catch (...) {
+        result.error = ERROR_UNHANDLED_EXCEPTION;
+    }
+    guard.StopMonitoring();
     const auto restored = cleanup::CleanupEngine::Run(
         session, result.error == ERROR_SUCCESS ? cleanup::Mode::Normal : cleanup::Mode::Critical,
-        cleanup::Artifacts::Remove, &guard);
+        cleanup::Artifacts::Remove, &guard.process());
     result.host_restored = restored.ok;
     result.rollback_error = restored.error;
     if (!result.host_restored || result.error != ERROR_SUCCESS) return result;
@@ -373,7 +429,7 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         result.error = ERROR_DEVICE_NOT_CONNECTED;
         return result;
     }
-    result.error = Publish(resolver, request, *candidates, folders, registry_changed, result);
+    result.error = Publish(resolver, app_dir, *candidates, folders, registry_changed, result);
     return result;
 }
 }

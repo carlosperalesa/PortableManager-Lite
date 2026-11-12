@@ -18,7 +18,8 @@ public:
     bool Create(pm::runtime::SessionManager& session, std::wstring_view instance, DWORD& error);
     bool Launch(const std::wstring& executable, std::wstring_view arguments,
                 const std::wstring& cwd, PROCESS_INFORMATION& process, DWORD& error,
-                ConsoleMode console = ConsoleMode::Hidden);
+                ConsoleMode console = ConsoleMode::Hidden,
+                const wchar_t* environment = nullptr);
     static bool RequestClose(const std::wstring& name, ULONGLONG deadline);
     static bool IsEmpty(const std::wstring& name);
     static bool TerminateAndWait(const std::wstring& name, DWORD& error);

@@ -17,6 +17,9 @@ struct Candidates {
 };
 
 struct LearningRequest {
+    // Existing installation directory relative to the PML root. The absolute
+    // executable path must point to a regular file inside this directory.
+    std::wstring app_dir;
     std::wstring executable;
     std::wstring arguments;
     std::wstring app_id;
@@ -25,6 +28,7 @@ struct LearningRequest {
     // PE metadata and an absent baseline are insufficient evidence.
     std::array<std::wstring, 3> exclusive_paths;
     DWORD timeout_ms = INFINITE;
+    HANDLE app_reservation = nullptr;
 };
 
 struct LearningResult {
@@ -33,7 +37,7 @@ struct LearningResult {
     DWORD rollback_error = ERROR_SUCCESS;
     std::wstring session_id;
     std::wstring data_path;
-    std::wstring recipe_path;
+    std::wstring wrapper_path;
 };
 
 class LearningEngine {

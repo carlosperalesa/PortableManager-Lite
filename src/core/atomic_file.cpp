@@ -234,7 +234,8 @@ AtomicWriteResult AtomicFile::WriteUtf8Text(
     return WriteBytes(target_path, utf8_text.data(), utf8_text.size(), simulate_interruption);
 }
 
-AtomicReadResult AtomicFile::ReadUtf8Text(std::wstring_view target_path) noexcept {
+AtomicReadResult AtomicFile::ReadUtf8Text(std::wstring_view target_path,
+                                          bool require_plain_file) noexcept {
     AtomicReadResult res{};
     if (target_path.empty()) {
         res.win32_error = ERROR_INVALID_PARAMETER;
@@ -248,12 +249,26 @@ AtomicReadResult AtomicFile::ReadUtf8Text(std::wstring_view target_path) noexcep
         FILE_SHARE_READ,
         nullptr,
         OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL,
+        require_plain_file ? FILE_FLAG_OPEN_REPARSE_POINT : FILE_ATTRIBUTE_NORMAL,
         nullptr);
 
     if (hFile == INVALID_HANDLE_VALUE) {
         res.win32_error = ::GetLastError();
         return res;
+    }
+
+    if (require_plain_file) {
+        BY_HANDLE_FILE_INFORMATION info{};
+        if (!::GetFileInformationByHandle(hFile, &info)) {
+            res.win32_error = ::GetLastError();
+        } else if (info.nNumberOfLinks != 1 ||
+                   (info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))) {
+            res.win32_error = ERROR_INVALID_DATA;
+        }
+        if (res.win32_error != ERROR_SUCCESS) {
+            ::CloseHandle(hFile);
+            return res;
+        }
     }
 
     LARGE_INTEGER file_size{};

@@ -143,7 +143,8 @@ public:
     // garantizando que KILL_JOB se ejecute primero antes de restaurar recursos e inspeccionando
     // el estado físico real de los recursos incluso si la operación quedó en INTENT_RECORDED.
     // Nunca elimina un respaldo (.pmbkp o .reg) si la restauración falla.
-    RollbackSummary ExecutePendingRollbacks(const RollbackHandlers& handlers = {});
+    RollbackSummary ExecutePendingRollbacks(const RollbackHandlers& handlers = {},
+                                            std::wstring_view app_id = {});
 
     // Ejecutores nativos por defecto para carpetas en disco:
     static bool DefaultRestoreBkpDir(

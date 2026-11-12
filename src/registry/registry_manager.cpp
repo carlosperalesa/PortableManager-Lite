@@ -292,7 +292,7 @@ bool RegistryManager::IsRegistryOperation(const ManifestOperation& op, std::wstr
 }
 
 bool RegistryManager::Prepare(SessionManager& session, std::wstring_view exclusive_key, DWORD& error,
-                              bool require_existing_parent) {
+                              bool require_existing_parent, std::wstring_view app_id) {
     error = ERROR_SUCCESS;
     if (!SafeKey(exclusive_key) || session.session_dir().empty()) return Fail(error, ERROR_INVALID_NAME);
     runtime::SessionLock lock(session.session_mutex_name());
@@ -300,9 +300,13 @@ bool RegistryManager::Prepare(SessionManager& session, std::wstring_view exclusi
     auto& manifest = session.manifest();
     const auto loaded = manifest.LoadFromDisk();
     if (!loaded.ok) return Fail(error, loaded.win32_error);
-    if (manifest.session_state() != runtime::SessionState::Preparing) return Fail(error, ERROR_INVALID_STATE);
+    if (manifest.session_state() != runtime::SessionState::Preparing &&
+        (manifest.session_state() != runtime::SessionState::Active ||
+         !SessionManager::IsValidSessionId(app_id))) return Fail(error, ERROR_INVALID_STATE);
     for (const auto& existing : manifest.operations()) {
-        if (existing.type == OperationType::KillJob) return Fail(error, ERROR_INVALID_STATE);
+        if (ManifestManager::IsTerminalAcceptableState(existing.state)) continue;
+        if (existing.type == OperationType::KillJob && (app_id.empty() || existing.app_id == app_id))
+            return Fail(error, ERROR_INVALID_STATE);
         if (existing.type == OperationType::RestoreReg &&
             (AtOrBelow(exclusive_key, existing.reg_key_path) || AtOrBelow(existing.reg_key_path, exclusive_key)))
             return Fail(error, ERROR_ALREADY_EXISTS);
@@ -312,6 +316,7 @@ bool RegistryManager::Prepare(SessionManager& session, std::wstring_view exclusi
     op.id = SessionManager::GenerateSessionGuid();
     if (op.id.empty()) return Fail(error, ERROR_GEN_FAILURE);
     op.type = OperationType::RestoreReg;
+    op.app_id = app_id;
     op.reg_key_path = exclusive_key;
     Key parent, leaf;
     std::wstring leaf_name;

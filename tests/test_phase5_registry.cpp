@@ -387,7 +387,7 @@ void GuardAfterCrash(const std::wstring& self, const std::wstring& pm) {
         throw;
     }
     ::DeleteFileW(ids.c_str());
-    ::DeleteFileW((fs::path(f.session.session_dir()) / L"pm-guard.exe").c_str());
+    ::DeleteFileW((fs::path(f.session.session_dir()) / L"pml.exe").c_str());
     f.Finalize();
 }
 }

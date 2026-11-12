@@ -1,3 +1,5 @@
+#include "applications/app_command.h"
+#include "pmd/pmd_module.h"
 #include "core/atomic_file.h"
 #include "core/config_manager.h"
 #include "core/path_resolver.h"
@@ -38,6 +40,8 @@ int wmain(int argc, wchar_t *argv[]) {
       return pm::guard::RunGuardMode(session_id, handle_arg, ready_arg, stop_arg);
     }
 
+    if (arg1 == L"--desktop" && argc == 2) return pm::pmd::Run(resolver);
+
     if (arg1 == L"--version") {
       std::wprintf(L"%ls v%ls (x64 Native Win32)\n", pm::core::kProductName,
                    pm::core::kVersionString);
@@ -76,10 +80,6 @@ int wmain(int argc, wchar_t *argv[]) {
       if (!cfg_mgr.config_doc().HasKey(L"General", L"DataDir")) {
         cfg_mgr.config_doc().SetRelativePathValue(L"General", L"DataDir",
                                                   L"Data", err);
-      }
-      if (!cfg_mgr.config_doc().HasKey(L"General", L"RecipesDir")) {
-        cfg_mgr.config_doc().SetRelativePathValue(L"General", L"RecipesDir",
-                                                  L"Data/recipes", err);
       }
 
       auto save_cfg = cfg_mgr.SaveConfigIniIfModified(true);
@@ -177,6 +177,7 @@ int wmain(int argc, wchar_t *argv[]) {
                    init_res.session_id.c_str());
       return 0;
     }
+    return pm::applications::RunCommand(resolver, arg1, argc, argv);
   }
 
   std::wprintf(L"%ls v%ls | Root=%ls | Ready.\n", pm::core::kProductName,

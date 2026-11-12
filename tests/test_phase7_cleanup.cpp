@@ -341,7 +341,7 @@ void OwnTemporariesOnly() {
 int Owner(const fs::path& root, const std::wstring& id, bool crash) {
     SessionManager session;
     Check(session.InitializeSessionWithId(id).ok, "initialize owner session");
-    const auto origin = (root / L"portable" / L"pm.exe").wstring();
+    const auto origin = (root / L"portable" / L"pml.exe").wstring();
     pm::guard::GuardProcess guard;
     DWORD error = 0;
     Check(guard.Start(origin, session, error), "start actual PMGuard shadow");
@@ -370,7 +370,7 @@ int Owner(const fs::path& root, const std::wstring& id, bool crash) {
 
 void Emergency(bool crash) {
     Fixture fixture;
-    fs::copy_file(pm_exe, fixture.portable / L"pm.exe");
+    fs::copy_file(pm_exe, fixture.portable / L"pml.exe");
     Handle ready(::CreateEventW(nullptr, TRUE, FALSE, EventName(fixture.id, L"_owner_ready").c_str()));
     Handle abandon(::CreateEventW(nullptr, TRUE, FALSE, EventName(fixture.id, L"_abandon").c_str()));
     Child owner;
@@ -382,6 +382,13 @@ void Emergency(bool crash) {
                                std::stoul(Read(fixture.root / L"guard.pid"))));
     Check(guard.value && ::WaitForSingleObject(guard.value, 0) == WAIT_TIMEOUT &&
           fs::exists(fixture.session_dir / L"session.ini"), "guard stays idle while PM is active");
+    const auto shadow = fixture.session_dir / L"pml.exe";
+    std::wstring image(32768, wchar_t{});
+    DWORD length = static_cast<DWORD>(image.size());
+    Check(::QueryFullProcessImageNameW(guard.value, 0, image.data(), &length) != FALSE,
+          "query PMG executable");
+    image.resize(length);
+    Check(fs::equivalent(shadow, fs::path(image)), "run the session's pml.exe as PMG");
     fixture.SetValue(99);
     const auto disconnected = fixture.root / L"disconnected";
     fs::rename(fixture.portable, disconnected);
@@ -394,10 +401,13 @@ void Emergency(bool crash) {
     fixture.CheckRestored(disconnected / L"Data" / L"apps" / L"app");
     Check(!fs::exists(fixture.portable), "no writes at lost origin");
     if (crash) {
+        const auto source_bytes = Read(disconnected / L"pml.exe");
+        Check(!source_bytes.empty() && Read(shadow) == source_bytes, "PMG is a copy of PML");
         SessionManager recovered;
         Check(recovered.OpenExistingSession(fixture.id).ok &&
               recovered.manifest().session_state() == SessionState::Cleaned &&
-              Read(fixture.log).find("REMOVE_GUARD_SHADOW") != std::string::npos,
+              Read(fixture.log).find("REMOVE_GUARD_SHADOW") != std::string::npos &&
+              Read(fixture.log).find("pml.exe") != std::string::npos && fs::exists(shadow),
               "record the sole remaining mapped guard image after crash recovery");
     } else {
         Check(!fs::exists(fixture.session_dir) && !fs::exists(fixture.log),

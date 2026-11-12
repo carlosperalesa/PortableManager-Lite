@@ -40,7 +40,7 @@ namespace PortableManager.Core
         }
 
         /// <summary>
-        /// Obtiene el directorio raíz donde reside pm.exe a partir de GetModuleFileNameW.
+        /// Obtiene el directorio raíz donde reside pml.exe a partir de GetModuleFileNameW.
         /// </summary>
         public static string GetExecutableDirectory()
         {

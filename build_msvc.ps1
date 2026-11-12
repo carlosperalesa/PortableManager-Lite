@@ -4,7 +4,7 @@
     Script de compilación nativa MSVC para PortableManager Lite (Fase 0+).
 .DESCRIPTION
     Detecta CMake o MSVC (cl.exe + link.exe + Windows SDK) en el sistema y compila
-    pm.exe (x64, C++20, /MT, /SWAPRUN:CD) y los tests correspondientes.
+    pml.exe (x64, C++20, /MT, /SWAPRUN:CD) y los tests correspondientes.
     No instala herramientas automáticamente (Sección 4).
 #>
 

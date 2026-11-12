@@ -5,7 +5,7 @@ namespace PortableManager.Guard
     public static class GuardEntry
     {
         /// <summary>
-        /// Punto de entrada del modo guardia: pm.exe --guard &lt;SessionID&gt; [PmProcessHandleHex]
+        /// Punto de entrada del modo guardia: pml.exe --guard &lt;SessionID&gt; [PmProcessHandleHex]
         /// </summary>
         public static int RunGuardMode(string sessionId, string pmHandleArg)
         {

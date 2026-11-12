@@ -1,11 +1,13 @@
 #pragma once
 #include "cleanup/cleanup_module.h"
+#include <functional>
 #include <string>
 #include <windows.h>
 
 
 namespace pm::guard {
-enum class OriginWaitResult { Released, OriginLost, TimedOut, Failed };
+inline constexpr wchar_t kShadowFilename[] = L"pml.exe";
+enum class OriginWaitResult { Released, Stopped, OriginLost, TimedOut, Failed };
 class GuardProcess {
 public:
   ~GuardProcess();
@@ -18,7 +20,9 @@ public:
   bool Start(const std::wstring &pm_executable,
              pm::runtime::SessionManager &session, DWORD &error,
              HANDLE resource_reservation = nullptr,
-             cleanup::Artifacts artifacts = cleanup::Artifacts::Remove);
+             cleanup::Artifacts artifacts = cleanup::Artifacts::Remove,
+             HANDLE app_reservation = nullptr,
+             const std::function<bool(HANDLE)>& before_resume = {});
   HANDLE handle() const noexcept { return process_; }
   // Only after durable restoration. Stop the idle guard and remove its own image.
   bool Retire(DWORD& error);
@@ -39,7 +43,8 @@ bool IsOriginAccessible(const std::wstring &pm_executable) noexcept;
 OriginWaitResult WaitForReleaseOrOriginLoss(const std::wstring &pm_executable,
                                             HANDLE release_event,
                                             DWORD timeout_ms,
-                                            DWORD &error) noexcept;
+                                            DWORD &error,
+                                            HANDLE stop_event = nullptr) noexcept;
 // Both PM's explicit shutdown and PMG use this path. Controlled Jobs stop
 // before any managed junction is removed or backup restored.
 bool CleanupSession(pm::runtime::SessionManager &session, DWORD &error);

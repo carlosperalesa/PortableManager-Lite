@@ -8,7 +8,7 @@ public:
     // The caller attributes the complete subtree to one application and starts
     // PMGuard first. Prepare must succeed before creating its Job or launching it.
     static bool Prepare(runtime::SessionManager& session, std::wstring_view exclusive_key,
-                        DWORD& error, bool require_existing_parent = false);
+                        DWORD& error, bool require_existing_parent = false, std::wstring_view app_id = {});
 
     // Observe whether an attributed subtree differs from its pre-launch
     // baseline. Any temporary comparison export stays in %TEMP% and is

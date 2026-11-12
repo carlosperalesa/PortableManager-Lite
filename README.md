@@ -1,15 +1,25 @@
-# PortableManager Lite (PM Lite) — Núcleo Nativo C++20
+# PortableManager Lite (PML Lite) — Núcleo Nativo C++20
 
-**Estado actual:** Fases 0B a 7 aprobadas. [Fase 6 — Aprendizaje Ligero](docs/fase06/README_FASE06.md) fue corregida para generar recetas operativas de limpieza sin copia de configuraciones y fusionada en `main` mediante [PR #5](https://github.com/carlosperalesa/PortableManager-Lite/pull/5). [Fase 7 — Motor de limpieza](docs/fase07/README_FASE07.md) aprobada y fusionada en `main` mediante [PR #7](https://github.com/carlosperalesa/PortableManager-Lite/pull/7). Fase 8 pendiente.
+**Estado actual:** Fases 0B a 7 aprobadas. La [integración de Fase 8](docs/fase08/README_FASE08.md) incluye catálogo, instalación, mantenimiento y PMD. Consulta los cierres de [Fase 6](docs/fase06/README_FASE06.md) y [Fase 7](docs/fase07/README_FASE07.md).
 **Toolchain oficial:** LLVM-MinGW `20261104` (Clang `23.1.5`, UCRT, Windows `x86_64`) portable en `tools/toolchains/llvm-mingw/`.
 
 ---
 
 ## 1. Descripción del Proyecto
 
-**PortableManager Lite (PM)** es un entorno portátil ligero en C++20 y Win32 API para Windows que administra aplicaciones portables (PAF y ZIP), sus datos, procesos y la restauración limpia del equipo anfitrión, operando desde cualquier ubicación (USB o carpeta local) mediante rutas relativas a `pm.exe` (`GetModuleFileNameW`).
+**PortableManager Lite (PML)** es un entorno portátil ligero en C++20 y Win32 API para Windows que administra aplicaciones portables (PAF y ZIP), sus datos, procesos y la restauración limpia del equipo anfitrión, operando desde cualquier ubicación (USB o carpeta local) mediante rutas relativas a `pml.exe` (`GetModuleFileNameW`).
 
 ---
+
+PML distribuye un solo ejecutable, `pml.exe`. PMG es el nombre de su función
+de guardián, ejecutada desde una copia temporal en modo `--guard`. PMD
+(PortableManager Desktop) es el módulo interno que abarcará la píldora,
+el escritorio semitransparente, los menús y las ventanas. Abre PMD con `pml.exe --desktop`.
+
+El aprendizaje publica un `wrapper.ini` de reglas operativas de limpieza
+en el directorio validado de cada aplicación. PMG puede restaurar el anfitrión
+desde `session.ini` y los respaldos temporales aunque pierda el acceso a la
+instalación y al wrapper.
 
 ## 2. Compilación Reproducible
 
@@ -90,8 +100,8 @@ El [índice documental y de auditoría](docs/README.md) enlaza el diseño, la ar
 ### Fase 3 — cierre aprobado
 
 El alcance, protocolo de handles, pruebas sintéticas y limitaciones están en
-[fase03/README_FASE03.md](docs/fase03/README_FASE03.md). `pm.exe --job-probe` permite
-comprobar el ciclo Job/Guard con un hijo sintético del propio PM en Windows.
+[fase03/README_FASE03.md](docs/fase03/README_FASE03.md). `pml.exe --job-probe` permite
+comprobar el ciclo Job/Guard con un hijo sintético del propio PML en Windows.
 Fase 3 (9/9 grupos) y las regresiones 0B/1/2 pasaron en Actions Windows
 [43130358371](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43130358371).
 El propietario aprobó el cierre y el PR #2 se fusionó en main.

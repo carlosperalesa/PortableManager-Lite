@@ -6,15 +6,15 @@
 **Documentos base:** `PortableManager-Lite-Diseno-v0.1-base.md` y `PortableManager-Lite-Diseno-v0.2.1.md`.\
 **Evidencias técnicas:** [AUDITORIA_CONTINUIDAD.md](../AUDITORIA_CONTINUIDAD.md), [PLAN_POC_PM_LITE.md](../PLAN_POC_PM_LITE.md), [RESULTADOS_POC_PM_LITE.md](../RESULTADOS_POC_PM_LITE.md), [RESULTADOS_APLICACIONES_REALES.md](../RESULTADOS_APLICACIONES_REALES.md) y [CONTINUIDAD_DESARROLLO.md](../CONTINUIDAD_DESARROLLO.md).
 
-> **Regla de interpretación:** este documento **complementa y sustituye** las decisiones previas de v0.1 y v0.2.1 donde existan discrepancias o precisiones técnicas derivadas de las PoCs. PortableManager (PM) es la aplicación principal; PM-Desktop (PMD) es únicamente su vista temporal. Contraer PMD **nunca** equivale a cerrar PM.
+> **Regla de interpretación:** este documento **complementa y sustituye** las decisiones previas de v0.1 y v0.2.1 donde existan discrepancias o precisiones técnicas derivadas de las PoCs. PortableManager Lite (PML) distribuye `pml.exe`. PortableManager Desktop (PMD) abarca toda la presentación gráfica dentro de PML, incluida la píldora, el escritorio semitransparente, los menús y las ventanas. Contraer el escritorio mantiene PML en ejecución.
 
 ---
 
 ## 18. Principio de producto y alcance
 
-- PM Lite es un entorno portátil, pequeño, discreto y de intervención mínima. Su propósito es permitir usar aplicaciones y documentos del USB conservando sus datos allí y **reduciendo al mínimo los rastros de información personal en Windows anfitrión**, particularmente en entornos compartidos como cibercafés.
-- PM **no** es un sistema de diagnóstico, auditoría ni administración general de Windows. No presenta asistentes, informes ni advertencias por cada incidencia. El usuario decide si restablece, reinstala o elimina una aplicación; PM no borra automáticamente sus **datos portables** porque una aplicación falle.
-- Se aprovechan comportamientos ya resueltos por PortableApps.com. Los lanzadores **PAF oficiales administran su propia portabilidad y limpieza**; PM no les superpone un segundo motor de restauración. PM gestiona la portabilidad de aplicaciones instaladas desde ZIP/7z/RAR/TAR.
+- PML Lite es un entorno portátil, pequeño, discreto y de intervención mínima. Su propósito es permitir usar aplicaciones y documentos del USB conservando sus datos allí y **reduciendo al mínimo los rastros de información personal en Windows anfitrión**, particularmente en entornos compartidos como cibercafés.
+- PML **no** es un sistema de diagnóstico, auditoría ni administración general de Windows. No presenta asistentes, informes ni advertencias por cada incidencia. El usuario decide si restablece, reinstala o elimina una aplicación; PML no borra automáticamente sus **datos portables** porque una aplicación falle.
+- Se aprovechan comportamientos ya resueltos por PortableApps.com. Los lanzadores **PAF oficiales administran su propia portabilidad y limpieza**; PML no les superpone un segundo motor de restauración. PML gestiona la portabilidad de aplicaciones instaladas desde ZIP/7z/RAR/TAR.
 - La obligación de limpiar **residuos del anfitrión** al terminar una aplicación es distinta de borrar deliberadamente los **datos personales guardados en el USB**. La primera es automática según el ciclo de vida; la segunda únicamente ocurre cuando el usuario ordena Restablecer o Desinstalar.
 - No añadir IA, cifrado, nube, controladores o diagnósticos complejos a Lite. No garantizar ausencia absoluta de trazas en todos los hosts: sin privilegios elevados no se pueden identificar o revertir todas las escrituras de terceros.
 
@@ -38,7 +38,7 @@ El usuario puede elegir conscientemente actualizar una instalación distinta de 
 
 - **PAF:** ejecutar su **instalador oficial** sobre la instalación elegida, respetando el lanzador portable y sus reglas de actualización. Su lanzador oficial es el ejecutable predeterminado.
 - **ZIP/7z/RAR/TAR:** extraer primero en una carpeta de trabajo `App/.temp/<id-operación>/` y solo después copiar/sobrescribir el destino elegido. La extracción incompleta **nunca** debe convertirse en una instalación parcial.
-- Para los ZIP no se implementa en Lite un clasificador sofisticado de archivos de perfil. Se respeta la estructura del paquete y se conserva el perfil externo administrado por PM. Un ZIP que contenga un archivo de configuración en el propio directorio del programa **podría sobrescribirlo**: no prometer conservación universal de contenidos mezclados.
+- Para los ZIP no se implementa en Lite un clasificador sofisticado de archivos de perfil. Se respeta la estructura del paquete y se conserva el perfil externo administrado por PML. Un ZIP que contenga un archivo de configuración en el propio directorio del programa **podría sobrescribirlo**: no prometer conservación universal de contenidos mezclados.
 - El color del **icono de instalación** es **verde** si puede iniciarse la operación y **rojo** si, por ejemplo, la aplicación destino está activa o sus archivos no pueden actualizarse. El color comunica disponibilidad, **no seguridad**. Una aplicación activa no se cierra automáticamente para actualizar.
 - Se admite detección de errores y reversión de elementos creados por una instalación fallida; no introducir diagnósticos ni asistentes. La barra de instalación empieza verde y cambia a roja mientras se revierte un error.
 
@@ -46,8 +46,8 @@ El usuario puede elegir conscientemente actualizar una instalación distinta de 
 
 - En PAF se utiliza el **lanzador PortableApps**, no el EXE interno de `App/`.
 - En un ZIP con **un único EXE en la raíz**, se registra automáticamente como ejecutable principal.
-- En un ZIP con **varios EXE en la raíz**, PM ofrece selección de ejecutable principal; la elección queda en el INI y puede editarse después.
-- El usuario decide si el paquete es portable; PM no certifica ni audita la seguridad o portabilidad absoluta de binarios desconocidos.
+- En un ZIP con **varios EXE en la raíz**, PML ofrece selección de ejecutable principal; la elección queda en el INI y puede editarse después.
+- El usuario decide si el paquete es portable; PML no certifica ni audita la seguridad o portabilidad absoluta de binarios desconocidos.
 
 ---
 
@@ -55,14 +55,14 @@ El usuario puede elegir conscientemente actualizar una instalación distinta de 
 
 - **Blanco/gris:** aplicación sin verificar o recién añadida sin ejecución previa.
 - **Verde:** aplicación validada empíricamente que no deja residuos personales en el anfitrión (mecanismo nativo portable, Prioridad 1). Ejemplo: `SumatraPDF`.
-- **Amarillo:** aplicación que escribe en rutas o claves conocidas del anfitrión pero queda completamente restaurada mediante las rutinas estándar de PM (Prioridades 2, 3 o recetas de Registro). Ejemplos: `PuTTY` (Registro), `FirefoxPortable` (PAF integrado).
-- **Rojo:** aplicación que deja residuos fuera de alcance, utiliza servicios del sistema, controladores, o rutas ambiguas que PM no puede aislar ni restaurar de forma determinista y segura. Se permite su ejecución bajo advertencia explícita al usuario, pero PM no garantiza portabilidad.
+- **Amarillo:** aplicación que escribe en rutas o claves conocidas del anfitrión pero queda completamente restaurada mediante las rutinas estándar de PML (Prioridades 2, 3 o wrappers con reglas de Registro). Ejemplos: `PuTTY` (Registro), `FirefoxPortable` (PAF integrado).
+- **Rojo:** aplicación que deja residuos fuera de alcance, utiliza servicios del sistema, controladores, o rutas ambiguas que PML no puede aislar ni restaurar de forma determinista y segura. Se permite su ejecución bajo advertencia explícita al usuario, pero PML no garantiza portabilidad.
 
 ---
 
 ## 21. Estrategia de Prioridades para Aislamiento de Datos
 
-Para aplicaciones no-PAF (ZIP/directorios), PM evalúa en orden estricto:
+Para aplicaciones no-PAF (ZIP/directorios), PML evalúa en orden estricto:
 
 1. **Prioridad 1 — Redirección nativa por parámetros o INI del ejecutable:**
    - La aplicación admite flags de línea de comandos (ej. `-profile`, `-portable`) o configuración local en su propia carpeta para almacenar datos directamente en el USB.
@@ -83,32 +83,32 @@ Para aplicaciones no-PAF (ZIP/directorios), PM evalúa en orden estricto:
 
 ## 22. Aprendizaje Ligero de Aplicaciones (Fase 6; decisión del propietario 2026-11-12)
 
-**Propósito exclusivo:** identificar qué archivos, carpetas y claves de Registro del anfitrión afecta una aplicación portable, para generar **recetas operativas de limpieza y restauración**. La receta describe recursos y acciones inversas; **no es una copia de seguridad de la configuración de la aplicación** y no ordena cosechar perfiles al USB.
+**Propósito exclusivo.** Identificar los archivos, carpetas y claves de Registro del anfitrión que la aplicación afecta. El wrapper describe los recursos y las operaciones inversas. El aprendizaje deja la configuración y los perfiles bajo control de la aplicación.
 
 1. **Identificación de candidatos:** usar metadatos PE (`CompanyName`, `ProductName` con `GetFileVersionInfoW` / `VerQueryValueW`) para acotar la inspección, por ejemplo, a `%APPDATA%\\<Company>\\<Product>`, `%LOCALAPPDATA%\\<Company>\\<Product>` y `HKCU\\Software\\<Company>\\<Product>`. Los metadatos y las rutas candidatas no demuestran por sí mismos propiedad ni modificación.
 2. **Observación y línea base:** antes de ejecutar, registrar existencia y estado de los recursos atribuibles. Identificar mediante observación/diferencias qué recursos fueron efectivamente creados, modificados o eliminados. No considerar un candidato como residuo sin evidencia.
-3. **Receta de limpieza:** registrar exclusivamente las ubicaciones afectadas, sus tipos, la condición previa y la operación inversa segura; usar variables estándar y referencias relativas cuando se persista una receta portable. No guardar rutas absolutas del anfitrión en la configuración persistente.
+3. **Wrapper de limpieza:** guardar `wrapper.ini` en el directorio real de la instalación indicado por `LearningRequest::app_dir`. Registrar exclusivamente las ubicaciones afectadas, sus tipos, la condición previa y la operación inversa segura; usar variables estándar y referencias relativas cuando se persista un wrapper portable. No guardar rutas absolutas del anfitrión en la configuración persistente.
 4. **Respaldo operativo:** si un recurso del anfitrión existía, respaldarlo **temporalmente solo para restaurarlo** (`.pmbkp` para carpetas exclusivas; `.reg` en la sesión para claves HKCU admitidas). Al finalizar, terminar primero los Jobs, retirar los recursos creados por la aplicación y restaurar exactamente los originales. Conservar respaldos si falla la restauración.
-5. **Datos de la aplicación:** la configuración portable es responsabilidad de cada aplicación o del mecanismo de portabilidad ya aprobado (modo nativo, variables de entorno del proceso o Junction hacia los datos que la aplicación administra). LearningEngine no copia, cosecha ni archiva configuraciones como parte de generar recetas.
-6. **No interferencia y cierre crítico:** no tocar recursos compartidos, ajenos o de atribución ambigua. En pérdida del USB o caída crítica, omitir toda escritura al dispositivo y restaurar el anfitrión usando el manifiesto y los respaldos operativos accesibles en `%TEMP%`; el cierre nunca debe depender de leer una receta en el USB.
-7. **Separación de responsabilidades:** el manifiesto temporal de sesión contiene operaciones concretas write-ahead para la recuperación inmediata; las recetas persistentes son descripciones de recursos observados para limpiezas posteriores. Una receta no sustituye el manifiesto ni habilita una limpieza destructiva sin revalidación.
+5. **Datos de la aplicación:** la configuración portable es responsabilidad de cada aplicación o del mecanismo de portabilidad ya aprobado (modo nativo, variables de entorno del proceso o Junction hacia los datos que la aplicación administra). LearningEngine no copia, cosecha ni archiva configuraciones como parte de generar wrappers.
+6. **No interferencia y cierre crítico:** no tocar recursos compartidos, ajenos o de atribución ambigua. En pérdida del USB o caída crítica, omitir toda escritura al dispositivo y restaurar el anfitrión usando el manifiesto y los respaldos operativos accesibles en `%TEMP%`; el cierre nunca debe depender de leer un wrapper en el USB.
+7. **Separación de responsabilidades:** el manifiesto temporal de sesión contiene operaciones concretas write-ahead para la recuperación inmediata; los wrappers persistentes son descripciones de recursos observados para limpiezas posteriores. Un wrapper no sustituye el manifiesto ni habilita una limpieza destructiva sin revalidación.
 
-Esta definición sustituye el antiguo apartado de «cosecha y receta» por decisión explícita del propietario. No se autoriza una función de copia de seguridad de aplicaciones.
+La actualización por copia encima debe preservar el wrapper existente. El diseño de Fase 8 deberá tratar `wrapper.ini` como nombre reservado, detectar la colisión con un archivo del paquete y evitar que el paquete reemplace las reglas aprendidas.
 
 ---
 
 ## 23. Ciclo de Vida y Protocolo de Cierre
 
-PM implementa tres modos deterministas de finalización:
+PML implementa tres modos deterministas de finalización:
 
 ### 23.1 Cierre Normal (`NORMAL`)
-- El usuario solicita salir de PM o de la aplicación.
+- El usuario solicita salir de PML o de la aplicación.
 - Cierre cooperativo mediante `WM_CLOSE` a ventanas de los procesos del Job Object. El motor nativo concede hasta 5 segundos cuando encuentra ventanas notificables.
 - No realizar cosecha ni respaldo de configuraciones de aplicaciones; cerrar los Jobs y ejecutar limpieza/restauración con el manifiesto operativo.
 - Desmantelamiento de Junctions (`RemoveDirectoryW`).
 - Restauración transaccional de claves de Registro desde el respaldo operativo `.reg` local.
 - Restauración de carpetas `.pmbkp` del anfitrión.
-- Salida limpia de PM y desactivación del monitor PMGuard.
+- Salida limpia de PML y desactivación del monitor PMGuard.
 
 ### 23.2 Cierre Rápido (`FAST`)
 - El usuario ordena cierre forzado o expulsión inminente.
@@ -118,7 +118,7 @@ PM implementa tres modos deterministas de finalización:
 - Restauración prioritaria del anfitrión (Junctions y Registro).
 
 ### 23.3 Cierre Crítico de Emergencia (`CRITICAL`)
-- Activado por **desconexión física abrupta del USB** o por **caída inesperada del proceso `pm.exe`**.
+- Activado por **desconexión física abrupta del USB** o por **caída inesperada del proceso `pml.exe`**.
 - El USB ya no es accesible o no es confiable: **se omiten todas las escrituras al USB** para evitar corrupción o bloqueos de E/S.
 - Terminación inmediata de procesos huérfanos mediante `TerminateJobObject`.
 - PMGuard (ejecutándose desde `%TEMP%`) toma el control mediante la adquisición del Mutex de sesión.
@@ -128,6 +128,6 @@ PM implementa tres modos deterministas de finalización:
   - Los respaldos `.pmbkp` y `.reg` necesarios para restaurar se conservan intactos.
   - Se genera el archivo `%TEMP%\pmlog` (texto plano, sin extensión).
   - Se registran exclusivamente las rutas afectadas y los códigos Win32 de error.
-  - PM y PMG finalizan sin bloquear el sistema.
+  - PML y PMG finalizan sin bloquear el sistema.
 
 El [protocolo nativo de Fase 7](../fase07/README_FASE07.md) describe el drenaje de Jobs, la recuperación de PMGuard y la finalización de temporales.

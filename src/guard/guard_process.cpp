@@ -51,16 +51,21 @@ GuardProcess::~GuardProcess() {
 
 bool GuardProcess::Retire(DWORD& error) {
   error = ERROR_SUCCESS;
-  if (!process_ || !stop_ || !shadow_) return true;
-  if (!::SetEvent(stop_)) {
+  if (process_ && !stop_) return true;
+  if (process_ && !::SetEvent(stop_)) {
     error = ::GetLastError();
     return false;
   }
-  const DWORD waited = ::WaitForSingleObject(process_, 10000);
+  const DWORD waited = process_ ? ::WaitForSingleObject(process_, 10000) : WAIT_OBJECT_0;
   if (waited != WAIT_OBJECT_0) {
     error = waited == WAIT_TIMEOUT ? ERROR_TIMEOUT : ::GetLastError();
     return false;
   }
+  if (process_) ::CloseHandle(process_);
+  if (stop_) ::CloseHandle(stop_);
+  process_ = nullptr;
+  stop_ = nullptr;
+  if (!shadow_) return true;
   BY_HANDLE_FILE_INFORMATION info{};
   if (!::GetFileInformationByHandle(shadow_, &info)) {
     error = ::GetLastError();
@@ -112,7 +117,7 @@ bool IsOriginAccessible(const std::wstring &pm_executable) noexcept {
 OriginWaitResult WaitForReleaseOrOriginLoss(const std::wstring &pm_executable,
                                             HANDLE release_event,
                                             DWORD timeout_ms,
-                                            DWORD &error) noexcept {
+                                            DWORD &error, HANDLE stop_event) noexcept {
   error = ERROR_SUCCESS;
   if (!IsOriginAccessible(pm_executable)) {
     return OriginWaitResult::OriginLost;
@@ -121,7 +126,10 @@ OriginWaitResult WaitForReleaseOrOriginLoss(const std::wstring &pm_executable,
   HDEVNOTIFY dev_notify = nullptr;
   HWND hwnd = CreateOriginMonitorWindow(dev_notify);
   const ULONGLONG start_tick = ::GetTickCount64();
-  const DWORD handle_count = (release_event != nullptr) ? 1 : 0;
+  HANDLE events[2]{};
+  DWORD handle_count = 0;
+  if (release_event) events[handle_count++] = release_event;
+  if (stop_event) events[handle_count++] = stop_event;
   OriginWaitResult result = OriginWaitResult::TimedOut;
 
   for (;;) {
@@ -143,12 +151,13 @@ OriginWaitResult WaitForReleaseOrOriginLoss(const std::wstring &pm_executable,
     }
 
     const DWORD waited = ::MsgWaitForMultipleObjects(
-        handle_count, release_event ? &release_event : nullptr, FALSE,
+        handle_count, events, FALSE,
         wait_slice, QS_ALLINPUT);
 
-    if (handle_count == 1 && waited == WAIT_OBJECT_0) {
-      result = IsOriginAccessible(pm_executable) ? OriginWaitResult::Released
-                                                 : OriginWaitResult::OriginLost;
+    if (waited < WAIT_OBJECT_0 + handle_count) {
+      if (!IsOriginAccessible(pm_executable)) result = OriginWaitResult::OriginLost;
+      else result = events[waited - WAIT_OBJECT_0] == stop_event
+          ? OriginWaitResult::Stopped : OriginWaitResult::Released;
       break;
     }
     if (waited == WAIT_OBJECT_0 + handle_count) {
@@ -175,13 +184,14 @@ OriginWaitResult WaitForReleaseOrOriginLoss(const std::wstring &pm_executable,
 }
 bool GuardProcess::Start(const std::wstring &executable,
                          pm::runtime::SessionManager &session, DWORD &error,
-                         HANDLE resource_reservation, cleanup::Artifacts artifacts) {
+                         HANDLE resource_reservation, cleanup::Artifacts artifacts,
+                         HANDLE app_reservation, const std::function<bool(HANDLE)>& before_resume) {
   error = ERROR_SUCCESS;
   if (process_ || session.session_dir().empty()) {
     error = ERROR_INVALID_STATE;
     return false;
   }
-  const std::wstring shadow = session.session_dir() + L"\\pm-guard.exe";
+  const std::wstring shadow = session.session_dir() + L"\\" + kShadowFilename;
   if (!::CopyFileW(executable.c_str(), shadow.c_str(), TRUE)) {
     error = ::GetLastError();
     return false;
@@ -238,11 +248,16 @@ bool GuardProcess::Start(const std::wstring &executable,
   const bool reserved = !resource_reservation ||
       ::DuplicateHandle(::GetCurrentProcess(), resource_reservation, ::GetCurrentProcess(),
                         &reservation, 0, TRUE, DUPLICATE_SAME_ACCESS);
-  HANDLE inherited[] = {parent, ready, stop, reservation};
+  HANDLE app = nullptr;
+  const bool app_reserved = !app_reservation ||
+      ::DuplicateHandle(::GetCurrentProcess(), app_reservation, ::GetCurrentProcess(),
+                        &app, 0, TRUE, DUPLICATE_SAME_ACCESS);
+  HANDLE inherited[5] = {parent, ready};
   SIZE_T inherited_count = 2;
   if (stop) inherited[inherited_count++] = stop;
   if (reservation) inherited[inherited_count++] = reservation;
-  ok = reserved && initialized &&
+  if (app) inherited[inherited_count++] = app;
+  ok = reserved && app_reserved && initialized &&
             ::UpdateProcThreadAttribute(
                 startup.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
                 inherited, inherited_count * sizeof(HANDLE), nullptr, nullptr);
@@ -257,7 +272,8 @@ bool GuardProcess::Start(const std::wstring &executable,
       command += L" " + std::to_wstring(reinterpret_cast<ULONG_PTR>(stop));
     const std::wstring temp = pm::runtime::SessionManager::QuerySystemTempDir();
     ok = ::CreateProcessW(shadow.c_str(), command.data(), nullptr, nullptr,
-                          TRUE, EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW,
+                          TRUE, EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW |
+                              (before_resume ? CREATE_SUSPENDED : 0),
                           nullptr, temp.c_str(), &startup.StartupInfo,
                           &pi) != FALSE;
   }
@@ -267,6 +283,17 @@ bool GuardProcess::Start(const std::wstring &executable,
     ::DeleteProcThreadAttributeList(startup.lpAttributeList);
   if (reservation)
     ::CloseHandle(reservation);
+  if (app)
+    ::CloseHandle(app);
+  if (ok && before_resume && (!before_resume(pi.hProcess) ||
+                              ::ResumeThread(pi.hThread) == static_cast<DWORD>(-1))) {
+    error = ::GetLastError();
+    ::TerminateProcess(pi.hProcess, error);
+    ::WaitForSingleObject(pi.hProcess, INFINITE);
+    ::CloseHandle(pi.hThread);
+    ::CloseHandle(pi.hProcess);
+    ok = false;
+  }
   if (ok) {
     ::CloseHandle(pi.hThread);
     HANDLE waits[] = {pi.hProcess, ready};

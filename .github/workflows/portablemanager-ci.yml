@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Bootstrap pinned LLVM-MinGW
         run: bash tools/bootstrap-codex-cloud.sh
-      - name: Cross-compile and inspect PE
+      - name: Cross-compile and inspect pml.exe
         run: bash tools/build-codex-cloud.sh
   native-windows-tests:
     name: Native Windows build and runtime tests
@@ -27,14 +27,14 @@ jobs:
       - name: Bootstrap pinned portable LLVM-MinGW
         shell: pwsh
         run: ./tools/bootstrap-toolchain.ps1
-      - name: Build and run phase 7 and phase 0B through 6 regression suites
+      - name: Build and run phases 0B through 8
         shell: pwsh
         run: ./build.ps1 -ReportJsonPath reports/ci_windows_native.json
       - name: Upload CI evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pm-windows-ci-evidence
+          name: pml-windows-ci-evidence
           path: |
             reports/ci_windows_native.json
             build/
