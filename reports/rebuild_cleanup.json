@@ -1,0 +1,80 @@
+{
+  "phase": 7,
+  "implementation_commit": "9456666f5d0eb9e0920c7a08f4757d97f31b49bf",
+  "pull_request": "https://github.com/carlosperalesa/PortableManager-Lite/pull/7",
+  "approval": "pending_owner_review",
+  "toolchain": "LLVM-MinGW 20261104, Windows x64 UCRT",
+  "validation_commands": {
+    "linux_cross_compile": "bash tools/bootstrap-codex-cloud.sh && bash tools/build-codex-cloud.sh",
+    "windows_native": "./build.ps1 -ReportJsonPath reports/ci_windows_native.json"
+  },
+  "ci": {
+    "run": "https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43254084270",
+    "linux": {
+      "job_id": 131307473363,
+      "status": "passed",
+      "checks": [
+        "AMD64 PE",
+        "SWAPRUN:CD",
+        "sin DLL externas del toolchain"
+      ]
+    },
+    "windows": {
+      "job_id": 131307473745,
+      "status": "passed",
+      "phase7_passed": 10,
+      "phase7_total": 10,
+      "regressions": {
+        "1": "passed",
+        "2": "passed",
+        "3": "passed",
+        "4": "passed",
+        "5": "passed",
+        "6": "passed",
+        "0B": "passed"
+      },
+      "artifact": "https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43254084270/artifacts/13959694281",
+      "phase7_cases": {
+        "normal_cooperative_and_outsider": "passed",
+        "fast_forces_after_200_ms": "passed",
+        "critical_without_cooperative_close": "passed",
+        "foreign_directory_log_backup_retry": "passed",
+        "preserve_foreign_pmlog": "passed",
+        "registry_backup_release_retry": "passed",
+        "job_failure_blocks_host_restoration": "passed",
+        "remove_only_owned_temporaries": "passed",
+        "live_pm_synthetic_origin_loss": "passed",
+        "pmguard_recovers_abandoned_cleanup": "passed"
+      }
+    }
+  },
+  "local_windows": {
+    "phase7_status": "passed",
+    "phase7_passed": 10,
+    "phase7_total": 10,
+    "fast_grace_ms": 200,
+    "fast_job_exit_ms": 218,
+    "fast_total_ms": 312,
+    "phase6_regression": {
+      "status": "failed",
+      "passed": 4,
+      "failed": 2,
+      "reason": "Windows Defender impidió abrir dos fixtures PE sintéticos para actualizar sus recursos (Win32 225)."
+    }
+  },
+  "physical_usb_disconnect": {
+    "status": "not_run",
+    "reason": "Postergada por el propietario hasta la validación final.",
+    "simulation": {
+      "status": "passed",
+      "method": "Renombrado de carpeta portable sintética con PM vivo y antes de una caída simulada de PM."
+    }
+  },
+  "known_residue_after_owner_crash": {
+    "host_rollback": "passed",
+    "shadow_image": "pm-guard.exe",
+    "diagnostic": "REMOVE_GUARD_SHADOW",
+    "win32_error": 1224
+  },
+  "status": "passed"
+}

@@ -1,6 +1,6 @@
 # Fase 07 — Motor de limpieza
 
-Implementación en revisión mediante un PR en borrador. La aprobación corresponde al propietario.
+Implementación en revisión en el [PR #7 en borrador](https://github.com/carlosperalesa/PortableManager-Lite/pull/7). La aprobación corresponde al propietario.
 
 ## Protocolo de cierre
 
@@ -40,7 +40,7 @@ archivo ajeno o un enlace.
 ## Verificación
 
 ```powershell
-pwsh -NoProfile -File build.ps1 -ReportJsonPath reports/rebuild_cleanup.json
+pwsh -NoProfile -File build.ps1 -ReportJsonPath "build/cleanup-$(Get-Date -Format yyyyMMddTHHmmssfff).json"
 ```
 
 ```bash
@@ -51,8 +51,11 @@ bash tools/build-codex-cloud.sh
 La suite usa ejecutables auxiliares, directorios temporales con GUID y claves
 sintéticas de HKCU. Cubre los tres modos, la barrera de Jobs, los conflictos de
 propiedad, los reintentos, la pérdida simulada del origen y la recuperación por
-PMGuard. GitHub Actions ejecuta también las regresiones 0B–6 en Windows e
-inspecciona el PE de Windows x64 compilado en Linux.
+PMGuard. La [CI 43254084270](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43254084270)
+validó 10/10 escenarios de Fase 7, las regresiones 0B–6 en Windows y la
+compilación cruzada con inspección del PE x64 en Linux. La suite local de Fase 7
+también pasó 10/10. En la regresión local de Fase 6, Defender impidió actualizar
+dos fixtures PE sintéticos (Win32 225). Los seis escenarios pasaron en CI.
 
 **Desconexión física USB:** `not_run`, postergada hasta la validación final por
 decisión del propietario. La pérdida de origen se simula renombrando una carpeta
