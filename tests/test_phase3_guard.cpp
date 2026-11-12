@@ -111,6 +111,25 @@ void RemoveSuccessfulSession(const std::wstring& id) {
     ::DeleteFileW((dir + L"\\session.ini").c_str());
     ::RemoveDirectoryW(dir.c_str());
 }
+void InspectJob(HANDLE job) {
+    std::vector<ULONG_PTR> buffer(128);
+    auto* ids = reinterpret_cast<JOBOBJECT_BASIC_PROCESS_ID_LIST*>(buffer.data());
+    if (!Check(::QueryInformationJobObject(job, JobObjectBasicProcessIdList, ids,
+               static_cast<DWORD>(buffer.size() * sizeof(ULONG_PTR)), nullptr) != FALSE, "query_job_pid_list")) return;
+    for (DWORD i = 0; i < ids->NumberOfProcessIdsInList; ++i) {
+        const DWORD pid = static_cast<DWORD>(ids->ProcessIdList[i]);
+        HANDLE process = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, pid);
+        wchar_t image[32768]{}; DWORD size = 32768;
+        if (process && ::QueryFullProcessImageNameW(process, 0, image, &size)) {
+            std::wstring path(image, size);
+            const auto slash = path.find_last_of(L"\\/");
+            const std::wstring name = path.substr(slash == std::wstring::npos ? 0 : slash + 1);
+            const std::string step = "job_member_" + std::string(name.begin(), name.end());
+            Check(true, step.c_str(), pid);
+        } else Check(false, "job_member_image", pid);
+        if (process) ::CloseHandle(process);
+    }
+}
 bool Lifecycle(const std::wstring& pm, const std::wstring& mode, bool remove_source = false) {
     const std::wstring id = SessionManager::GenerateSessionGuid();
     HANDLE ready = Event(id, L"_ready"), release = Event(id, L"_release");
@@ -135,6 +154,7 @@ bool Lifecycle(const std::wstring& pm, const std::wstring& mode, bool remove_sou
         if (!Check(job != nullptr, "open_job")) return false;
         JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting{};
         if (!Check(::QueryInformationJobObject(job, JobObjectBasicAccountingInformation, &accounting, sizeof(accounting), nullptr) != FALSE, "query_active_job")) return false;
+        InspectJob(job);
         if (!Value("active_processes_before", accounting.ActiveProcesses, 2)) return false;
         const ULONGLONG before = Cpu(guard);
         ::Sleep(1200);
