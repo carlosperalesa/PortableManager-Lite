@@ -93,6 +93,16 @@ demuestran por sí solos que la implementación actual siga funcionando.
 -   No diagnosticar ni reparar automáticamente una aplicación que no
     funciona.
 
+### 3.2.1 Aprendizaje y recetas de limpieza (decisión del propietario 2026-11-12)
+
+- El aprendizaje identifica **archivos, carpetas y claves de Registro efectivamente afectados** por una aplicación, para generar recetas de limpieza y restauración; no hace copias de seguridad de la aplicación.
+- Las recetas persistentes describen los recursos afectados y las operaciones inversas, con rutas relativas o variables estándar; no contienen datos de configuración de la aplicación ni rutas absolutas del anfitrión.
+- Los respaldos `.pmbkp` y `.reg` son **operativos, temporales y destinados exclusivamente a restaurar el anfitrión**. No son un mecanismo de preservación de configuraciones portables.
+- Los datos propios de la aplicación se conservan mediante su mecanismo portable o una redirección aprobada. LearningEngine no debe copiar, cosechar ni mover perfiles de aplicaciones para producir recetas.
+- En un cierre crítico por desconexión del USB, no escribir al dispositivo ausente; detener los procesos controlados y restaurar el anfitrión a partir del manifiesto y respaldos operativos accesibles en `%TEMP%`.
+- Un candidato inferido de metadatos PE no prueba que el recurso haya sido modificado ni que pertenezca exclusivamente a la aplicación. No limpiar cambios ajenos o ambiguos.
+- Si una implementación existente de LearningEngine contradice estas reglas, corregirla y volver a probarla antes de aprobar su fase.
+
 ### 3.3 Estrategias de portabilidad para ZIP
 
 Aplicar este orden:
