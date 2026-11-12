@@ -95,11 +95,11 @@ bool OwnedJob(const ManifestOperation& op, const SessionManager& session) {
            op.job_name == jobs::JobManager::MakeName(session.session_id(), op.app_id);
 }
 
-void CooperativeClose(const std::vector<ManifestOperation>& operations, DWORD grace) {
+void CooperativeClose(const std::vector<ManifestOperation>& operations, DWORD grace, std::wstring_view app_id) {
     const auto deadline = ::GetTickCount64() + grace;
     std::vector<std::wstring> active;
     for (const auto& op : operations) {
-        if (op.type != OperationType::KillJob ||
+        if ((!app_id.empty() && op.app_id != app_id) || op.type != OperationType::KillJob ||
             op.state == OperationState::IntentRecorded ||
             ManifestManager::IsTerminalAcceptableState(op.state)) continue;
         if (::GetTickCount64() >= deadline) break;
@@ -114,7 +114,8 @@ void CooperativeClose(const std::vector<ManifestOperation>& operations, DWORD gr
 }
 
 Result Execute(SessionManager& session, Mode mode, Artifacts artifacts,
-               guard::GuardProcess* guard, bool recovering, bool managed_shadow) {
+               guard::GuardProcess* guard, bool recovering, bool managed_shadow,
+               std::wstring_view app_id = {}) {
     const auto fail = [](const std::vector<Pending>& pending) {
         const auto failure = std::find_if(pending.begin(), pending.end(), [](const Pending& item) {
             return item.error != ERROR_IO_PENDING;
@@ -138,10 +139,13 @@ Result Execute(SessionManager& session, Mode mode, Artifacts artifacts,
         return fail({{L"LOAD_MANIFEST", path, loaded.win32_error}});
     }
 
+    if (!app_id.empty() && manifest.session_state() != SessionState::Active)
+        return {false, ERROR_INVALID_STATE};
     std::vector<Pending> pending;
     if (manifest.session_state() != SessionState::Cleaned) {
         // Reject a foreign Job or an unsupported inverse before touching resources.
         for (const auto& op : manifest.operations()) {
+            if (!app_id.empty() && op.app_id != app_id) continue;
             if (!OwnedJob(op, session) &&
                 !junctions::JunctionManager::IsJunctionOperation(op) &&
                 !registry::RegistryManager::IsRegistryOperation(op, session.session_dir()))
@@ -156,7 +160,7 @@ Result Execute(SessionManager& session, Mode mode, Artifacts artifacts,
             if (cooperative) {
                 cooperative = false;
                 CooperativeClose(manifest.operations(),
-                                 mode == Mode::Fast ? kFastGraceMs : kNormalGraceMs);
+                                 mode == Mode::Fast ? kFastGraceMs : kNormalGraceMs, app_id);
             }
             // No process can launch before the Job is durably APPLIED.
             if (op.state == OperationState::IntentRecorded ||
@@ -170,10 +174,11 @@ Result Execute(SessionManager& session, Mode mode, Artifacts artifacts,
             pending.push_back({L"RELEASE_REG_BACKUP", op.backup_host_path, error});
             return false;
         };
-        const auto summary = manifest.ExecutePendingRollbacks(handlers);
+        const auto summary = manifest.ExecutePendingRollbacks(handlers, app_id);
         if (!summary.all_succeeded) {
             for (const auto& op : manifest.operations()) {
-                if (ManifestManager::IsTerminalAcceptableState(op.state)) continue;
+                if ((!app_id.empty() && op.app_id != app_id) ||
+                    ManifestManager::IsTerminalAcceptableState(op.state)) continue;
                 pending.push_back({ManifestManager::OperationTypeToString(op.type),
                                    Resource(op, path),
                                    op.last_error ? op.last_error : ERROR_IO_PENDING});
@@ -184,6 +189,7 @@ Result Execute(SessionManager& session, Mode mode, Artifacts artifacts,
             return fail(pending);
         }
     }
+    if (!app_id.empty()) return {true};
     DWORD error = ERROR_SUCCESS;
     const auto shadow_path = session.session_dir() + L"\\" + guard::kShadowFilename;
     if (guard && !guard->Retire(error)) {
@@ -203,6 +209,11 @@ Result Execute(SessionManager& session, Mode mode, Artifacts artifacts,
 Result CleanupEngine::Run(SessionManager& session, Mode mode, Artifacts artifacts,
                           guard::GuardProcess* guard) {
     return Execute(session, mode, artifacts, guard, false, false);
+}
+
+Result CleanupEngine::RunApplication(SessionManager& session, std::wstring_view app_id, Mode mode) {
+    if (!SessionManager::IsValidSessionId(app_id)) return {false, ERROR_INVALID_PARAMETER};
+    return Execute(session, mode, Artifacts::KeepManifest, nullptr, false, false, app_id);
 }
 
 Result CleanupEngine::Recover(SessionManager& session, bool managed_shadow) {

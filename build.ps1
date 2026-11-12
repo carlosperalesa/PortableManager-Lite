@@ -89,6 +89,8 @@ $guardSources = @(
 Write-Host "=== [1/6] Compilando pml.exe (C++20, Windows x64, Unicode, -static, /SWAPRUN:CD) ==="
 $pmlSources = @(
     $LearningSource,
+    (Join-Path $ProjectRoot "src\guard\guard_supervisor.cpp"),
+    (Join-Path $ProjectRoot "src\applications\session_host.cpp"),
     (Join-Path $ProjectRoot "src\applications\app_paths.cpp"),
     (Join-Path $ProjectRoot "src\applications\applications_module.cpp"),
     (Join-Path $ProjectRoot "src\applications\package_manager.cpp"),

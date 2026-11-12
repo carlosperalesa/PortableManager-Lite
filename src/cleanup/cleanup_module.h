@@ -22,6 +22,7 @@ public:
     static Result Run(runtime::SessionManager& session, Mode mode,
                       Artifacts artifacts = Artifacts::Remove,
                       guard::GuardProcess* guard = nullptr);
+    static Result RunApplication(runtime::SessionManager& session, std::wstring_view app_id, Mode mode);
     // PMGuard can call this only after its monitored owner exits.
     static Result Recover(runtime::SessionManager& session, bool managed_shadow);
 };

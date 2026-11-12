@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "runtime/manifest_manager.h"
 
 #include "core/atomic_file.h"
@@ -665,7 +666,9 @@ ManifestStatusResult ManifestManager::RecordOperationIntent(
     // KILL_JOB debe registrarse como la última operación de preparación inmediatamente antes de iniciar
     // la aplicación, para que en el rollback LIFO sea la primera operación efectiva.
     for (const auto& existing : operations_) {
-        if (existing.type == OperationType::KillJob && op.type != OperationType::KillJob) {
+        if (existing.type == OperationType::KillJob && op.type != OperationType::KillJob &&
+            (session_state_ != SessionState::Active || op.app_id.empty() ||
+             (existing.app_id == op.app_id && !IsTerminalAcceptableState(existing.state)))) {
             return {false, false, ERROR_INVALID_PARAMETER,
                     L"Directiva KILL_JOB: KILL_JOB debe ser la ultima operacion de preparacion; no se pueden registrar operaciones adicionales despues de KILL_JOB."};
         }
@@ -673,7 +676,9 @@ ManifestStatusResult ManifestManager::RecordOperationIntent(
 
     if (op.id.empty()) {
         wchar_t buf[32]{};
-        std::swprintf(buf, sizeof(buf) / sizeof(wchar_t), L"op_%04zu", next_op_seq_++);
+        do {
+            std::swprintf(buf, sizeof(buf) / sizeof(wchar_t), L"op_%04zu", next_op_seq_++);
+        } while (FindOperation(buf));
         op.id = buf;
     } else {
         ++next_op_seq_;
@@ -818,9 +823,10 @@ bool ManifestManager::DefaultDeleteCreatedDir(
     return DeleteDirectoryTreeSafe(op.target_host_path, out_err);
 }
 
-RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers& handlers) {
+RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers& handlers,
+                                                         std::wstring_view app_id) {
     RollbackSummary summary{};
-    session_state_ = SessionState::Cleaning;
+    if (app_id.empty()) session_state_ = SessionState::Cleaning;
     if (const auto saved = SaveToDisk(); !saved.ok) {
         summary.persistence_error = saved.win32_error;
         summary.failed_count = 1;
@@ -845,6 +851,7 @@ RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers&
 
     for (std::size_t op_index : lifo_indices) {
         ManifestOperation& op = operations_[op_index];
+        if (!app_id.empty() && op.app_id != app_id) continue;
         ++summary.total_considered;
         summary.execution_order_ids.push_back(op.id);
         summary.execution_order_types.push_back(op.type);
@@ -956,8 +963,21 @@ RollbackSummary ManifestManager::ExecutePendingRollbacks(const RollbackHandlers&
         if (!step_ok && op.type == OperationType::KillJob) return summary;
     }
 
-    summary.all_succeeded = (summary.failed_count == 0) && AreAllOperationsTerminalAcceptable();
-    if (summary.all_succeeded) {
+    summary.all_succeeded = (summary.failed_count == 0) && (app_id.empty() ? AreAllOperationsTerminalAcceptable() :
+        std::none_of(operations_.begin(), operations_.end(), [&](const auto& op) {
+            return op.app_id == app_id && !IsTerminalAcceptableState(op.state);
+        }));
+    if (summary.all_succeeded && !app_id.empty()) {
+        // Backups were released after persisting their inverse operations.
+        // Keep the shared manifest focused on active or unresolved work.
+        std::erase_if(operations_, [&](const auto& op) { return op.app_id == app_id; });
+        if (const auto saved = SaveToDisk(); !saved.ok) {
+            summary.persistence_error = saved.win32_error;
+            summary.all_succeeded = false;
+            ++summary.failed_count;
+        }
+    }
+    if (summary.all_succeeded && app_id.empty()) {
         session_state_ = SessionState::Cleaned;
         if (const auto saved = SaveToDisk(); !saved.ok) {
             summary.persistence_error = saved.win32_error;

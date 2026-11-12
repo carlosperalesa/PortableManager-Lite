@@ -38,11 +38,21 @@ aplicaciones del anfitrión desde PMD requiere confirmación.
   atribución exclusiva acreditada. `ExclusiveRoaming`, `ExclusiveLocal` y
   `ExclusiveRegistry` en `apps.ini` activan únicamente reglas que coinciden
   exactamente con el wrapper aprendido y los candidatos de la aplicación.
-- Cada ejecución mantiene un Job y un `session.ini` write-ahead propios. PMG
-  conserva el arrendamiento de la instalación hasta que termina la
-  restauración. Una actualización concurrente devuelve un error de ocupación.
-  El cierre crítico usa los respaldos temporales y puede dejar registrada en
-  `pmlog` la copia mapeada del guardián que Windows todavía no permite retirar.
+- Al abrir PML se crean un `session.ini` write-ahead y un único PMG, aun
+  con cero aplicaciones. Cada lanzamiento tiene su propio Job y registra sus
+  operaciones en el mismo manifiesto. El cierre de una app restaura solo su
+  alcance. En el cierre global, todos los Jobs se drenan antes del rollback.
+- PMG retiene las reservas de las aplicaciones mientras puede necesitarlas
+  para la recuperación, y las recibe antes de confirmar que un sustituto
+  está listo. Una actualización concurrente devuelve un error de ocupación.
+- PML supervisa a PMG con una espera asíncrona del pool de Windows. Ante
+  caída, conserva las apps y reintenta en la misma sesión. El primer intento
+  es inmediato. Los siguientes esperan 2 y 5 segundos tras el intento previo.
+  Una caída en los primeros 30 segundos del sustituto consume el presupuesto
+  de la misma incidencia. Una vez agotado, el aviso queda rojo hasta reiniciar PML.
+- El escudo arriba a la derecha de PMD está verde cuando el guardián está listo.
+  El escudo y el LED de la píldora están rojos mientras PMG falta o se recupera.
+  El cierre crítico puede dejar en `pmlog` la copia de PMG aún mapeada por Windows.
 - La clasificación inicial es gris. El operador puede guardar el color
   acreditado en el catálogo. Una aplicación roja pide confirmación en PMD
   y requiere `--allow-red` inmediatamente después del ID en consola.
@@ -77,7 +87,8 @@ fuera de esas operaciones.
 
 `test_phase8_integration.exe` usa un ejecutable, un perfil y un paquete
 sintéticos. Recorre registro, aprendizaje, lanzamiento, recuperación por
-caída, actualización, navegación básica en PMD y mantenimiento. GitHub
+caída, actualización, navegación básica en PMD, mantenimiento, sesión compartida con dos Jobs,
+reposición de PMG y agotamiento de reintentos. GitHub
 Actions ejecuta 0B–8 en Windows y compila para Windows x64 desde Ubuntu.
 El JSON combinado se publica como `reports/ci_windows_native.json` en el
 artefacto de Windows. La retirada física final queda `not_run`.

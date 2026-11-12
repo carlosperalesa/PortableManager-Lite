@@ -138,14 +138,18 @@ automáticamente.
 
 -   PMG es una instancia de sombra del mismo ejecutable, invocada en
     modo `--guard` como `%TEMP%\PortableManager\Session\<SessionID>\pml.exe`.
--   PML distribuye un solo ejecutable, `pml.exe`.
+-   PML distribuye un solo ejecutable, `pml.exe`. Cada instancia principal
+    inicia un único PMG al abrir su sesión, aunque no haya apps abiertas.
 -   PMG restaura desde `session.ini` y los respaldos operativos locales.
     Puede completar el rollback con el dispositivo y el wrapper inaccesibles.
 -   PMG solo ejecuta la limpieza de emergencia cuando PML ha desaparecido
     inesperadamente.
 -   Si PML sigue activo, PMG no limpia.
 -   Si PMG termina mientras PML sigue activo, PML continúa siendo
-    responsable de la limpieza.
+    responsable de la limpieza y conserva las aplicaciones abiertas.
+    PML supervisa el handle mediante una espera asíncrona y hace hasta tres
+    intentos de reposición en la misma sesión. Al agotarlos, el aviso de
+    protección degradada permanece hasta reiniciar PML.
 -   PML y PMG nunca pueden ejecutar simultáneamente las mismas
     operaciones de limpieza.
 -   Utilizar exclusión mutua y comprobar el estado real de la sesión.
@@ -183,7 +187,10 @@ seguro.
 ### 3.7 Manifiesto de sesión
 
 -   Vive en `%TEMP%\PortableManager\Session\<SessionID>\session.ini`.
--   Es operativo y temporal; no es configuración persistente.
+-   Es el manifiesto operativo y temporal único de la instancia de PML.
+    Se crea al arrancar y registra los Jobs y las operaciones de todas sus
+    aplicaciones. El cierre individual restaura solo las operaciones de esa
+    aplicación; el cierre global o la recuperación crítica cubren toda la sesión.
 -   Debe registrar la intención antes de modificar el anfitrión
     (Write-Ahead).
 -   Las operaciones inversas deben ser idempotentes.

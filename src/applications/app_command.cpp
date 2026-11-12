@@ -1,5 +1,6 @@
 #include "applications/app_command.h"
 #include "applications/app_paths.h"
+#include "applications/session_host.h"
 #include "jobs/job_manager.h"
 #include "learning/learning_engine.h"
 
@@ -95,15 +96,27 @@ int RunCommand(const core::PathResolver& resolver, std::wstring_view command, in
         int argument_start = 3;
         if (argc > 3 && std::wstring_view(argv[3]) == L"--allow-red") ++argument_start;
         if (Equal(app.color, L"Red") && argument_start == 3) return Status(ERROR_ACCESS_DENIED);
+        SessionHost host;
+        const auto started = host.Start(core::PathResolver::QueryExecutablePath());
+        if (started) {
+            host.Close(cleanup::Mode::Critical);
+            return Status(started);
+        }
         const Handle event(::CreateEventW(nullptr, TRUE, FALSE, nullptr));
-        if (!event) return Status(::GetLastError());
+        if (!event) {
+            const auto event_error = ::GetLastError();
+            host.Close(cleanup::Mode::Critical);
+            return Status(event_error);
+        }
         StopRequest stop;
         stop.event = event.get();
         active_stop.store(&stop);
         ::SetConsoleCtrlHandler(StopConsole, TRUE);
-        const auto result = Run(resolver, app, Arguments(argument_start, argc, argv), stop);
+        const auto result = Run(resolver, app, Arguments(argument_start, argc, argv), stop, host);
         ::SetConsoleCtrlHandler(StopConsole, FALSE);
         active_stop.store(nullptr);
+        const auto closed = host.Close(result.error ? cleanup::Mode::Critical : stop.mode.load());
+        if (closed) return Status(closed);
         if (result.rollback_error || result.error)
             return Status(result.rollback_error ? result.rollback_error : result.error);
         return static_cast<int>(result.exit_code);

@@ -44,6 +44,8 @@ set(PM_GUARD_SOURCES
 
 add_executable(pml
     src/pmd/pmd_module.h
+    src/guard/guard_supervisor.cpp
+    src/applications/session_host.cpp
     src/applications/app_paths.cpp
     src/applications/applications_module.cpp
     src/applications/package_manager.cpp

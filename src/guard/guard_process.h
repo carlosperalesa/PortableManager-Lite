@@ -1,5 +1,6 @@
 #pragma once
 #include "cleanup/cleanup_module.h"
+#include <functional>
 #include <string>
 #include <windows.h>
 
@@ -20,7 +21,8 @@ public:
              pm::runtime::SessionManager &session, DWORD &error,
              HANDLE resource_reservation = nullptr,
              cleanup::Artifacts artifacts = cleanup::Artifacts::Remove,
-             HANDLE app_reservation = nullptr);
+             HANDLE app_reservation = nullptr,
+             const std::function<bool(HANDLE)>& before_resume = {});
   HANDLE handle() const noexcept { return process_; }
   // Only after durable restoration. Stop the idle guard and remove its own image.
   bool Retire(DWORD& error);

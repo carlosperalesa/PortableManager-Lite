@@ -310,8 +310,9 @@ coordinador de configuración.
 -   PM lee ese manifiesto durante el cierre normal.
 -   Si PM desaparece, PMG lee el mismo manifiesto.
 -   PMG no necesita recibir ni almacenar una copia del `pm.ini`.
--   Si PMG desaparece mientras PM sigue vivo, PM detecta su terminación
-    y ejecuta la rutina de emergencia por sí mismo.
+-   PML abre la sesión y arranca un único PMG, también con el manifiesto vacío.
+    Al cerrar una aplicación, PML actualiza sus operaciones y mantiene el
+    guardián para el resto de la sesión.
 
 No se necesita una tubería de mensajes para transferir recetas. La
 receta permanente está en el USB; el manifiesto de sesión está en
@@ -325,8 +326,7 @@ Ejemplo conceptual:
 %TEMP%\PortableManager\Session\<SessionID>\session.ini
 ```
 
-Contiene solo la información operativa necesaria para revertir la sesión
-activa:
+Contiene la información operativa de todas las aplicaciones controladas por la sesión activa:
 
 -   Aplicación y transacción.
 -   Rutas originales.
@@ -350,11 +350,16 @@ procesos puedan terminar los grupos.
 
 ### Supervisión mutua
 
--   PM vigila el proceso PMG.
--   PMG vigila el proceso PM.
--   Si PMG termina inesperadamente, PM ejecuta la rutina de emergencia y
-    cierra la sesión.
--   Si PM termina inesperadamente, PMG ejecuta la rutina de emergencia.
+-   PMG espera la terminación del proceso PML. Si PML desaparece, PMG
+    restaura todo lo pendiente desde el manifiesto de la sesión.
+-   PML detecta la terminación inesperada de PMG con una espera asíncrona
+    sobre su handle. Mantiene las aplicaciones abiertas e intenta reponer
+    el guardián en la misma sesión. Los intentos se cancelan al cerrar PML.
+-   Hay tres intentos como máximo: inmediato, dos segundos después del
+    primer fallo y cinco segundos después del segundo. El escudo de PMD
+    está verde cuando PMG está listo. El escudo y el LED de la píldora
+    están rojos mientras falta PMG, incluso durante la recuperación.
+    Si se agota el presupuesto, el rojo permanece hasta el próximo arranque.
 -   Los Job Objects con `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` pueden
     servir como última protección para terminar procesos si se pierden
     todos los handles.
@@ -517,7 +522,7 @@ identifican por sí mismas el proceso responsable.
     subclaves originales.
 7.  PM y PMG pueden leer el mismo manifiesto temporal.
 8.  Si PM desaparece, PMG ejecuta la rutina de emergencia.
-9.  Si PMG desaparece, PM ejecuta la rutina de emergencia.
+9.  Si PMG desaparece, PML conserva la sesión e intenta restablecer su guardián.
 10. La rutina de emergencia no depende del USB.
 11. El cierre normal permite que los lanzadores PAF terminen su propia
     limpieza.

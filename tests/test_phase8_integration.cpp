@@ -2,6 +2,7 @@
 #include "core/path_resolver.h"
 #include "runtime/session_manager.h"
 
+#include <tlhelp32.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -56,6 +57,59 @@ std::string Read(const fs::path& path) {
 void Write(const fs::path& path, const char* content) {
     std::ofstream output(path, std::ios::binary);
     Check(static_cast<bool>(output << content), "write fixture file");
+}
+
+template <typename Predicate>
+bool Until(Predicate predicate, DWORD timeout = 10000) {
+    const auto deadline = ::GetTickCount64() + timeout;
+    do {
+        if (predicate()) return true;
+        ::Sleep(20);
+    } while (::GetTickCount64() < deadline);
+    return false;
+}
+
+struct ChildImage {
+    DWORD pid;
+    fs::path image;
+};
+
+std::vector<ChildImage> Children(DWORD owner, const fs::path& directory, bool guard) {
+    std::vector<ChildImage> found;
+    const HANDLE snapshot = ::CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return found;
+    PROCESSENTRY32W entry{};
+    entry.dwSize = sizeof(entry);
+    if (::Process32FirstW(snapshot, &entry)) do {
+        if (entry.th32ParentProcessID != owner) continue;
+        const HANDLE child = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, entry.th32ProcessID);
+        if (!child) continue;
+        wchar_t image[32768]{};
+        DWORD size = static_cast<DWORD>(std::size(image));
+        const bool active = ::WaitForSingleObject(child, 0) == WAIT_TIMEOUT &&
+                            ::QueryFullProcessImageNameW(child, 0, image, &size);
+        ::CloseHandle(child);
+        if (!active) continue;
+        const fs::path path(image);
+        if (guard ? (path.filename() == L"pml.exe" && path.parent_path().parent_path() == directory)
+                  : path.parent_path() == directory)
+            found.push_back({entry.th32ProcessID, path});
+    } while (::Process32NextW(snapshot, &entry));
+    ::CloseHandle(snapshot);
+    return found;
+}
+
+void InterruptGuard(const ChildImage& guard) {
+    const auto child = ::OpenProcess(PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION |
+                                     SYNCHRONIZE, FALSE, guard.pid);
+    Check(child != nullptr, "open synthetic guardian");
+    wchar_t image[32768]{};
+    DWORD size = static_cast<DWORD>(std::size(image));
+    const bool stopped = ::QueryFullProcessImageNameW(child, 0, image, &size) &&
+                         fs::path(image) == guard.image && ::TerminateProcess(child, 74) &&
+                         ::WaitForSingleObject(child, 5000) == WAIT_OBJECT_0;
+    ::CloseHandle(child);
+    Check(stopped, "interrupt only the verified synthetic guardian");
 }
 
 constexpr wchar_t kCandidate[] =
@@ -180,9 +234,7 @@ struct Fixture {
         Check(guard_exited, "guard released application reservation");
     }
 
-    void Desktop() const {
-        Process process;
-        process.Start(pml, L"--desktop", tmp);
+    HWND DesktopWindow(Process& process) const {
         struct WindowSearch { DWORD pid; HWND hwnd; } search{::GetProcessId(process.handle), nullptr};
         const auto callback = [](HWND window, LPARAM value) -> BOOL {
             auto& found = *reinterpret_cast<WindowSearch*>(value);
@@ -199,26 +251,125 @@ struct Fixture {
             if (!search.hwnd) ::Sleep(20);
         }
         Check(search.hwnd != nullptr, "PMD owns a native pill window");
-        const auto send = [&](HWND window, UINT message, WPARAM value) {
-            DWORD_PTR reply = 0;
-            Check(::SendMessageTimeoutW(window, message, value, 0, SMTO_ABORTIFHUNG, 3000, &reply) != 0,
-                  "send PMD navigation command");
-        };
-        HWND input = nullptr, list = nullptr;
-        for (int i = 0; i < 100; ++i) {
-            input = ::GetDlgItem(search.hwnd, 1);
-            list = ::GetDlgItem(search.hwnd, 2);
-            if (input && list && ::IsWindowVisible(search.hwnd)) break;
-            ::Sleep(20);
-        }
-        Check(input && list, "PMD owns search and desktop controls");
-        send(search.hwnd, WM_HOTKEY, 1);
+        Check(Until([&] { return ::GetDlgItem(search.hwnd, 1) && ::GetDlgItem(search.hwnd, 2) &&
+                                 ::IsWindowVisible(search.hwnd); }), "PMD controls are ready");
+        return search.hwnd;
+    }
+
+    static void Send(HWND window, UINT message, WPARAM value, LPARAM data = 0) {
+        DWORD_PTR reply = 0;
+        Check(::SendMessageTimeoutW(window, message, value, data, SMTO_ABORTIFHUNG, 3000, &reply) != 0,
+              "send PMD navigation command");
+    }
+
+    void Desktop() const {
+        Process process;
+        process.Start(pml, L"--desktop", tmp);
+        const auto window = DesktopWindow(process);
+        const auto input = ::GetDlgItem(window, 1);
+        const auto list = ::GetDlgItem(window, 2);
+        Send(window, WM_HOTKEY, 1);
         Check(::IsWindowVisible(input), "hotkey opens search");
-        send(input, WM_CHAR, L' ');
+        Send(input, WM_CHAR, L' ');
         Check(!::IsWindowVisible(input) && ::IsWindowVisible(list), "space opens desktop");
-        send(list, WM_KEYDOWN, VK_ESCAPE);
+        Send(list, WM_KEYDOWN, VK_ESCAPE);
         Check(!::IsWindowVisible(list), "escape collapses desktop");
-        Check(::PostMessageW(search.hwnd, WM_CLOSE, 0, 0) && process.Wait() == 0, "close PMD normally");
+        Check(::PostMessageW(window, WM_CLOSE, 0, 0) && process.Wait() == 0, "close PMD normally");
+    }
+
+    ChildImage OneGuard(const Process& owner, DWORD previous = 0) const {
+        const auto sessions = tmp / L"PortableManager" / L"Session";
+        const DWORD pid = ::GetProcessId(owner.handle);
+        std::vector<ChildImage> children;
+        Check(Until([&] {
+            children = Children(pid, sessions, true);
+            return children.size() == 1 && children.front().pid != previous;
+        }, 15000), "one guardian for the PML process");
+        return children.front();
+    }
+
+    void SharedSession() const {
+        const auto second = app.parent_path() / L"second";
+        fs::create_directory(second);
+        fs::copy_file(PathResolver::QueryExecutablePath(), second / L"second.exe");
+        Check(Run(L"--register second App/second App/second/second.exe Second") == 0, "register second app");
+        Process owner;
+        owner.Start(pml, L"--desktop", tmp);
+        const auto window = DesktopWindow(owner);
+        const auto guardian = OneGuard(owner);
+        const auto manifest = guardian.image.parent_path() / L"session.ini";
+        Check(Read(manifest).find("KILL_JOB") == std::string::npos, "guardian and manifest start before the first Job");
+
+        const auto release = root / L"release-first";
+        const auto launch = [&](const std::wstring& command) {
+            Send(window, WM_HOTKEY, 1);
+            const auto input = ::GetDlgItem(window, 1);
+            Send(input, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(command.c_str()));
+            Send(input, WM_KEYDOWN, VK_RETURN);
+        };
+        launch(L"demo --exercise " + Quote(root.native()) + L" until-release");
+        const auto owner_pid = ::GetProcessId(owner.handle);
+        Check(Until([&] { return Read(host / L"written.txt") == "synthetic output" &&
+                                 !fs::exists(host / L"original.txt"); }), "first application is active");
+        launch(L"second --idle " + Quote(root.native()));
+        Check(Until([&] { return fs::exists(root / L"ready-second"); }), "second application is active");
+        Check(Children(owner_pid, app, false).size() == 1 && Children(owner_pid, second, false).size() == 1 &&
+              OneGuard(owner).pid == guardian.pid, "two Jobs and still one guardian");
+        const auto active = Read(manifest);
+        Check(active.find("AppId=demo") != std::string::npos && active.find("AppId=second") != std::string::npos,
+              "shared manifest records both applications");
+
+        InterruptGuard(guardian);
+        const auto replacement = OneGuard(owner, guardian.pid);
+        Check(replacement.image == guardian.image &&
+              Children(owner_pid, app, false).size() == 1 && Children(owner_pid, second, false).size() == 1,
+              "replace guardian in the same session while both apps keep running");
+        Check(Run(L"--install demo " + Quote(package.native())) != 0, "replacement keeps application reservation");
+        Write(release, "release");
+        Check(Until([&] {
+            const auto current = Read(manifest);
+            return Read(host / L"original.txt") == "original" &&
+                   Children(owner_pid, app, false).empty() &&
+                   current.find("AppId=second") != std::string::npos &&
+                   current.find("AppId=demo") == std::string::npos;
+        }), "closing first app restores only its resources and retires its entries");
+        Check(Children(owner_pid, second, false).size() == 1 && OneGuard(owner).pid == replacement.pid,
+              "unit close leaves the other app and the guardian alive");
+        const auto remaining = Children(owner_pid, second, false);
+        const auto child = ::OpenProcess(SYNCHRONIZE, FALSE, remaining.front().pid);
+        Check(child != nullptr, "observe remaining synthetic app");
+        const auto guard = ::OpenProcess(SYNCHRONIZE, FALSE, replacement.pid);
+        Check(guard != nullptr, "observe replacement guardian");
+        const bool interrupted = ::TerminateProcess(owner.handle, 76) && owner.Wait() == 76;
+        const bool child_exited = ::WaitForSingleObject(child, 10000) == WAIT_OBJECT_0;
+        const bool guard_exited = ::WaitForSingleObject(guard, 10000) == WAIT_OBJECT_0;
+        ::CloseHandle(child);
+        ::CloseHandle(guard);
+        Check(interrupted && child_exited && guard_exited &&
+              Read(manifest).find("State=CLEANED") != std::string::npos,
+              "replacement restores the full shared session after owner crash");
+    }
+
+    void RetryBudget() const {
+        Process owner;
+        owner.Start(pml, L"--desktop", tmp);
+        const auto window = DesktopWindow(owner);
+        auto guardian = OneGuard(owner);
+        const auto session_dir = guardian.image.parent_path();
+        for (unsigned i = 0; i < 3; ++i) {
+            InterruptGuard(guardian);
+            guardian = OneGuard(owner, guardian.pid);
+            Check(guardian.image.parent_path() == session_dir, "retry uses the same session");
+        }
+        InterruptGuard(guardian);
+        const auto sessions = tmp / L"PortableManager" / L"Session";
+        const auto owner_pid = ::GetProcessId(owner.handle);
+        Check(!Until([&] { return !Children(owner_pid, sessions, true).empty(); }, 5500),
+              "retry budget remains exhausted");
+        Send(window, WM_HOTKEY, 1);
+        Check(Children(owner_pid, sessions, true).empty(), "opening PMD does not reset retry budget");
+        Check(::PostMessageW(window, WM_CLOSE, 0, 0) && owner.Wait() == 0, "PML can cleanly close without PMG");
+        Check(!fs::exists(session_dir), "remove the retired session after exhausted retries");
     }
 
     void Maintenance() const {
@@ -234,7 +385,7 @@ struct Fixture {
     }
 };
 
-int Exercise(const fs::path& root, bool hold) {
+int Exercise(const fs::path& root, std::wstring_view mode) {
     Check(root.filename().native().starts_with(L"pml8-"), "require synthetic root");
     const auto host = PathResolver::ResolveHostTokenPath(kCandidate);
     Check(host.ok && fs::path(host.resolved_path).parent_path().parent_path() == root / L"profile" / L"roaming",
@@ -243,10 +394,12 @@ int Exercise(const fs::path& root, bool hold) {
     Check(fs::is_directory(dir), "junction prepared before launch");
     Check(!fs::exists(dir / L"original.txt"), "host original isolated");
     Write(dir / L"written.txt", "synthetic output");
-    if (hold) {
+    if (mode == L"hold") {
         Write(root / L"ready", "ready");
         ::Sleep(INFINITE);
     }
+    if (mode == L"until-release")
+        Check(Until([&] { return fs::exists(root / L"release-first"); }, 60000), "wait for synthetic app release");
     return 0;
 }
 
@@ -255,7 +408,14 @@ int Exercise(const fs::path& root, bool hold) {
 int wmain(int argc, wchar_t** argv) {
     try {
         if (argc == 4 && std::wstring_view(argv[1]) == L"--exercise")
-            return Exercise(argv[2], std::wstring_view(argv[3]) == L"hold");
+            return Exercise(argv[2], argv[3]);
+        if (argc == 3 && std::wstring_view(argv[1]) == L"--idle") {
+            const fs::path root(argv[2]);
+            Check(root.filename().native().starts_with(L"pml8-"), "require synthetic root");
+            Write(root / L"ready-second", "ready");
+            ::Sleep(INFINITE);
+            return 0;
+        }
         if (argc != 3) return 2;
         std::ofstream report(fs::path(argv[2]), std::ios::binary);
         Check(report.good(), "open integration report");
@@ -280,6 +440,8 @@ int wmain(int argc, wchar_t** argv) {
         run("update_preserves_wrapper", [&] { f.ZipUpdate(); });
         run("guard_rollback_and_update_exclusion", [&] { f.RunAndCrash(); });
         run("pmd_hotkey_space_and_escape", [&] { f.Desktop(); });
+        run("single_guard_shared_manifest_and_replacement", [&] { f.SharedSession(); });
+        run("guard_retry_budget", [&] { f.RetryBudget(); });
         run("reset_archive_reinstall_uninstall", [&] { f.Maintenance(); });
         report << "\n  },\n  \"status\": \"" << (passed ? "passed" : "failed") << "\"\n}\n";
         return passed ? 0 : 1;

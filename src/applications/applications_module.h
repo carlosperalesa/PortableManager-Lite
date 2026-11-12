@@ -27,6 +27,8 @@ struct App {
     bool browser = false;
 };
 
+class SessionHost;
+
 struct StopRequest {
     HANDLE event = nullptr;
     std::atomic<cleanup::Mode> mode{cleanup::Mode::Normal};
@@ -44,7 +46,7 @@ DWORD Association(const core::PathResolver& resolver, std::wstring_view extensio
 DWORD SetAssociation(const core::PathResolver& resolver, std::wstring_view extension, std::wstring_view id);
 DWORD Find(const core::PathResolver& resolver, std::wstring_view id, App& app);
 RunResult Run(const core::PathResolver& resolver, const App& app, std::wstring_view arguments,
-              const StopRequest& stop);
+              const StopRequest& stop, SessionHost& host);
 DWORD Install(const core::PathResolver& resolver, std::wstring_view id,
               const std::wstring& package, std::wstring_view selected_executable,
               std::vector<std::wstring>* executable_choices = nullptr);

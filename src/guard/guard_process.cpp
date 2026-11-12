@@ -51,16 +51,21 @@ GuardProcess::~GuardProcess() {
 
 bool GuardProcess::Retire(DWORD& error) {
   error = ERROR_SUCCESS;
-  if (!process_ || !stop_ || !shadow_) return true;
-  if (!::SetEvent(stop_)) {
+  if (process_ && !stop_) return true;
+  if (process_ && !::SetEvent(stop_)) {
     error = ::GetLastError();
     return false;
   }
-  const DWORD waited = ::WaitForSingleObject(process_, 10000);
+  const DWORD waited = process_ ? ::WaitForSingleObject(process_, 10000) : WAIT_OBJECT_0;
   if (waited != WAIT_OBJECT_0) {
     error = waited == WAIT_TIMEOUT ? ERROR_TIMEOUT : ::GetLastError();
     return false;
   }
+  if (process_) ::CloseHandle(process_);
+  if (stop_) ::CloseHandle(stop_);
+  process_ = nullptr;
+  stop_ = nullptr;
+  if (!shadow_) return true;
   BY_HANDLE_FILE_INFORMATION info{};
   if (!::GetFileInformationByHandle(shadow_, &info)) {
     error = ::GetLastError();
@@ -180,7 +185,7 @@ OriginWaitResult WaitForReleaseOrOriginLoss(const std::wstring &pm_executable,
 bool GuardProcess::Start(const std::wstring &executable,
                          pm::runtime::SessionManager &session, DWORD &error,
                          HANDLE resource_reservation, cleanup::Artifacts artifacts,
-                         HANDLE app_reservation) {
+                         HANDLE app_reservation, const std::function<bool(HANDLE)>& before_resume) {
   error = ERROR_SUCCESS;
   if (process_ || session.session_dir().empty()) {
     error = ERROR_INVALID_STATE;
@@ -267,7 +272,8 @@ bool GuardProcess::Start(const std::wstring &executable,
       command += L" " + std::to_wstring(reinterpret_cast<ULONG_PTR>(stop));
     const std::wstring temp = pm::runtime::SessionManager::QuerySystemTempDir();
     ok = ::CreateProcessW(shadow.c_str(), command.data(), nullptr, nullptr,
-                          TRUE, EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW,
+                          TRUE, EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW |
+                              (before_resume ? CREATE_SUSPENDED : 0),
                           nullptr, temp.c_str(), &startup.StartupInfo,
                           &pi) != FALSE;
   }
@@ -279,6 +285,15 @@ bool GuardProcess::Start(const std::wstring &executable,
     ::CloseHandle(reservation);
   if (app)
     ::CloseHandle(app);
+  if (ok && before_resume && (!before_resume(pi.hProcess) ||
+                              ::ResumeThread(pi.hThread) == static_cast<DWORD>(-1))) {
+    error = ::GetLastError();
+    ::TerminateProcess(pi.hProcess, error);
+    ::WaitForSingleObject(pi.hProcess, INFINITE);
+    ::CloseHandle(pi.hThread);
+    ::CloseHandle(pi.hProcess);
+    ok = false;
+  }
   if (ok) {
     ::CloseHandle(pi.hThread);
     HANDLE waits[] = {pi.hProcess, ready};

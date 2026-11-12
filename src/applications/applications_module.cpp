@@ -1,4 +1,5 @@
 #include "applications/app_paths.h"
+#include "applications/session_host.h"
 #include "core/config_manager.h"
 #include "guard/guard_process.h"
 #include "jobs/job_manager.h"
@@ -124,7 +125,7 @@ DWORD PreparePolicy(runtime::SessionManager& session, const PathResolver& resolv
             return error;
     }
     DWORD error = ERROR_SUCCESS;
-    if (!policy.registry.empty() && !registry::RegistryManager::Prepare(session, policy.registry, error, true))
+    if (!policy.registry.empty() && !registry::RegistryManager::Prepare(session, policy.registry, error, true, app.id))
         return error;
     return ERROR_SUCCESS;
 }
@@ -278,18 +279,18 @@ DWORD Find(const PathResolver& resolver, std::wstring_view id, App& app) {
 }
 
 RunResult Run(const PathResolver& resolver, const App& selected, std::wstring_view arguments,
-              const StopRequest& stop) {
+              const StopRequest& stop, SessionHost& host) {
     RunResult result;
     App app = selected;
     const auto stop_signaled = [&] { return stop.event && ::WaitForSingleObject(stop.event, 0) == WAIT_OBJECT_0; };
-    if (stop_signaled()) return result;
+    if (stop_signaled() || host.closing()) return result;
     if (app.archived) return {ERROR_FILE_NOT_FOUND};
     result.error = ValidateApp(resolver, app, false);
     if (result.error) return result;
     Handle lease;
     result.error = AcquireApp(resolver, app.directory, lease);
     if (result.error) return result;
-    const auto origin = PathResolver::QueryExecutablePath();
+    const auto& origin = host.origin();
     const auto executable = resolver.ResolvePmRelativePath(app.executable).resolved_path;
     const auto cwd = executable.substr(0, executable.rfind(L'\\'));
     if (!guard::IsOriginAccessible(origin)) return {ERROR_DEVICE_NOT_CONNECTED};
@@ -306,29 +307,32 @@ RunResult Run(const PathResolver& resolver, const App& selected, std::wstring_vi
     result.error = MakeEnvironment(resolver, app, environment);
     if (result.error) return result;
 
-    runtime::SessionManager session;
-    const auto init = session.InitializeNewSession();
-    if (!init.ok) return {init.win32_error};
-    guard::GuardProcess guard;
-    jobs::JobManager job;
+    auto& session = host.session();
+    auto job = std::make_shared<jobs::JobManager>();
+    bool added = false;
     const auto launch = [&]() -> DWORD {
         DWORD error = ERROR_SUCCESS;
-        if (!guard.Start(origin, session, error, policy.lease.get(), cleanup::Artifacts::Remove, lease.get()))
-            return error;
-        error = PreparePolicy(session, resolver, app, policy);
-        if (error) return error;
-        if (!job.Create(session, app.id, error)) return error;
-        const auto active = session.TransitionState(runtime::SessionState::Active);
-        if (!active.ok) return active.win32_error;
-        if (stop_signaled()) return ERROR_SUCCESS;
         PROCESS_INFORMATION process{};
-        auto command = app.arguments;
-        if (!arguments.empty()) {
-            if (!command.empty()) command += L" ";
-            command += arguments;
+        {
+            runtime::SessionLock lock(session.session_mutex_name());
+            if (!lock.ok()) return lock.error();
+            if (stop_signaled() || host.closing()) return ERROR_SUCCESS;
+            const HANDLE reservations[] = {lease.get(), policy.lease.get()};
+            error = host.Add(app.id, job, reservations);
+            if (error) return error == ERROR_CANCELLED ? ERROR_SUCCESS : error;
+            added = true;
+            error = PreparePolicy(session, resolver, app, policy);
+            if (error) return error;
+            if (!job->Create(session, app.id, error)) return error;
+            if (stop_signaled() || host.closing()) return ERROR_SUCCESS;
+            auto command = app.arguments;
+            if (!arguments.empty()) {
+                if (!command.empty()) command += L" ";
+                command += arguments;
+            }
+            if (!job->Launch(executable, command, cwd, process, error, jobs::ConsoleMode::Detached,
+                             environment.empty() ? nullptr : environment.c_str())) return error;
         }
-        if (!job.Launch(executable, command, cwd, process, error, jobs::ConsoleMode::Detached,
-                        environment.empty() ? nullptr : environment.c_str())) return error;
         file.reset();
         pins.clear();
         ::CloseHandle(process.hThread);
@@ -336,7 +340,7 @@ RunResult Run(const PathResolver& resolver, const App& selected, std::wstring_vi
         auto wait = guard::WaitForReleaseOrOriginLoss(origin, child.get(), INFINITE, error, stop.event);
         if (wait == guard::OriginWaitResult::Released) {
             if (!::GetExitCodeProcess(child.get(), &result.exit_code)) return ::GetLastError();
-            while (!jobs::JobManager::IsEmpty(job.name())) {
+            while (!jobs::JobManager::IsEmpty(job->name())) {
                 wait = guard::WaitForReleaseOrOriginLoss(origin, nullptr, 200, error, stop.event);
                 if (wait != guard::OriginWaitResult::TimedOut) break;
             }
@@ -349,8 +353,21 @@ RunResult Run(const PathResolver& resolver, const App& selected, std::wstring_vi
     } catch (...) {
         result.error = ERROR_UNHANDLED_EXCEPTION;
     }
+    if (!added) return result;
+    if (result.error == ERROR_DEVICE_NOT_CONNECTED) host.BeginShutdown();
+    runtime::SessionLock lock(session.session_mutex_name());
+    if (!lock.ok()) {
+        result.rollback_error = lock.error();
+        return result;
+    }
+    if (host.closing()) return result; // The owner closes all Jobs together.
     const auto mode = result.error ? cleanup::Mode::Critical : stop.mode.load();
-    result.rollback_error = cleanup::CleanupEngine::Run(session, mode, cleanup::Artifacts::Remove, &guard).error;
+    const auto cleaned = cleanup::CleanupEngine::RunApplication(session, app.id, mode);
+    result.rollback_error = cleaned.error;
+    if (cleaned.ok) {
+        job.reset();
+        host.Release(app.id);
+    }
     return result;
 }
 

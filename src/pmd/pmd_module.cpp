@@ -1,5 +1,6 @@
 #include "pmd/pmd_module.h"
 #include "applications/app_paths.h"
+#include "applications/session_host.h"
 #include "core/config_manager.h"
 #include "guard/guard_process.h"
 #include "jobs/job_manager.h"
@@ -27,6 +28,7 @@ constexpr wchar_t kWindowClass[] = L"PML_PortableManagerDesktop";
 constexpr UINT kFinished = WM_APP + 1;
 constexpr UINT kOperation = WM_APP + 2;
 constexpr UINT kOpen = WM_APP + 3;
+constexpr UINT kGuardChanged = WM_APP + 4;
 enum class View { Pill, Search, Files };
 enum class Kind { App, File, Folder };
 struct Item {
@@ -183,6 +185,7 @@ private:
 
     const PathResolver& resolver_;
     core::ConfigManager config_;
+    applications::SessionHost session_;
     HWND hwnd_ = nullptr;
     HWND edit_ = nullptr;
     HWND list_ = nullptr;
@@ -206,6 +209,7 @@ private:
     std::shared_ptr<InstallSelection> selection_;
     bool busy_ = false;
     bool closing_ = false;
+    Mode close_mode_ = Mode::Normal;
     bool modal_ = false;
     bool error_ = false;
     int status_ = 0;
@@ -228,6 +232,14 @@ int Desktop::Run() {
         kWindowClass, L"PortableManager Desktop", WS_POPUP, 0, 0, 96, 28,
         nullptr, nullptr, instance, this);
     if (!hwnd_) return 1;
+    const DWORD started = session_.Start(origin_, [window = hwnd_] {
+        ::PostMessageW(window, kGuardChanged, 0, 0);
+    });
+    if (started) {
+        session_.Close(Mode::Critical);
+        ::DestroyWindow(hwnd_);
+        return 1;
+    }
     const auto key = config_.config_doc().GetValue(L"Desktop", L"Hotkey", L"Ctrl+Space");
     const auto tokens = Split(key, L'+');
     UINT modifiers = MOD_NOREPEAT;
@@ -249,7 +261,7 @@ int Desktop::Run() {
         ::TranslateMessage(&msg);
         ::DispatchMessageW(&msg);
     }
-    return status_;
+    return session_.Close(close_mode_) ? 1 : status_;
 }
 
 LRESULT CALLBACK Desktop::WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -335,7 +347,7 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             ::GetClientRect(hwnd_, &rect);
             ::FillRect(dc, &rect, static_cast<HBRUSH>(::GetStockObject(BLACK_BRUSH)));
             if (view_ == View::Pill) {
-                const auto color = error_ ? RGB(238, 81, 84) : closing_ || busy_ ? RGB(247, 185, 65) : RGB(92, 223, 164);
+                const auto color = (error_ || !session_.protected_by_guard()) ? RGB(238, 81, 84) : closing_ || busy_ ? RGB(247, 185, 65) : RGB(92, 223, 164);
                 const auto led = ::CreateSolidBrush(color);
                 const auto brush = ::SelectObject(dc, led);
                 const auto pen = ::SelectObject(dc, ::GetStockObject(NULL_PEN));
@@ -343,6 +355,18 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
                 ::SelectObject(dc, pen);
                 ::SelectObject(dc, brush);
                 ::DeleteObject(led);
+            } else {
+                const int x = rect.right - 19;
+                const POINT shield[] = {{x - 8, 7}, {x, 4}, {x + 8, 7}, {x + 7, 16},
+                                        {x + 4, 21}, {x, 24}, {x - 4, 21}, {x - 7, 16}};
+                const auto fill = ::CreateSolidBrush(session_.protected_by_guard() ?
+                    RGB(92, 223, 164) : RGB(238, 81, 84));
+                const auto brush = ::SelectObject(dc, fill);
+                const auto pen = ::SelectObject(dc, ::GetStockObject(NULL_PEN));
+                ::Polygon(dc, shield, static_cast<int>(std::size(shield)));
+                ::SelectObject(dc, pen);
+                ::SelectObject(dc, brush);
+                ::DeleteObject(fill);
             }
             ::EndPaint(hwnd_, &ps);
             return 0;
@@ -405,6 +429,7 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         case WM_CLOSE: Close(Mode::Normal); return 0;
         case WM_QUERYENDSESSION: Close(Mode::Critical); return TRUE;
+        case kGuardChanged: ::InvalidateRect(hwnd_, nullptr, TRUE); return 0;
         case kOpen: Open(static_cast<int>(wp)); return 0;
         case kFinished: Finish(reinterpret_cast<Worker*>(lp)); return 0;
         case kOperation:
@@ -436,7 +461,7 @@ void Desktop::Layout() {
     const int rows = std::clamp(static_cast<int>(items_.size()), 1, std::max(1, (static_cast<int>(area.bottom - area.top) - 65) / 26));
     const bool offer = view_ == View::Pill && !package_.empty() && !closing_ && !busy_;
     const int width = std::min(view_ == View::Pill ? (offer ? 238 : 92) : 326, static_cast<int>(area.right - area.left));
-    const int top = view_ == View::Search ? 34 : 0;
+    const int top = view_ == View::Search ? 34 : view_ == View::Files ? 27 : 0;
     const int height = view_ == View::Pill ? 28 : top + rows * 26 + 8;
     const auto position = [&](const wchar_t* key, LONG fallback, LONG low, LONG high) {
         const auto value = config_.config_doc().GetValue(L"Desktop", key);
@@ -451,8 +476,8 @@ void Desktop::Layout() {
     const auto region = ::CreateRoundRectRgn(0, 0, width + 1, height + 1, view_ == View::Pill ? 28 : 12, view_ == View::Pill ? 28 : 12);
     if (region && !::SetWindowRgn(hwnd_, region, TRUE)) ::DeleteObject(region);
     ::SetLayeredWindowAttributes(hwnd_, 0, view_ == View::Files ? 224 : 255, LWA_ALPHA);
-    ::MoveWindow(edit_, 7, 5, width - 51, 24, TRUE);
-    ::MoveWindow(web_, width - 39, 5, 31, 24, TRUE);
+    ::MoveWindow(edit_, 7, 5, width - 79, 24, TRUE);
+    ::MoveWindow(web_, width - 67, 5, 31, 24, TRUE);
     ::MoveWindow(list_, 5, top + 4, width - 10, rows * 26, TRUE);
     ::MoveWindow(install_, 10, 3, width - 45, 22, TRUE);
     ::ShowWindow(edit_, view_ == View::Search ? SW_SHOW : SW_HIDE);
@@ -689,7 +714,7 @@ void Desktop::Launch(const App& app, std::wstring arguments) {
     workers_.push_back(std::move(entry));
     try {
         worker->thread = std::thread([this, worker, args = std::move(arguments)] {
-            try { worker->result = applications::Run(resolver_, worker->app, args, worker->stop); }
+            try { worker->result = applications::Run(resolver_, worker->app, args, worker->stop, session_); }
             catch (...) { worker->result.error = ERROR_UNHANDLED_EXCEPTION; }
             ::PostMessageW(hwnd_, kFinished, 0, reinterpret_cast<LPARAM>(worker));
         });
@@ -721,7 +746,9 @@ void Desktop::Finish(Worker* worker) {
 }
 
 void Desktop::Close(Mode mode) {
+    if (!closing_ || mode == Mode::Critical) close_mode_ = mode;
     closing_ = true;
+    session_.BeginShutdown();
     view_ = View::Pill;
     for (auto& worker : workers_) {
         worker->stop.mode.store(mode);

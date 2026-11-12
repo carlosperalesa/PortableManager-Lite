@@ -45,7 +45,8 @@ d:\Data\
    - Registro previo obligatorio (*write-ahead*) antes de cualquier modificación en el anfitrión y actualización atómica tras completar cada paso.
 
 3. **`src/jobs/` y `src/guard/` (Fase 3):**
-   - `JobManager`: objetos Job nombrados por sesión/aplicación con `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
+   - `JobManager`: un Job nombrado por aplicación lanzada, con `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. Los Jobs de la instancia de PML comparten manifiesto.
+   - `GuardSupervisor`: un PMG desde el arranque, espera asíncrona sobre el handle y hasta tres intentos de reposición en la misma sesión.
    - `PMGuard`: mismo binario `pml.exe` copiado al directorio de sesión en `%TEMP%` e invocado con `--guard`, con CWD liberado hacia `%TEMP%` (`SetCurrentDirectoryW`), esperando el handle del proceso PML mediante `WaitForSingleObject(..., INFINITE)` (0% CPU) y coordinado mediante Mutex nombrado (`Local\PM_Session_Mutex_<SessionID>`).
 
 4. **`src/junctions/` (Fase 4):**

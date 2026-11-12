@@ -284,7 +284,8 @@ bool JunctionManager::Prepare(runtime::SessionManager& session, const PathResolv
     auto& manifest = session.manifest();
     const auto loaded = manifest.LoadFromDisk();
     if (!loaded.ok) return Fail(error, loaded.win32_error);
-    if (manifest.session_state() != runtime::SessionState::Preparing)
+    if (manifest.session_state() != runtime::SessionState::Preparing &&
+        manifest.session_state() != runtime::SessionState::Active)
         return Fail(error, ERROR_INVALID_STATE);
 
     ManifestOperation op;
@@ -298,6 +299,7 @@ bool JunctionManager::Prepare(runtime::SessionManager& session, const PathResolv
     if (!ManifestManager::ValidateOperationSecurity(op, validation_error))
         return Fail(error, ERROR_INVALID_NAME);
     for (const auto& existing : manifest.operations()) {
+        if (ManifestManager::IsTerminalAcceptableState(existing.state)) continue;
         if (Equal(existing.target_host_path, exclusive_host_path) ||
             Within(existing.target_host_path, exclusive_host_path) ||
             Within(exclusive_host_path, existing.target_host_path))
