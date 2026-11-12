@@ -44,6 +44,11 @@ set(PM_GUARD_SOURCES
 
 add_executable(pml
     src/pmd/pmd_module.h
+    src/applications/app_paths.cpp
+    src/applications/applications_module.cpp
+    src/applications/package_manager.cpp
+    src/applications/app_command.cpp
+    src/pmd/pmd_module.cpp
     ${PM_GUARD_SOURCES}
     src/learning/learning_engine.cpp
     src/core/main.cpp
@@ -59,6 +64,8 @@ target_include_directories(pml PRIVATE
 target_link_libraries(pml PRIVATE
     kernel32
     user32
+    gdi32
+    comdlg32
     advapi32
     shell32
     shlwapi
@@ -168,8 +175,19 @@ target_link_libraries(test_phase7_cleanup PRIVATE kernel32 user32 advapi32 ole32
 add_test(NAME Phase7_CleanupTest COMMAND test_phase7_cleanup $<TARGET_FILE:pml> "${CMAKE_CURRENT_BINARY_DIR}/phase7_windows_runtime.json")
 set_tests_properties(Phase7_CleanupTest PROPERTIES TIMEOUT 120)
 
+add_executable(test_phase8_integration
+    tests/test_phase8_integration.cpp
+    tests/phase6_fixture.rc
+    ${PM_CORE_SOURCES}
+    ${PM_RUNTIME_SOURCES}
+)
+target_include_directories(test_phase8_integration PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(test_phase8_integration PRIVATE kernel32 user32 advapi32 ole32)
+add_test(NAME Phase8_IntegrationTest COMMAND test_phase8_integration $<TARGET_FILE:pml> "${CMAKE_CURRENT_BINARY_DIR}/phase8_windows_runtime.json")
+set_tests_properties(Phase8_IntegrationTest PROPERTIES TIMEOUT 150)
+
 if(NOT CMAKE_CROSSCOMPILING)
-    foreach(suite IN ITEMS Phase3_GuardTest Phase4_JunctionsTest Phase5_RegistryTest Phase6_LearningTest)
+    foreach(suite IN ITEMS Phase3_GuardTest Phase4_JunctionsTest Phase5_RegistryTest Phase6_LearningTest Phase7_CleanupTest Phase8_IntegrationTest)
         set(suite_temp "${CMAKE_CURRENT_BINARY_DIR}/temp/${suite}")
         file(MAKE_DIRECTORY "${suite_temp}")
         file(TO_NATIVE_PATH "${suite_temp}" suite_temp_native)

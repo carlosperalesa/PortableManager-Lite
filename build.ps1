@@ -5,7 +5,7 @@
 .DESCRIPTION
     Resuelve todas las rutas respecto a la ubicación del script (independiente del CWD),
     no modifica el PATH global ni el registro de Windows, compila pml.exe y las suites de prueba
-    (Fases 0B a 7) con tools/toolchains/llvm-mingw/bin/clang++.exe, verifica las cabeceras PE
+    (Fases 0B a 8) con tools/toolchains/llvm-mingw/bin/clang++.exe, verifica las cabeceras PE
     y DLL importadas con llvm-readobj.exe, y genera el informe JSON de validación.
 #>
 
@@ -56,12 +56,14 @@ $Phase6TestExe = Join-Path $OutputDir "test_phase6_learning.exe"
 $Phase6Report = Join-Path $OutputDir ("phase6_windows_" + (Get-Date -Format "yyyyMMddTHHmmssfff") + ".json")
 $Phase7TestExe = Join-Path $OutputDir "test_phase7_cleanup.exe"
 $Phase7Report = Join-Path $OutputDir ("phase7_windows_" + (Get-Date -Format "yyyyMMddTHHmmssfff") + ".json")
+$Phase8TestExe = Join-Path $OutputDir "test_phase8_integration.exe"
+$Phase8Report = Join-Path $OutputDir ("phase8_windows_" + (Get-Date -Format "yyyyMMddTHHmmssfff") + ".json")
 $Phase6Resource = Join-Path $OutputDir "phase6_fixture.o"
 $LearningSource = Join-Path $ProjectRoot "src\learning\learning_engine.cpp"
 $IncludeDir    = Join-Path $ProjectRoot "src"
 
 # 1. Compilación limpia
-foreach ($bin in @($PmlExe, $SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe, $Phase4TestExe, $Phase5TestExe, $Phase6TestExe, $Phase7TestExe, $Phase6Resource)) {
+foreach ($bin in @($PmlExe, $SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe, $Phase4TestExe, $Phase5TestExe, $Phase6TestExe, $Phase7TestExe, $Phase8TestExe, $Phase6Resource)) {
     if (Test-Path $bin) { Remove-Item $bin -Force }
 }
 
@@ -87,6 +89,11 @@ $guardSources = @(
 Write-Host "=== [1/6] Compilando pml.exe (C++20, Windows x64, Unicode, -static, /SWAPRUN:CD) ==="
 $pmlSources = @(
     $LearningSource,
+    (Join-Path $ProjectRoot "src\applications\app_paths.cpp"),
+    (Join-Path $ProjectRoot "src\applications\applications_module.cpp"),
+    (Join-Path $ProjectRoot "src\applications\package_manager.cpp"),
+    (Join-Path $ProjectRoot "src\applications\app_command.cpp"),
+    (Join-Path $ProjectRoot "src\pmd\pmd_module.cpp"),
     (Join-Path $ProjectRoot "src\core\main.cpp"),
     (Join-Path $ProjectRoot "src\guard\guard_entry.cpp")
 ) + $coreSources + $runtimeSources + $guardSources
@@ -98,7 +105,7 @@ $pmlSources = @(
     "-I$IncludeDir" `
     $pmlSources `
     -o $PmlExe `
-    -lkernel32 -luser32 -ladvapi32 -lshell32 -lshlwapi -lversion -lole32 -lbcrypt
+    -lkernel32 -luser32 -lgdi32 -lcomdlg32 -ladvapi32 -lshell32 -lshlwapi -lversion -lole32 -lbcrypt
 
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $PmlExe)) {
     throw "Fallo al compilar pml.exe (ExitCode=$LASTEXITCODE)"
@@ -219,6 +226,19 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Phase7TestExe)) {
     throw "Fallo al compilar test_phase7_cleanup.exe (ExitCode=$LASTEXITCODE)"
 }
 
+Write-Host "=== Compilando test_phase8_integration.exe (C++20) ==="
+& $ClangPP `
+    -std=c++20 -O2 -Wall -Wextra -Werror `
+    -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNOMINMAX `
+    -municode -static "-Wl,-Xlink=-swaprun:cd" `
+    "-I$IncludeDir" `
+    (Join-Path $ProjectRoot "tests\test_phase8_integration.cpp") `
+    $coreSources $runtimeSources $Phase6Resource `
+    -o $Phase8TestExe -lkernel32 -luser32 -ladvapi32 -lole32
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Phase8TestExe)) {
+    throw "Fallo al compilar test_phase8_integration.exe (ExitCode=$LASTEXITCODE)"
+}
+
 Write-Host "=== [5/6] Inspeccionando cabecera PE e importaciones COFF con llvm-readobj.exe ==="
 $peHeadersRaw = (& $ReadObj --file-headers $PmlExe) -join "`n"
 $coffImportsRaw = (& $ReadObj --coff-imports $PmlExe) -join "`n"
@@ -256,7 +276,7 @@ Write-Host "=== [6/6] Ejecutando suites de prueba desde directorio de trabajo ex
 $tempWorkDir = Join-Path ([System.IO.Path]::GetTempPath()) ("pm-tests-" + [guid]::NewGuid().ToString("N").Substring(0, 12))
 New-Item -ItemType Directory -Path $tempWorkDir | Out-Null
 
-foreach ($testBin in @($SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe, $Phase4TestExe, $Phase5TestExe, $Phase6TestExe, $Phase7TestExe)) {
+foreach ($testBin in @($SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe, $Phase4TestExe, $Phase5TestExe, $Phase6TestExe, $Phase7TestExe, $Phase8TestExe)) {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $testBin
     $psi.Arguments = "`"$PmlExe`""
@@ -265,6 +285,7 @@ foreach ($testBin in @($SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3Tes
     if ($testBin -eq $Phase5TestExe) { $psi.Arguments += " `"$Phase5Report`"" }
     if ($testBin -eq $Phase6TestExe) { $psi.Arguments = "`"$Phase6Report`"" }
     if ($testBin -eq $Phase7TestExe) { $psi.Arguments += " `"$Phase7Report`"" }
+    if ($testBin -eq $Phase8TestExe) { $psi.Arguments += " `"$Phase8Report`"" }
     $psi.WorkingDirectory = $tempWorkDir
     $psi.EnvironmentVariables["TEMP"] = $tempWorkDir
     $psi.EnvironmentVariables["TMP"] = $tempWorkDir
@@ -299,7 +320,7 @@ $clangVer    = ((& $ClangPP --version) | Select-Object -First 1).Trim()
 
 if (-not [string]::IsNullOrWhiteSpace($ReportJsonPath)) {
     $reportObj = [ordered]@{
-        phase         = "Regresion 0B a 7"
+        phase         = "Regresion 0B a 8"
         usb_physical_disconnect = "not_run"
         timestamp_utc = (Get-Date).ToUniversalTime().ToString("o")
         toolchain     = [ordered]@{
@@ -334,7 +355,9 @@ if (-not [string]::IsNullOrWhiteSpace($ReportJsonPath)) {
         phase6_evidence_path = $Phase6Report
         phase7_runtime = (Get-Content -LiteralPath $Phase7Report -Raw | ConvertFrom-Json)
         phase7_evidence_path = $Phase7Report
-        regression_suites = @("test_phase0_smoke", "test_phase1_core", "test_phase2_runtime", "test_phase3_guard", "test_phase4_junctions", "test_phase5_registry", "test_phase6_learning", "test_phase7_cleanup")
+        phase8_runtime = (Get-Content -LiteralPath $Phase8Report -Raw | ConvertFrom-Json)
+        phase8_evidence_path = $Phase8Report
+        regression_suites = @("test_phase0_smoke", "test_phase1_core", "test_phase2_runtime", "test_phase3_guard", "test_phase4_junctions", "test_phase5_registry", "test_phase6_learning", "test_phase7_cleanup", "test_phase8_integration")
         regression_status = "passed"
         status        = "passed"
     }

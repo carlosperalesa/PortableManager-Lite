@@ -1,6 +1,6 @@
 # PortableManager Lite (PML Lite) — Núcleo Nativo C++20
 
-**Estado actual:** Fases 0B a 7 aprobadas y Fase 8 pendiente de autorización. La refactorización previa a Fase 8 adopta `pml.exe` y los wrappers por instalación. Consulta los cierres de [Fase 6](docs/fase06/README_FASE06.md) y [Fase 7](docs/fase07/README_FASE07.md).
+**Estado actual:** Fases 0B a 7 aprobadas. La [integración de Fase 8](docs/fase08/README_FASE08.md) incluye catálogo, instalación, mantenimiento y PMD. Consulta los cierres de [Fase 6](docs/fase06/README_FASE06.md) y [Fase 7](docs/fase07/README_FASE07.md).
 **Toolchain oficial:** LLVM-MinGW `20261104` (Clang `23.1.5`, UCRT, Windows `x86_64`) portable en `tools/toolchains/llvm-mingw/`.
 
 ---
@@ -14,8 +14,7 @@
 PML distribuye un solo ejecutable, `pml.exe`. PMG es el nombre de su función
 de guardián, ejecutada desde una copia temporal en modo `--guard`. PMD
 (PortableManager Desktop) es el módulo interno que abarcará la píldora,
-el escritorio semitransparente, los menús y las ventanas. Su integración
-gráfica queda pendiente.
+el escritorio semitransparente, los menús y las ventanas. Abre PMD con `pml.exe --desktop`.
 
 El aprendizaje publica un `wrapper.ini` de reglas operativas de limpieza
 en el directorio validado de cada aplicación. PMG puede restaurar el anfitrión

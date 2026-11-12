@@ -66,6 +66,9 @@ public:
         std::wstring_view relative_path,
         std::wstring& out_error);
 
+    void RemoveSection(std::wstring_view section);
+    void RemoveKey(std::wstring_view section, std::wstring_view key);
+
     bool is_dirty() const noexcept { return dirty_; }
     void ClearDirty() noexcept { dirty_ = false; }
     void MarkDirty() noexcept { dirty_ = true; }

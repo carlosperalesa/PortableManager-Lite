@@ -1,3 +1,5 @@
+#include "applications/app_command.h"
+#include "pmd/pmd_module.h"
 #include "core/atomic_file.h"
 #include "core/config_manager.h"
 #include "core/path_resolver.h"
@@ -37,6 +39,8 @@ int wmain(int argc, wchar_t *argv[]) {
       const std::wstring_view stop_arg = argc == 6 ? std::wstring_view(argv[5]) : std::wstring_view{};
       return pm::guard::RunGuardMode(session_id, handle_arg, ready_arg, stop_arg);
     }
+
+    if (arg1 == L"--desktop" && argc == 2) return pm::pmd::Run(resolver);
 
     if (arg1 == L"--version") {
       std::wprintf(L"%ls v%ls (x64 Native Win32)\n", pm::core::kProductName,
@@ -173,6 +177,7 @@ int wmain(int argc, wchar_t *argv[]) {
                    init_res.session_id.c_str());
       return 0;
     }
+    return pm::applications::RunCommand(resolver, arg1, argc, argv);
   }
 
   std::wprintf(L"%ls v%ls | Root=%ls | Ready.\n", pm::core::kProductName,

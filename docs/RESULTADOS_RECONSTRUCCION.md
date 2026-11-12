@@ -16,4 +16,4 @@
 | **Fase 5** | `docs/fase05/` | Registro Win32 (`RegistryManager`) | Aprobada | [Evidencia local](../reports/rebuild_registry.json) | [PR #4 fusionado](https://github.com/carlosperalesa/PortableManager-Lite/pull/4). |
 | **Fase 6** | `docs/fase06/` | Aprendizaje Ligero (`LearningEngine`) | **passed**, aprobada y fusionada (PR #5, CI 43246078395) | [Evidencia local](../reports/rebuild_learning.json) | [Alcance y pruebas](fase06/README_FASE06.md). |
 | **Fase 7** | `docs/fase07/` | Motor de Limpieza (`CleanupEngine`) | **passed**, aprobada y fusionada (PR #7, CI 43263214086) | [Evidencia](../reports/rebuild_cleanup.json) | Desconexión física USB `not_run`, diferida a validación final. |
-| **Fase 8** | `docs/fase08/` | Integración Nativa | `not_run` | Pendiente (`reports/rebuild_integration.json`) | Fase 7 cerrada; Fase 8 aún no iniciada. |
+| **Fase 8** | `docs/fase08/` | Integración Nativa | [Verificación](fase08/README_FASE08.md) | `reports/ci_windows_native.json` (artefacto CI) | Retirada física final `not_run`. |

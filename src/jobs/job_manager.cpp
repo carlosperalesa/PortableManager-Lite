@@ -69,7 +69,8 @@ bool JobManager::Create(pm::runtime::SessionManager& session, std::wstring_view 
     return applied.ok;
 }
 bool JobManager::Launch(const std::wstring& executable, std::wstring_view arguments,
-                        const std::wstring& cwd, PROCESS_INFORMATION& process, DWORD& error, ConsoleMode console) {
+                        const std::wstring& cwd, PROCESS_INFORMATION& process, DWORD& error, ConsoleMode console,
+                        const wchar_t* environment) {
     process = {};
     if (!job_) { error = ERROR_INVALID_HANDLE; return false; }
     pm::runtime::SessionLock lock(mutex_name_);
@@ -87,7 +88,9 @@ bool JobManager::Launch(const std::wstring& executable, std::wstring_view argume
     if (!arguments.empty()) cmd += L" " + std::wstring(arguments);
     STARTUPINFOW startup{}; startup.cb = sizeof(startup);
     if (!::CreateProcessW(executable.c_str(), cmd.data(), nullptr, nullptr, FALSE,
-                          CREATE_SUSPENDED | (console == ConsoleMode::Detached ? DETACHED_PROCESS : CREATE_NO_WINDOW), nullptr,
+                          CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT |
+                          (console == ConsoleMode::Detached ? DETACHED_PROCESS : CREATE_NO_WINDOW),
+                          const_cast<wchar_t*>(environment),
                           cwd.empty() ? nullptr : cwd.c_str(), &startup, &process)) {
         error = ::GetLastError(); return false;
     }
