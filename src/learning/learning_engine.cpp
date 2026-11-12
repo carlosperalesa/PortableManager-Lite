@@ -71,24 +71,23 @@ std::wstring VersionValue(void* info, WORD language, WORD codepage, const wchar_
 // Only create directories below the portable root. Pin the checked path while
 // using it so a reparse point cannot replace a component during publication.
 DWORD PinPortableDirectory(const PathResolver& resolver, std::wstring_view relative,
-                           bool create, PinnedDirectories& pinned, bool protect_writes = false) {
+                           bool create, PinnedDirectories& pinned) {
     const auto target = resolver.ResolvePmRelativePath(relative);
     if (!target.ok || !DrivePath(target.resolved_path)) return ERROR_INVALID_NAME;
     const auto& path = target.resolved_path;
-    if (protect_writes) {
-        const auto tail = std::wstring_view(path).substr(3);
-        const auto normalized = PathResolver::NormalizePmRelativePath(tail);
-        if (!normalized.ok || normalized.resolved_path != tail) return ERROR_INVALID_NAME;
-    }
+    const auto tail = std::wstring_view(path).substr(3);
+    const auto normalized = PathResolver::NormalizePmRelativePath(tail);
+    if (!normalized.ok || normalized.resolved_path != tail) return ERROR_INVALID_NAME;
     const auto root_length = resolver.root_dir().size();
     for (std::size_t end = path.find(L'\\', 3);; end = path.find(L'\\', end + 1)) {
         const auto prefix = path.substr(0, end);
         if (create && prefix.size() > root_length &&
             !::CreateDirectoryW(prefix.c_str(), nullptr) && ::GetLastError() != ERROR_ALREADY_EXISTS)
             return ::GetLastError();
-        const DWORD access = FILE_READ_ATTRIBUTES | (protect_writes ? FILE_LIST_DIRECTORY : 0);
-        const DWORD share = FILE_SHARE_READ | (protect_writes ? 0 : FILE_SHARE_WRITE);
-        Handle dir(::CreateFileW(prefix.c_str(), access, share, nullptr, OPEN_EXISTING,
+        // MoveFileExW needs write sharing on the directory for atomic
+        // publication. Withhold delete sharing to pin each checked component.
+        Handle dir(::CreateFileW(prefix.c_str(), FILE_READ_ATTRIBUTES,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
                                 FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr));
         if (dir.get() == INVALID_HANDLE_VALUE) {
             dir.release();
@@ -128,7 +127,7 @@ DWORD InspectInstallation(const PathResolver& resolver, const LearningRequest& r
     executable = resolver.ResolvePmRelativePath(relative_exe).resolved_path;
     PinnedDirectories pinned;
     const auto directory = relative_exe.substr(0, relative_exe.rfind(L'\\'));
-    const DWORD pinned_error = PinPortableDirectory(resolver, directory, false, pinned, true);
+    const DWORD pinned_error = PinPortableDirectory(resolver, directory, false, pinned);
     if (pinned_error != ERROR_SUCCESS) return pinned_error;
 
     HANDLE raw = ::CreateFileW(executable.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
@@ -221,7 +220,7 @@ DWORD Publish(const PathResolver& resolver, const std::wstring& app_dir,
         return ERROR_SUCCESS;
 
     PinnedDirectories pinned;
-    const DWORD error = PinPortableDirectory(resolver, app_dir, false, pinned, true);
+    const DWORD error = PinPortableDirectory(resolver, app_dir, false, pinned);
     if (error != ERROR_SUCCESS) return error;
 
     // Serialize writers to the same directory even if the app IDs or path
