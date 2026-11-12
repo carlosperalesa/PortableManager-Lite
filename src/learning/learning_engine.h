@@ -28,6 +28,7 @@ struct LearningRequest {
     // PE metadata and an absent baseline are insufficient evidence.
     std::array<std::wstring, 3> exclusive_paths;
     DWORD timeout_ms = INFINITE;
+    HANDLE app_reservation = nullptr;
 };
 
 struct LearningResult {

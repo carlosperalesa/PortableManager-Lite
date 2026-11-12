@@ -153,6 +153,7 @@ add_test(NAME Phase5_RegistryTest COMMAND test_phase5_registry $<TARGET_FILE:pml
 set_tests_properties(Phase5_RegistryTest PROPERTIES TIMEOUT 120)
 
 add_executable(test_phase6_learning
+    src/guard/guard_supervisor.cpp
     tests/test_phase6_learning.cpp
     tests/phase6_fixture.rc
     src/learning/learning_engine.cpp

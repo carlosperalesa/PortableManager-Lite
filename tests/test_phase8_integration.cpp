@@ -368,7 +368,21 @@ struct Fixture {
               "retry budget remains exhausted");
         Send(window, WM_HOTKEY, 1);
         Check(Children(owner_pid, sessions, true).empty(), "opening PMD does not reset retry budget");
-        Check(::PostMessageW(window, WM_CLOSE, 0, 0) && owner.Wait() == 0, "PML can cleanly close without PMG");
+        fs::remove(root / L"ready-second");
+        const auto input = ::GetDlgItem(window, 1);
+        const auto command = L"second --idle " + Quote(root.native());
+        Send(input, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(command.c_str()));
+        Send(input, WM_KEYDOWN, VK_RETURN);
+        Check(Until([&] { return fs::exists(root / L"ready-second"); }), "ordinary launch remains available");
+        const auto app_children = Children(owner_pid, app.parent_path() / L"second", false);
+        Check(app_children.size() == 1 && Children(owner_pid, sessions, true).empty(),
+              "ordinary launch does not reset retry budget");
+        const auto child = ::OpenProcess(SYNCHRONIZE, FALSE, app_children.front().pid);
+        Check(child != nullptr, "observe ordinary launch");
+        const bool closed = ::PostMessageW(window, WM_CLOSE, 0, 0) && owner.Wait() == 0;
+        const bool stopped = ::WaitForSingleObject(child, 5000) == WAIT_OBJECT_0;
+        ::CloseHandle(child);
+        Check(closed && stopped, "PML closes ordinary apps without PMG");
         Check(!fs::exists(session_dir), "remove the retired session after exhausted retries");
     }
 

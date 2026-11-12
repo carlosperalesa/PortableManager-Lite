@@ -13,11 +13,11 @@ DWORD SessionHost::Start(std::wstring origin, std::function<void()> notify) {
 }
 
 DWORD SessionHost::Add(const std::wstring& app, std::shared_ptr<jobs::JobManager> job,
-                       std::span<const HANDLE> reservations) {
+                       std::span<const HANDLE> reservations, bool require_guard) {
     if (closing()) return ERROR_CANCELLED;
     auto [entry, inserted] = jobs_.try_emplace(app, std::move(job));
     if (!inserted) return ERROR_ALREADY_EXISTS;
-    const DWORD error = guard_.Protect(app, reservations);
+    const DWORD error = guard_.Protect(app, reservations, require_guard);
     if (error) jobs_.erase(entry);
     return error;
 }

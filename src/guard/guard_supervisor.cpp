@@ -97,10 +97,12 @@ bool GuardSupervisor::Attach(HANDLE process, Reservation& reservation) {
                              &reservation.remote, 0, FALSE, DUPLICATE_SAME_ACCESS) != FALSE;
 }
 
-DWORD GuardSupervisor::Protect(const std::wstring& app_id, std::span<const HANDLE> handles) {
+DWORD GuardSupervisor::Protect(const std::wstring& app_id, std::span<const HANDLE> handles,
+                               bool require_guard) {
     std::lock_guard lock(mutex_);
-    if (stopping_ || !ready_ || ::WaitForSingleObject(process_.handle(), 0) != WAIT_TIMEOUT)
-        return ERROR_NOT_READY;
+    if (stopping_) return ERROR_CANCELLED;
+    const bool live = ready_ && ::WaitForSingleObject(process_.handle(), 0) == WAIT_TIMEOUT;
+    if (require_guard && !live) return ERROR_NOT_READY;
     auto [entry, inserted] = reservations_.try_emplace(app_id);
     if (!inserted) return ERROR_ALREADY_EXISTS;
     auto& reservations = entry->second;
@@ -111,7 +113,7 @@ DWORD GuardSupervisor::Protect(const std::wstring& app_id, std::span<const HANDL
         if (::DuplicateHandle(::GetCurrentProcess(), handle, ::GetCurrentProcess(),
                               &reservation.local, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
             reservations.push_back(reservation);
-            if (Attach(process_.handle(), reservations.back())) continue;
+            if (!live || Attach(process_.handle(), reservations.back())) continue;
         }
         const DWORD error = ::GetLastError();
         Release(reservations);

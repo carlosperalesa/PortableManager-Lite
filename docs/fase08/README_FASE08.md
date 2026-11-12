@@ -45,6 +45,9 @@ aplicaciones del anfitrión desde PMD requiere confirmación.
 - PMG retiene las reservas de las aplicaciones mientras puede necesitarlas
   para la recuperación, y las recibe antes de confirmar que un sustituto
   está listo. Una actualización concurrente devuelve un error de ocupación.
+  Si el guardián falta, PML puede iniciar apps que solo requieren un Job.
+  El aprendizaje y los nuevos cambios de Junctions o Registro requieren
+  que PMG esté operativo antes de preparar los recursos del anfitrión.
 - PML supervisa a PMG con una espera asíncrona del pool de Windows. Ante
   caída, conserva las apps y reintenta en la misma sesión. El primer intento
   es inmediato. Los siguientes esperan 2 y 5 segundos tras el intento previo.

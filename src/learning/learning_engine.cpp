@@ -1,7 +1,7 @@
 #include "learning/learning_engine.h"
 
 #include "core/config_manager.h"
-#include "guard/guard_process.h"
+#include "guard/guard_supervisor.h"
 #include "jobs/job_manager.h"
 #include "junctions/junction_manager.h"
 #include "registry/registry_manager.h"
@@ -352,9 +352,14 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
     result.session_id = init.session_id;
     result.data_path = L"Data\\apps\\" + request.app_id + L"\\" + result.session_id;
     const auto origin = PathResolver::QueryExecutablePath();
-    guard::GuardProcess guard;
-    if (!guard.Start(origin, session, result.error, reservation.get())) {
-        const auto restored = cleanup::CleanupEngine::Run(session, cleanup::Mode::Critical);
+    guard::GuardSupervisor guard;
+    guard.Start(origin, session);
+    const HANDLE reservations[] = {reservation.get(), request.app_reservation};
+    result.error = guard.Protect(request.app_id, reservations);
+    if (result.error != ERROR_SUCCESS) {
+        guard.StopMonitoring();
+        const auto restored = cleanup::CleanupEngine::Run(
+            session, cleanup::Mode::Critical, cleanup::Artifacts::Remove, &guard.process());
         result.host_restored = restored.ok;
         result.rollback_error = restored.error;
         return result;
@@ -408,10 +413,15 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         }
         return ERROR_SUCCESS;
     };
-    result.error = run();
+    try {
+        result.error = run();
+    } catch (...) {
+        result.error = ERROR_UNHANDLED_EXCEPTION;
+    }
+    guard.StopMonitoring();
     const auto restored = cleanup::CleanupEngine::Run(
         session, result.error == ERROR_SUCCESS ? cleanup::Mode::Normal : cleanup::Mode::Critical,
-        cleanup::Artifacts::Remove, &guard);
+        cleanup::Artifacts::Remove, &guard.process());
     result.host_restored = restored.ok;
     result.rollback_error = restored.error;
     if (!result.host_restored || result.error != ERROR_SUCCESS) return result;

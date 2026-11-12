@@ -18,7 +18,8 @@ public:
     runtime::SessionManager& session() noexcept { return session_; }
 
     // Called under the named session mutex from preparation and unit cleanup.
-    DWORD Add(const std::wstring& app, std::shared_ptr<jobs::JobManager> job, std::span<const HANDLE> reservations);
+    DWORD Add(const std::wstring& app, std::shared_ptr<jobs::JobManager> job, std::span<const HANDLE> reservations,
+              bool require_guard);
     void Release(const std::wstring& app);
     DWORD Close(cleanup::Mode mode);
 

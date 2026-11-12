@@ -22,7 +22,8 @@ public:
 
     // Keep the application's leases alive in PMG across owner death. Keep
     // owner-side duplicates too, for replacing a failed PMG.
-    DWORD Protect(const std::wstring& app_id, std::span<const HANDLE> reservations);
+    DWORD Protect(const std::wstring& app_id, std::span<const HANDLE> reservations,
+                  bool require_guard = true);
     void Release(const std::wstring& app_id);
 
 private:

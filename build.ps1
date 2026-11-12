@@ -59,6 +59,7 @@ $Phase7Report = Join-Path $OutputDir ("phase7_windows_" + (Get-Date -Format "yyy
 $Phase8TestExe = Join-Path $OutputDir "test_phase8_integration.exe"
 $Phase8Report = Join-Path $OutputDir ("phase8_windows_" + (Get-Date -Format "yyyyMMddTHHmmssfff") + ".json")
 $Phase6Resource = Join-Path $OutputDir "phase6_fixture.o"
+$GuardSupervisorSource = Join-Path $ProjectRoot "src\guard\guard_supervisor.cpp"
 $LearningSource = Join-Path $ProjectRoot "src\learning\learning_engine.cpp"
 $IncludeDir    = Join-Path $ProjectRoot "src"
 
@@ -89,7 +90,7 @@ $guardSources = @(
 Write-Host "=== [1/6] Compilando pml.exe (C++20, Windows x64, Unicode, -static, /SWAPRUN:CD) ==="
 $pmlSources = @(
     $LearningSource,
-    (Join-Path $ProjectRoot "src\guard\guard_supervisor.cpp"),
+    $GuardSupervisorSource,
     (Join-Path $ProjectRoot "src\applications\session_host.cpp"),
     (Join-Path $ProjectRoot "src\applications\app_paths.cpp"),
     (Join-Path $ProjectRoot "src\applications\applications_module.cpp"),
@@ -206,6 +207,7 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Phase6Resource)) {
 }
 $test6Sources = @(
     $LearningSource,
+    $GuardSupervisorSource,
     (Join-Path $ProjectRoot "src\guard\guard_entry.cpp"),
     (Join-Path $ProjectRoot "tests\test_phase6_learning.cpp")
 ) + $coreSources + $runtimeSources + $guardSources

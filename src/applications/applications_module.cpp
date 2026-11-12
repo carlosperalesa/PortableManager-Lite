@@ -318,7 +318,7 @@ RunResult Run(const PathResolver& resolver, const App& selected, std::wstring_vi
             if (!lock.ok()) return lock.error();
             if (stop_signaled() || host.closing()) return ERROR_SUCCESS;
             const HANDLE reservations[] = {lease.get(), policy.lease.get()};
-            error = host.Add(app.id, job, reservations);
+            error = host.Add(app.id, job, reservations, policy.lease != nullptr);
             if (error) return error == ERROR_CANCELLED ? ERROR_SUCCESS : error;
             added = true;
             error = PreparePolicy(session, resolver, app, policy);

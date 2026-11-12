@@ -89,6 +89,7 @@ int RunCommand(const core::PathResolver& resolver, std::wstring_view command, in
             Handle lease;
             const DWORD acquired = AcquireApp(resolver, app.directory, lease);
             if (acquired) return Status(acquired);
+            request.app_reservation = lease.get();
             const auto result = learning::LearningEngine::Run(resolver, request);
             if (!result.wrapper_path.empty()) std::wprintf(L"%ls\n", result.wrapper_path.c_str());
             return Status(result.rollback_error ? result.rollback_error : result.error);
