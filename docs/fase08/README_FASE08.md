@@ -97,4 +97,4 @@ El JSON combinado se publica como `reports/ci_windows_native.json` en el
 artefacto de Windows. La retirada física final queda `not_run`.
 
 Las pruebas con un instalador PAF real y la revisión visual en múltiples
-monitores quedan fuera de la suite sintética.\n
+monitores quedan fuera de la suite sintética.
