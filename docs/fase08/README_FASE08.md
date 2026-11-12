@@ -18,9 +18,34 @@ mantenimiento y la interfaz PortableManager Desktop (PMD) en `pml.exe`.
 
 `--desktop` abre la píldora. `Ctrl+Espacio` activa la búsqueda y Espacio con
 la entrada vacía abre PMD. Las aplicaciones y alias se completan por prefijo.
-Esc retrocede por carpetas o contrae la vista. `Other/` es la raíz de documentos.
-El menú de la píldora ofrece los tres modos de cierre. El menú de una app
+En búsqueda, el primer `Esc` borra el texto escrito (y en la píldora descarta
+la oferta del portapapeles) y el segundo `Esc` contrae la vista a la píldora;
+en el escritorio `Esc` retrocede por carpetas hasta volver a la píldora.
+`Other/` es la raíz de documentos. El menú de la píldora ofrece `Configuración…`
+(crea y abre `Data/config.ini`) y los tres modos de cierre. El menú de una app
 permite cerrar, configurar, actualizar, restablecer, archivar y desinstalar.
+
+### Interfaz gráfica de PMD
+
+PMD utiliza una cápsula única expandible renderizada con GDI+ (`UpdateLayeredWindow`
+32-bpp ARGB, bordes suavizados y soporte High-DPI por monitor) y menús
+contextuales propios del mismo estilo cristal oscuro. En reposo es una
+píldora limpia arrastrable con el LED de estado; al detectar un paquete en el
+portapapeles se ensancha mostrando el icono de descarga limpio y el selector de
+destino (y tras instalarlo exitosamente deja de ofrecerlo hasta que cambie el
+portapapeles). Al abrir el buscador o el escritorio, la misma cápsula se
+expande desde su centro horizontal hacia los lados y hacia abajo: el buscador
+conserva la forma de píldora arriba sin mostrar lista hasta empezar a escribir,
+con autocompletado inline y lista de una línea sin subtítulos ni escudo; el
+escritorio muestra los iconos directamente sobre el fondo translúcido en
+cuadrícula (`Columns` configurable), con el punto de privacidad en la esquina
+inferior derecha de cada icono y el escudo de PMG arriba a la derecha.
+
+En `Data/config.ini` bajo `[Desktop]` se configuran `Hotkey` (por defecto
+`Ctrl+Space`), `AlwaysOnTop` (`true`/`false`), `Translucent` (`15%`–`100%`, por
+defecto `90%`) y `RememberPosition` (`true`/`false`, guardando `X` e `Y` al
+cerrar cuando el origen está accesible). Los cambios en `config.ini` se
+recargan automáticamente al activar PMD.
 
 ## Catálogo y ejecución
 
@@ -62,9 +87,14 @@ aplicaciones del anfitrión desde PMD requiere confirmación.
   colores adicionales para operaciones en curso o errores, que se informan
   con un diálogo.
   El cierre crítico puede dejar en `pmlog` la copia de PMG aún mapeada por Windows.
-- La clasificación inicial es gris. El operador puede guardar el color
-  acreditado en el catálogo. Una aplicación roja pide confirmación en PMD
-  y requiere `--allow-red` inmediatamente después del ID en consola.
+- La clasificación inicial es gris. En la primera apertura real desde PMD de
+  cualquier aplicación (tanto ZIP como PAF) que aún no tenga `wrapper.ini`, PML
+  ejecuta el flujo unificado de aprendizaje (`LearningEngine`) para generar su
+  `wrapper.ini` y actualiza automáticamente `Color` en `Data/apps.ini`:
+  `Green` si cerró limpia y sin residuos en el anfitrión, `Yellow` si generó
+  recursos aprendidos que PML limpió al cerrar, y `Red` si no se pudo restaurar
+  el anfitrión o hubo error de rollback. Una aplicación roja pide confirmación
+  en PMD y requiere `--allow-red` inmediatamente después del ID en consola.
 
 ## Paquetes y mantenimiento
 

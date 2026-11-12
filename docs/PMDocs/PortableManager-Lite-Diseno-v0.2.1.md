@@ -591,8 +591,7 @@ RedirectTemp=true
 -   **Editor de texto integrado**, similar a Bloc de notas, para
     visualizar/editar BAT, CMD, PS1, PY y otros archivos de texto sin
     depender de software del anfitrión.
--   **Gestión visual de comandos personalizados**, inspirada
-    funcionalmente en el `Add` de SlickRun, pero con identidad de PM;
+-   **Gestión visual de comandos personalizados**, con identidad de PM;
     **por ahora se gestionan mediante INI**. Los comandos no equivalen
     automáticamente a aplicaciones registradas en PMD.
 -   **Restablecimiento parcial:** borrar únicamente preferencias

@@ -66,7 +66,7 @@ PM Lite administra aplicaciones portables en `App/`, abre y gestiona contenido d
 - `Esc` cancela búsqueda, borra la entrada activa y devuelve la isla a reposo.
 - Con la entrada **vacía**, `Espacio` abre PM-Desktop. El espacio también puede formar parte de los parámetros de una MagicWord cuando la entrada **no** está vacía.
 
-### 3.3 Autocompletado SlickRun
+### 3.3 Autocompletado del Buscador
 
 - Coincidencia por **prefijo**, no búsqueda difusa ni coincidencia en cualquier parte.
 - Candidatos: nombres de aplicaciones, alias (MagicWords), comandos internos y archivos/carpetas visibles de `Other/` según la búsqueda. **Las aplicaciones se presentan primero**, archivos/carpetas después.
@@ -85,7 +85,7 @@ PM Lite administra aplicaciones portables en `App/`, abre y gestiona contenido d
 
 ## 4. MagicWords y `_DEFAULT`
 
-El comportamiento se basa en SlickRun, separando **coincidencia y ejecución** de la acción web explícita.
+El buscador separa **coincidencia y ejecución** de la acción web explícita.
 
 ### 4.1 MagicWords
 
@@ -97,16 +97,16 @@ El comportamiento se basa en SlickRun, separando **coincidencia y ejecución** d
 - Comandos internos iniciales: `exit` (cierre normal de PM), calculadora con prefijo `=`, y aquellos necesarios para gestión/ajustes que se definan más adelante.
 - `=25*4` devuelve `100` sin invocar un intérprete de comandos del sistema ni `eval` inseguro. Solo aritmética expresamente admitida.
 
-### 4.2 `_DEFAULT` tal como SlickRun
+### 4.2 `_DEFAULT` de respaldo
 
 - `_DEFAULT` es una **MagicWord de respaldo** que se ejecuta cuando, al confirmar con `Enter`, el texto **no resuelve a una MagicWord/comando/ruta/archivo reconocidos**.
 - Recibe **la entrada original completa**, sin reemplazarla por una autocompletación.
-- La expansión de parámetros conserva la distinción de SlickRun: `$I$` = texto original; `$W$` = texto codificado para URL. En el caso predeterminado, `$W$` se incorpora a la consulta de Google.
+- La expansión de parámetros distingue `$I$` = texto original; `$W$` = texto codificado para URL. En el caso predeterminado, `$W$` se incorpora a la consulta de Google.
 - Valor inicial: abrir `https://www.google.com/search?q=$W$` en el **navegador portable predeterminado** de PM.
 - La MagicWord `_DEFAULT` es configurable en el INI; no se limita conceptualmente a Google y puede apuntar a otra acción legítima.
 - No debe lanzar de manera implícita binarios arbitrarios, una shell del host o comandos elevados como resultado de texto no reconocido.
 - Una coincidencia parcial ya autocompletada se considera MagicWord válida al pulsar Enter, por lo que **no cae en `_DEFAULT`**.
-- Diferencia deliberada con SlickRun: PM restringe ejecución y apertura al entorno portable, salvo autorización explícita para usar el anfitrión.
+- PM restringe ejecución y apertura al entorno portable, salvo autorización explícita para usar el anfitrión.
 
 **Ejemplos:**
 
@@ -384,8 +384,6 @@ Estas cuestiones **no están resueltas** y no deben completarse automáticamente
 
 **Fuentes externas verificadas:**
 
-- SlickRun Advanced Help, evento `_DEFAULT`, parámetros `$W$` y `$I$`: https://www.bayden.com/slickrun/1033/SlickRunAdvancedHelp.htm
-- SlickRun Setup, MagicWords, alias y control de autocompletado por origen: https://bayden.com/slickrun/1033/SlickRunSetup.htm
 - PortableApps.com: instalación y actualización de aplicaciones portables individuales: https://portableapps.com/support/portable_app
 - PortableApps.com Installer: política de carpetas durante actualización (`Data` preservada por defecto, otras configurables): https://portableapps.com/manuals/PortableApps.comLauncher/ref/paf/installer.html
 

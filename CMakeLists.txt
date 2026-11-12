@@ -51,6 +51,8 @@ add_executable(pml
     src/applications/package_manager.cpp
     src/applications/app_command.cpp
     src/pmd/pmd_module.cpp
+    src/pmd/pmd_graphics.cpp
+    src/pmd/pmd_graphics.h
     ${PM_GUARD_SOURCES}
     src/learning/learning_engine.cpp
     src/core/main.cpp
@@ -67,6 +69,8 @@ target_link_libraries(pml PRIVATE
     kernel32
     user32
     gdi32
+    gdiplus
+    dwmapi
     comdlg32
     advapi32
     shell32

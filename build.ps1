@@ -97,6 +97,7 @@ $pmlSources = @(
     (Join-Path $ProjectRoot "src\applications\package_manager.cpp"),
     (Join-Path $ProjectRoot "src\applications\app_command.cpp"),
     (Join-Path $ProjectRoot "src\pmd\pmd_module.cpp"),
+    (Join-Path $ProjectRoot "src\pmd\pmd_graphics.cpp"),
     (Join-Path $ProjectRoot "src\core\main.cpp"),
     (Join-Path $ProjectRoot "src\guard\guard_entry.cpp")
 ) + $coreSources + $runtimeSources + $guardSources
@@ -108,7 +109,7 @@ $pmlSources = @(
     "-I$IncludeDir" `
     $pmlSources `
     -o $PmlExe `
-    -lkernel32 -luser32 -lgdi32 -lcomdlg32 -ladvapi32 -lshell32 -lshlwapi -lversion -lole32 -lbcrypt
+    -lkernel32 -luser32 -lgdi32 -lgdiplus -ldwmapi -lcomdlg32 -ladvapi32 -lshell32 -lshlwapi -lversion -lole32 -lbcrypt
 
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $PmlExe)) {
     throw "Fallo al compilar pml.exe (ExitCode=$LASTEXITCODE)"

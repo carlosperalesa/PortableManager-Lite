@@ -211,11 +211,24 @@ AtomicWriteResult AtomicFile::WriteBytes(
 
     // 4. Reemplazar el destino mediante MoveFileExW con MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
     const std::wstring target_str(target_path);
-    if (!::MoveFileExW(
-            temp_path.c_str(),
-            target_str.c_str(),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-        result.win32_error = ::GetLastError();
+    BOOL moved = FALSE;
+    DWORD move_err = ERROR_SUCCESS;
+    for (int retry = 0; retry < 8; ++retry) {
+        if (::MoveFileExW(
+                temp_path.c_str(),
+                target_str.c_str(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+            moved = TRUE;
+            break;
+        }
+        move_err = ::GetLastError();
+        if (move_err != ERROR_SHARING_VIOLATION && move_err != ERROR_ACCESS_DENIED) {
+            break;
+        }
+        ::Sleep(15);
+    }
+    if (!moved) {
+        result.win32_error = move_err;
         result.failed_stage = L"MoveFileExW";
         cleanup_temp();
         return result;
