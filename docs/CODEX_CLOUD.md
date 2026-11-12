@@ -1,6 +1,6 @@
 # Entorno de desarrollo cloud — PortableManager Lite
 
-Este documento prepara un entorno reproducible para continuar el desarrollo sin depender del PC local. El PR #2 cerró la Fase 3 en main. La implementación y las pruebas vigentes de Fase 4 se documentan en [fase04/](../fase04/README_FASE04.md).
+Este documento prepara un entorno reproducible para continuar el desarrollo sin depender del PC local. El PR #2 cerró la Fase 3 en main. La implementación y las pruebas vigentes de Fase 4 se documentan en [docs/fase04/](fase04/README_FASE04.md).
 
 ## Entornos y responsabilidades
 
