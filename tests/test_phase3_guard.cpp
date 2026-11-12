@@ -10,6 +10,24 @@ namespace {
 using pm::runtime::SessionManager;
 using pm::runtime::SessionState;
 std::wstring self;
+std::wstring context, diagnostic_file, artifact_dir;
+std::string diagnostic_log;
+bool Check(bool ok, const char* step, ULONGLONG actual = 0, ULONGLONG expected = 0) {
+    const DWORD error = ::GetLastError();
+    const std::string scope(context.begin(), context.end());
+    const std::string line = "[CHECK] " + scope + " step=" + step + " status=" +
+        (ok ? "passed" : "failed") + " actual=" + std::to_string(actual) +
+        " expected=" + std::to_string(expected) + " last_error=" + std::to_string(error) + "\n";
+    diagnostic_log += line;
+    const std::wstring wide(line.begin(), line.end());
+    std::fwprintf(stdout, L"%ls", wide.c_str()); std::fflush(stdout);
+    if (!diagnostic_file.empty())
+        pm::core::AtomicFile::WriteUtf8Text(diagnostic_file, diagnostic_log, false);
+    return ok;
+}
+bool Value(const char* step, ULONGLONG actual, ULONGLONG expected) {
+    return Check(actual == expected, step, actual, expected);
+}
 std::wstring Q(std::wstring_view s) { return pm::jobs::QuoteArgument(s); }
 void Close(PROCESS_INFORMATION& p) {
     if (p.hThread) ::CloseHandle(p.hThread);
@@ -25,8 +43,9 @@ bool Spawn(const std::wstring& exe, const std::wstring& args, PROCESS_INFORMATIO
 }
 bool WaitExit(HANDLE process, DWORD expected = 0) {
     DWORD code = 999;
-    return ::WaitForSingleObject(process, 15000) == WAIT_OBJECT_0 &&
-        ::GetExitCodeProcess(process, &code) && code == expected;
+    return Value("wait_process_exit", ::WaitForSingleObject(process, 15000), WAIT_OBJECT_0) &&
+        Check(::GetExitCodeProcess(process, &code) != FALSE, "get_process_exit_code") &&
+        Value("process_exit_code", code, expected);
 }
 ULONGLONG Ticks(FILETIME ft) { return (static_cast<ULONGLONG>(ft.dwHighDateTime) << 32) | ft.dwLowDateTime; }
 ULONGLONG Cpu(HANDLE process) {
@@ -45,27 +64,30 @@ std::wstring SessionPath(const std::wstring& id) {
 int Controller(int argc, wchar_t** argv) {
     if (argc != 5) return 2;
     const std::wstring id = argv[2], pm = argv[3], mode = argv[4];
+    context = L"controller_" + mode + L"_" + id;
     HANDLE ready = Event(id, L"_ready"), release = Event(id, L"_release");
     SessionManager session;
     DWORD error = 0;
-    if (!session.InitializeSessionWithId(id).ok) return 3;
+    if (!Check(session.InitializeSessionWithId(id).ok, "initialize_session")) return 3;
+    diagnostic_file = session.session_dir() + L"\\controller-diagnostic.txt";
     pm::jobs::JobManager job;
-    if (!job.Create(session, L"synthetic", error)) return 4;
+    if (!Check(job.Create(session, L"synthetic", error), "create_job", error)) return 4;
     pm::guard::GuardProcess guard;
-    if (!guard.Start(pm, session, error)) return 5;
+    if (!Check(guard.Start(pm, session, error), "start_guard", error)) return 5;
     PROCESS_INFORMATION worker{};
-    if (!job.Launch(self, L"--tree " + Q(id), SessionManager::QuerySystemTempDir(), worker, error)) return 6;
+    if (!Check(job.Launch(self, L"--tree " + Q(id), SessionManager::QuerySystemTempDir(), worker, error), "launch_tree", error)) return 6;
     HANDLE tree_ready = Event(id, L"_tree");
-    if (::WaitForSingleObject(tree_ready, 10000) != WAIT_OBJECT_0) return 7;
+    if (!Value("tree_ready", ::WaitForSingleObject(tree_ready, 10000), WAIT_OBJECT_0)) return 7;
     ::CloseHandle(tree_ready);
-    if (!session.TransitionState(SessionState::Active).ok) return 8;
+    if (!Check(session.TransitionState(SessionState::Active).ok, "activate_session")) return 8;
     const std::string info = std::to_string(::GetProcessId(guard.handle())) + " " + std::to_string(worker.dwProcessId);
-    if (!pm::core::AtomicFile::WriteUtf8Text(session.session_dir() + L"\\test-info.txt", info, false).ok) return 9;
+    if (!Check(pm::core::AtomicFile::WriteUtf8Text(session.session_dir() + L"\\test-info.txt", info, false).ok, "publish_pids")) return 9;
     ::SetEvent(ready);
     ::WaitForSingleObject(release, INFINITE);
     if (mode == L"normal" || mode == L"guard-dead" || mode == L"children-dead") {
         // Calling twice must perform no second rollback after CLEANED.
-        if (!pm::guard::CleanupSession(session, error) || !pm::guard::CleanupSession(session, error)) return 10;
+        if (!Check(pm::guard::CleanupSession(session, error), "cleanup_first", error) ||
+            !Check(pm::guard::CleanupSession(session, error), "cleanup_repeat", error)) return 10;
     } else {
         ::TerminateProcess(::GetCurrentProcess(), 77); // No destructors, abrupt PM disappearance.
     }
@@ -85,6 +107,7 @@ void RemoveSuccessfulSession(const std::wstring& id) {
     const std::wstring dir = SessionPath(id);
     ::DeleteFileW((dir + L"\\pm-guard.exe").c_str());
     ::DeleteFileW((dir + L"\\test-info.txt").c_str());
+    ::DeleteFileW((dir + L"\\controller-diagnostic.txt").c_str());
     ::DeleteFileW((dir + L"\\session.ini").c_str());
     ::RemoveDirectoryW(dir.c_str());
 }
@@ -93,58 +116,66 @@ bool Lifecycle(const std::wstring& pm, const std::wstring& mode, bool remove_sou
     HANDLE ready = Event(id, L"_ready"), release = Event(id, L"_release");
     PROCESS_INFORMATION owner{}, outsider{};
     HANDLE guard = nullptr, worker = nullptr, job = nullptr;
-    bool ok = Spawn(self, L"--leaf", outsider) && Spawn(self, L"--controller " + Q(id) + L" " + Q(pm) + L" " + Q(mode), owner);
-    if (ok) ok = ::WaitForSingleObject(ready, 15000) == WAIT_OBJECT_0;
-    if (ok) {
+    context = mode + (remove_source ? L"_source_loss_" : L"_") + id;
+    auto exercise = [&]() {
+        if (!Check(ready && release, "create_events")) return false;
+        if (!Check(Spawn(self, L"--leaf", outsider), "spawn_outsider")) return false;
+        if (!Check(Spawn(self, L"--controller " + Q(id) + L" " + Q(pm) + L" " + Q(mode), owner), "spawn_owner")) return false;
+        HANDLE startup[] = {ready, owner.hProcess};
+        if (!Value("owner_ready", ::WaitForMultipleObjects(2, startup, FALSE, 15000), WAIT_OBJECT_0)) return false;
         auto info = pm::core::AtomicFile::ReadUtf8Text(SessionPath(id) + L"\\test-info.txt");
         unsigned long guard_id = 0, worker_id = 0;
-        ok = info.ok && std::sscanf(info.content.c_str(), "%lu %lu", &guard_id, &worker_id) == 2;
-        if (ok) {
-            guard = ::OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE, FALSE, guard_id);
-            worker = ::OpenProcess(SYNCHRONIZE, FALSE, worker_id);
-            job = ::OpenJobObjectW(JOB_OBJECT_QUERY | JOB_OBJECT_TERMINATE, FALSE,
-                pm::jobs::JobManager::MakeName(id, L"synthetic").c_str());
-            ok = guard && worker && job;
-        }
-    }
-    if (ok) {
+        if (!Check(info.ok && std::sscanf(info.content.c_str(), "%lu %lu", &guard_id, &worker_id) == 2, "read_pids")) return false;
+        guard = ::OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE, FALSE, guard_id);
+        if (!Check(guard != nullptr, "open_guard")) return false;
+        worker = ::OpenProcess(SYNCHRONIZE, FALSE, worker_id);
+        if (!Check(worker != nullptr, "open_worker")) return false;
+        job = ::OpenJobObjectW(JOB_OBJECT_QUERY | JOB_OBJECT_TERMINATE, FALSE,
+            pm::jobs::JobManager::MakeName(id, L"synthetic").c_str());
+        if (!Check(job != nullptr, "open_job")) return false;
         JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting{};
-        ok = ::QueryInformationJobObject(job, JobObjectBasicAccountingInformation, &accounting, sizeof(accounting), nullptr) &&
-            accounting.ActiveProcesses == 2; // Launcher + its descendant both assigned.
+        if (!Check(::QueryInformationJobObject(job, JobObjectBasicAccountingInformation, &accounting, sizeof(accounting), nullptr) != FALSE, "query_active_job")) return false;
+        if (!Value("active_processes_before", accounting.ActiveProcesses, 2)) return false;
         const ULONGLONG before = Cpu(guard);
-        ::Sleep(1200); // Measurement interval in test only.
+        ::Sleep(1200);
         const ULONGLONG after = Cpu(guard);
-        std::wprintf(L"[CPU] mode=%ls delta_100ns=%llu interval_ms=1200\n", mode.c_str(), after - before);
+        if (!Check(before != ~0ULL && after >= before && (after - before) <= 200000,
+                   "blocked_guard_cpu_1200ms", after - before, 200000)) return false;
+        if (!Value("guard_alive", ::WaitForSingleObject(guard, 0), WAIT_TIMEOUT)) return false;
+        if (!Value("worker_alive", ::WaitForSingleObject(worker, 0), WAIT_TIMEOUT)) return false;
         SessionManager observed;
-        ok = ok && before != ~0ULL && after >= before && (after - before) <= 200000 &&
-            ::WaitForSingleObject(guard, 0) == WAIT_TIMEOUT &&
-            ::WaitForSingleObject(worker, 0) == WAIT_TIMEOUT &&
-            observed.OpenExistingSession(id).ok && observed.manifest().session_state() == SessionState::Active;
+        if (!Check(observed.OpenExistingSession(id).ok, "open_active_manifest")) return false;
+        if (!Value("active_session_state", static_cast<unsigned>(observed.manifest().session_state()), static_cast<unsigned>(SessionState::Active))) return false;
         if (remove_source) {
             const std::wstring source_dir = pm.substr(0, pm.find_last_of(L"\\/"));
-            ok = ok && ::DeleteFileW(pm.c_str()) && ::RemoveDirectoryW(source_dir.c_str());
+            if (!Check(::DeleteFileW(pm.c_str()) != FALSE, "remove_source_executable") ||
+                !Check(::RemoveDirectoryW(source_dir.c_str()) != FALSE, "remove_source_directory")) return false;
         }
         if (mode == L"guard-dead") {
-            ok = ok && ::TerminateProcess(guard, 88) && WaitExit(guard, 88);
+            if (!Check(::TerminateProcess(guard, 88) != FALSE, "terminate_guard") || !WaitExit(guard, 88)) return false;
         }
         if (mode == L"children-dead") {
-            ok = ok && ::TerminateJobObject(job, 89) &&
-                ::WaitForSingleObject(worker, 10000) == WAIT_OBJECT_0 &&
-                ::WaitForSingleObject(owner.hProcess, 0) == WAIT_TIMEOUT &&
-                ::WaitForSingleObject(guard, 0) == WAIT_TIMEOUT;
+            if (!Check(::TerminateJobObject(job, 89) != FALSE, "terminate_children") ||
+                !Value("children_exit", ::WaitForSingleObject(worker, 10000), WAIT_OBJECT_0) ||
+                !Value("owner_survives_children", ::WaitForSingleObject(owner.hProcess, 0), WAIT_TIMEOUT) ||
+                !Value("guard_survives_children", ::WaitForSingleObject(guard, 0), WAIT_TIMEOUT)) return false;
         }
-    }
-    ::SetEvent(release);
-    if (ok) ok = WaitExit(owner.hProcess, mode == L"crash" ? 77 : 0);
-    if (ok && mode != L"guard-dead") ok = WaitExit(guard);
-    if (ok) {
-        SessionManager observed;
-        JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting{};
-        ok = ::WaitForSingleObject(worker, 10000) == WAIT_OBJECT_0 &&
-            ::QueryInformationJobObject(job, JobObjectBasicAccountingInformation, &accounting, sizeof(accounting), nullptr) &&
-            accounting.ActiveProcesses == 0 && observed.OpenExistingSession(id).ok &&
-            observed.manifest().session_state() == SessionState::Cleaned &&
-            ::WaitForSingleObject(outsider.hProcess, 0) == WAIT_TIMEOUT;
+        if (!Check(::SetEvent(release) != FALSE, "release_owner")) return false;
+        if (!WaitExit(owner.hProcess, mode == L"crash" ? 77 : 0)) return false;
+        if (mode != L"guard-dead" && !WaitExit(guard)) return false;
+        if (!Value("worker_terminated", ::WaitForSingleObject(worker, 10000), WAIT_OBJECT_0)) return false;
+        if (!Check(::QueryInformationJobObject(job, JobObjectBasicAccountingInformation, &accounting, sizeof(accounting), nullptr) != FALSE, "query_drained_job")) return false;
+        if (!Value("active_processes_after", accounting.ActiveProcesses, 0)) return false;
+        if (!Check(observed.OpenExistingSession(id).ok, "open_final_manifest")) return false;
+        if (!Value("final_session_state", static_cast<unsigned>(observed.manifest().session_state()), static_cast<unsigned>(SessionState::Cleaned))) return false;
+        return Value("outsider_survives", ::WaitForSingleObject(outsider.hProcess, 0), WAIT_TIMEOUT);
+    };
+    const bool ok = exercise();
+    // Snapshot BEFORE failure containment, so cleanup cannot mask the failing state.
+    if (!artifact_dir.empty()) {
+        const std::wstring prefix = artifact_dir + L"\\phase3_" + id;
+        ::CopyFileW((SessionPath(id) + L"\\session.ini").c_str(), (prefix + L"_manifest.ini").c_str(), TRUE);
+        ::CopyFileW((SessionPath(id) + L"\\controller-diagnostic.txt").c_str(), (prefix + L"_controller.txt").c_str(), TRUE);
     }
     // Failure containment applies exclusively to helpers created by this test.
     if (owner.hProcess && ::WaitForSingleObject(owner.hProcess, 0) == WAIT_TIMEOUT) {
@@ -260,6 +291,11 @@ int wmain(int argc, wchar_t** argv) {
     if (argc > 1 && std::wstring_view(argv[1]) == L"--controller") return Controller(argc, argv);
     if (argc != 2 && argc != 3) return 2;
     const std::wstring pm = argv[1];
+    if (argc == 3) {
+        const std::wstring output = argv[2];
+        const auto slash = output.find_last_of(L"\\/");
+        if (slash != std::wstring::npos) artifact_dir = output.substr(0, slash);
+    }
     struct Test { const wchar_t* name; bool passed; };
     const std::vector<Test> tests = {
         {L"normal_once_active_guard_blocked_cpu_children_foreign", Lifecycle(pm, L"normal")},
@@ -284,6 +320,7 @@ int wmain(int argc, wchar_t** argv) {
         }
         json += std::string("  ],\n  \"status\": \"") + (all ? "passed" : "failed") + "\"\n}\n";
         if (!pm::core::AtomicFile::WriteUtf8Text(argv[2], json, false).ok) return 3;
+        if (!pm::core::AtomicFile::WriteUtf8Text(std::wstring(argv[2]) + L".diagnostics.txt", diagnostic_log, false).ok) return 3;
     }
     return all ? 0 : 1;
 }

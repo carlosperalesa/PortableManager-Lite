@@ -290,6 +290,23 @@ Directivas:
 No cambiar el toolchain ni las opciones base sin justificarlo y pedir
 aprobación.
 
+### Sesiones Codex Cloud (Linux)
+
+Al iniciar cada sesión, activar las herramientas existentes solo para el proceso:
+
+```bash
+export PATH="/workspace/.pm-cloud-tools/bin:/workspace/PortableManager-Lite/tools/toolchains/llvm-mingw-linux/bin:$PATH"
+```
+
+Ejecutables disponibles: `cmake`, `ninja`, `clang++`, `llvm-readobj` y
+`x86_64-w64-mingw32-clang++`. `clang++` sin target explícito es un compilador
+host Linux; para compilar directamente Windows x64 usar
+`x86_64-w64-mingw32-clang++` o `clang++ --target=x86_64-w64-windows-gnu`.
+El toolchain CMake del proyecto fija ese target. Comprobar con `command -v`
+y `--version`; no reinstalar herramientas que ya funcionan. Los ejecutables
+PE se prueban en GitHub Actions Windows, nunca se consideran ejecutados por
+el mero hecho de compilar en Linux.
+
 ## 7. Seguridad de pruebas
 
 Por defecto, todas las pruebas deben ser seguras, aisladas y
