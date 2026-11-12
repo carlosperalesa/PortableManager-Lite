@@ -33,6 +33,6 @@ El commit anterior `396e734` pasó seis escenarios sintéticos y las regresiones
 
 La implementación se ha modificado en el PR #5 para sustituir la captura de datos HKCU por comparación temporal de estados y para registrar en la receta únicamente los nombres de archivos/carpetas observados y las reglas inversas de Junctions y Registro. **No se copia ningún archivo .reg aprendido al USB** ni se escribe `RegistryDataPath` en la receta. Los archivos que la propia aplicación escribe mediante una Junction permanecen en la carpeta portable redirigida como parte de la estrategia de portabilidad existente; no son un respaldo generado por la receta.
 
-La nueva CI y las regresiones deben aprobarse para aceptar este cambio. Siguen sin ejecutarse pruebas con aplicaciones reales, ACL personalizadas y desconexión física de USB específica de esta fase.
+Validación confirmada en GitHub Actions [43245395915](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43245395915): compilación Linux y suite nativa Windows correctas, con Fase 6 6/6, Fase 5 8/8, Fase 4 9/9 y regresiones anteriores. Siguen sin ejecutarse pruebas con aplicaciones reales, ACL personalizadas y desconexión física de USB específica de esta fase.
 
-No cerrar ni fusionar el PR #5 hasta confirmar todas las pruebas del HEAD final.
+Revisión técnica favorable tras la redefinición del alcance. Pendiente únicamente de integración formal del PR #5 en main.
