@@ -234,7 +234,7 @@ int Controller(const fs::path& root, std::wstring_view mode) {
     Check(Read(data / L"roaming" / L"learned.txt") == "roaming output", "keep learned roaming data");
     if (mode == L"failure") {
         Check(result.error != ERROR_SUCCESS && result.recipe_path.empty(), "report recipe failure");
-        Check(fs::exists(data / L"registry.reg"), "retain captured data on recipe failure");
+        Check(!fs::exists(data / L"registry.reg"), "never copy registry settings on recipe failure");
         return 0;
     }
     const auto recipe = Read(root / L"portable" / result.recipe_path);
@@ -247,10 +247,11 @@ int Controller(const fs::path& root, std::wstring_view mode) {
               "exclude ambiguous output");
     } else {
         Check(Read(data / L"local" / L"learned.txt") == "local output", "keep learned local data");
-        const bool capture_registry = mode != L"existing";
-        Check(fs::exists(data / L"registry.reg") == capture_registry &&
-              (recipe.find("RegistryDataPath=Data/apps/fixture/") != std::string::npos) == capture_registry,
-              "capture only new registry data");
+        Check(!fs::exists(data / L"registry.reg") &&
+              recipe.find("RegistryDataPath") == std::string::npos &&
+              recipe.find("RegistryKey=HKCU\\Software\\") != std::string::npos &&
+              recipe.find("RegistryCleanup=RESTORE_REG") != std::string::npos,
+              "record modified registry resource but never copy settings");
     }
     return 0;
 }
