@@ -263,8 +263,17 @@ void Scenario(std::wstring_view mode) {
     }
     const auto args = L"--case " + pm::jobs::QuoteArgument(fixture.root.wstring()) + L" " + std::wstring(mode);
     auto child = Spawn(PathResolver::QueryExecutablePath(), args);
+    const auto dump_errors = [&] {
+        const auto controller_log = Read(fixture.root / L"controller.log");
+        const auto writer_log = Read(fixture.root / L"writer.log");
+        if (!controller_log.empty()) std::fputs(controller_log.c_str(), stderr);
+        if (!writer_log.empty()) std::fputs(writer_log.c_str(), stderr);
+    };
     if (mode == L"crash") {
-        for (unsigned i = 0; i < 500 && !fs::exists(fixture.root / L"ready.txt"); ++i) ::Sleep(20);
+        for (unsigned i = 0; i < 500 && !fs::exists(fixture.root / L"ready.txt"); ++i) {
+            if (::WaitForSingleObject(child.get(), 20) == WAIT_OBJECT_0) break;
+        }
+        if (!fs::exists(fixture.root / L"ready.txt")) dump_errors();
         Check(fs::exists(fixture.root / L"ready.txt"), "wait for managed writer");
         Write(fixture.root / L"shared.txt", "concurrent shared output");
         const auto request = Request(fixture.root, mode);
@@ -300,7 +309,9 @@ void Scenario(std::wstring_view mode) {
         Check(sessions == 1, "verify the interrupted session");
         Check(Read(recipes / L"fixture.ini") == "[Previous]\r\nPrevious=keep\r\n", "critical exit leaves recipe untouched");
     } else {
-        Check(Wait(child.get()) == 0, "learning controller");
+        const auto exit_code = Wait(child.get());
+        if (exit_code != 0) dump_errors();
+        Check(exit_code == 0, "learning controller");
     }
     Check(Read(fixture.roaming / L"original.txt") == "host original" &&
           !fs::exists(fixture.roaming / L"learned.txt") &&
@@ -347,8 +358,15 @@ int wmain(int argc, wchar_t** argv) {
     try {
         if (argc == 5 && std::wstring_view(argv[1]) == L"--guard")
             return pm::guard::RunGuardMode(argv[2], argv[3], argv[4]);
-        if (argc == 4 && std::wstring_view(argv[1]) == L"--case") return Controller(argv[2], argv[3]);
-        if (argc == 4 && std::wstring_view(argv[1]) == L"--write") return Writer(argv[2], argv[3]);
+        if (argc == 4 && (std::wstring_view(argv[1]) == L"--case" || std::wstring_view(argv[1]) == L"--write")) {
+            const fs::path root(argv[2]);
+            const auto name = root.filename().wstring();
+            if (!name.starts_with(L"pm6-") || !Guid(std::wstring_view(name).substr(4))) return 2;
+            const bool controller = std::wstring_view(argv[1]) == L"--case";
+            const auto log = root / (controller ? L"controller.log" : L"writer.log");
+            if (!::_wfreopen(log.c_str(), L"w", stderr)) return 2;
+            return controller ? Controller(root, argv[3]) : Writer(root, argv[3]);
+        }
         if (argc == 2 && std::wstring_view(argv[1]) == L"--descendant") {
             ::Sleep(INFINITE);
             return 0;
