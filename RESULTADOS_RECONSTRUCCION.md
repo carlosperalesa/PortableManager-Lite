@@ -14,6 +14,6 @@
 | **Fase 3** | fase03/ | JobObjects y PMGuard | **passed**, aprobada | reports/fase03_usb_physical_disconnect_v2_20261112.json | Fusionada en main. [CI de main](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43148647984). |
 | **Fase 4** | fase04/ | Directory Junctions (JunctionManager) | **passed**, aprobada | [Evidencia](reports/rebuild_junctions_windows_final.json) | [PR #3 fusionado](https://github.com/carlosperalesa/PortableManager-Lite/pull/3). |
 | **Fase 5** | `fase05/` | Registro Win32 (`RegistryManager`) | Aprobada | [Evidencia local](reports/rebuild_registry.json) | [PR #4 fusionado](https://github.com/carlosperalesa/PortableManager-Lite/pull/4). |
-| **Fase 6** | `fase06/` | Aprendizaje Ligero (`LearningEngine`) | Refactorizada y validada (CI 43245395915); pendiente de fusión formal | [Evidencia local](reports/rebuild_learning.json) | [Alcance y pruebas](fase06/README_FASE06.md). |
-| **Fase 7** | `fase07/` | Motor de Limpieza (`CleanupEngine`) | `not_run` | Pendiente (`reports/rebuild_cleanup.json`) | Pendiente de Fase 6. |
+| **Fase 6** | `fase06/` | Aprendizaje Ligero (`LearningEngine`) | **passed**, aprobada y fusionada (PR #5, CI 43246078395) | [Evidencia local](reports/rebuild_learning.json) | [Alcance y pruebas](fase06/README_FASE06.md). |
+| **Fase 7** | `fase07/` | Motor de Limpieza (`CleanupEngine`) | `not_run` | Pendiente (`reports/rebuild_cleanup.json`) | Fase 6 cerrada; Fase 7 aún no iniciada. |
 | **Fase 8** | `fase08/` | Integración Nativa | `not_run` | Pendiente (`reports/rebuild_integration.json`) | Pendiente de Fase 7. |

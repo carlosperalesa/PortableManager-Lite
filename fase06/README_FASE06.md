@@ -1,6 +1,6 @@
 # Fase 06 — Aprendizaje Ligero (LearningEngine)
 
-**Estado: adecuación pendiente; no aprobada ni fusionada.**
+**Estado: Fase 6 aprobada y fusionada en `main` (PR #5).**
 
 ## Decisión vinculante del propietario (2026-11-12)
 
@@ -35,4 +35,4 @@ La implementación se ha modificado en el PR #5 para sustituir la captura de dat
 
 Validación confirmada en GitHub Actions [43245395915](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43245395915): compilación Linux y suite nativa Windows correctas, con Fase 6 6/6, Fase 5 8/8, Fase 4 9/9 y regresiones anteriores. Siguen sin ejecutarse pruebas con aplicaciones reales, ACL personalizadas y desconexión física de USB específica de esta fase.
 
-Revisión técnica favorable tras la redefinición del alcance. Pendiente únicamente de integración formal del PR #5 en main.
+La revisión técnica y la CI del HEAD final [43246078395](https://github.com/carlosperalesa/PortableManager-Lite/actions/runs/43246078395) fueron favorables. El PR #5 se fusionó como commit `843f1fe75b3bdbd4dd437b6654583e9c3155ba5e`.
