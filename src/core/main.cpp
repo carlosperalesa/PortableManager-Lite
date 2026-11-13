@@ -12,12 +12,64 @@
 
 #include <cstdio>
 #include <cwchar>
+#include <filesystem>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <windows.h>
+#include <shellapi.h>
 
+namespace {
 
-int wmain(int argc, wchar_t *argv[]) {
+int DiscardOrphansList(const std::vector<std::wstring>& orphans) {
+  const std::filesystem::path sessions_root =
+      std::filesystem::path(pm::runtime::SessionManager::QuerySystemTempDir()) /
+      L"PortableManager" / L"Session";
+  int failures = 0;
+  for (const auto& id : orphans) {
+    std::error_code ec;
+    std::filesystem::remove_all(sessions_root / id, ec);
+    if (ec) ++failures;
+  }
+  std::wprintf(L"[PM] Sesiones huérfanas desechadas (fallos=%d).\n", failures);
+  return failures == 0 ? 0 : 1;
+}
+
+int RestoreOrphansList(const std::vector<std::wstring>& orphans) {
+  int failures = 0;
+  for (const auto& id : orphans) {
+    pm::runtime::SessionManager session;
+    if (!session.OpenExistingSession(id).ok) {
+      ++failures;
+      continue;
+    }
+    const auto res = pm::cleanup::CleanupEngine::Recover(session, true);
+    if (!res.ok) ++failures;
+  }
+  std::wprintf(L"[PM] Recuperación finalizada (fallos=%d).\n", failures);
+  return failures == 0 ? 0 : 1;
+}
+
+} // namespace
+
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+  int argc = 0;
+  std::unique_ptr<wchar_t*, decltype(&::LocalFree)> argv_guard(
+      ::CommandLineToArgvW(::GetCommandLineW(), &argc), &::LocalFree);
+  wchar_t** argv = argv_guard.get();
+  if (!argv || argc <= 0) return 1;
+
+  if (argc >= 2 && std::wstring_view(argv[1]) != L"--desktop" &&
+      std::wstring_view(argv[1]) != L"--guard" &&
+      ::GetFileType(::GetStdHandle(STD_OUTPUT_HANDLE)) == FILE_TYPE_UNKNOWN) {
+    if (::AttachConsole(ATTACH_PARENT_PROCESS)) {
+      FILE* dummy = nullptr;
+      freopen_s(&dummy, "CONOUT$", "w", stdout);
+      freopen_s(&dummy, "CONOUT$", "w", stderr);
+      freopen_s(&dummy, "CONIN$", "r", stdin);
+    }
+  }
+
   const pm::core::PathResolver resolver;
   const std::wstring &exe_dir = resolver.root_dir();
   if (exe_dir.empty()) {
@@ -110,7 +162,8 @@ int wmain(int argc, wchar_t *argv[]) {
       return 0;
     }
 
-    if (arg1 == L"--restore-orphans") {
+    if (arg1 == L"--restore-orphans" || arg1 == L"--discard-orphans") {
+      const bool discard_only = (arg1 == L"--discard-orphans");
       const bool confirmed_flag =
           (argc == 3 && std::wstring_view(argv[2]) == L"--confirm");
       if (argc > 3 || (argc == 3 && !confirmed_flag)) return 2;
@@ -122,28 +175,35 @@ int wmain(int argc, wchar_t *argv[]) {
       }
       std::wprintf(L"[PM] Sesiones huerfanas detectadas (%zu):\n", orphans.size());
       for (const auto &id : orphans) std::wprintf(L"  - %ls\n", id.c_str());
+      if (discard_only) {
+        if (!confirmed_flag) {
+          std::wprintf(L"Desechar registros temporales sin tocar el anfitrion? [s/N]: ");
+          std::fflush(stdout);
+          wchar_t ans[16]{};
+          if (!std::fgetws(ans, static_cast<int>(std::size(ans)), stdin) ||
+              (ans[0] != L's' && ans[0] != L'S' && ans[0] != L'y' && ans[0] != L'Y')) {
+            std::wprintf(L"[PM] Operacion cancelada.\n");
+            return 0;
+          }
+        }
+        return DiscardOrphansList(orphans);
+      }
       if (!confirmed_flag) {
-        std::wprintf(L"Restaurar el anfitrion y retirar estas sesiones? [s/N]: ");
+        std::wprintf(L"Accion: [R]estaurar anfitrion / [D]esechar registros / [C]ancelar: ");
         std::fflush(stdout);
         wchar_t ans[16]{};
-        if (!std::fgetws(ans, static_cast<int>(std::size(ans)), stdin) ||
-            (ans[0] != L's' && ans[0] != L'S' && ans[0] != L'y' && ans[0] != L'Y')) {
+        if (!std::fgetws(ans, static_cast<int>(std::size(ans)), stdin)) {
+          std::wprintf(L"[PM] Operacion cancelada.\n");
+          return 0;
+        }
+        if (ans[0] == L'd' || ans[0] == L'D') return DiscardOrphansList(orphans);
+        if (ans[0] != L'r' && ans[0] != L'R' && ans[0] != L's' && ans[0] != L'S' &&
+            ans[0] != L'y' && ans[0] != L'Y') {
           std::wprintf(L"[PM] Operacion cancelada.\n");
           return 0;
         }
       }
-      int failures = 0;
-      for (const auto &id : orphans) {
-        pm::runtime::SessionManager session;
-        if (!session.OpenExistingSession(id).ok) {
-          ++failures;
-          continue;
-        }
-        const auto res = pm::cleanup::CleanupEngine::Recover(session, true);
-        if (!res.ok) ++failures;
-      }
-      std::wprintf(L"[PM] Recuperacion finalizada (fallos=%d).\n", failures);
-      return failures == 0 ? 0 : 1;
+      return RestoreOrphansList(orphans);
     }
 
 #ifdef PM_ENABLE_TEST_PROBES

@@ -111,7 +111,7 @@ $pmlSources = @(
 & $ClangPP `
     -std=c++20 -O2 -Wall -Wextra -Werror `
     -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNOMINMAX `
-    -municode -static "-Wl,-Xlink=-swaprun:cd" `
+    -municode -mwindows -static "-Wl,-Xlink=-swaprun:cd" `
     "-I$IncludeDir" `
     $pmlSources $PmlResource `
     -o $PmlExe `
@@ -241,7 +241,7 @@ Write-Host "=== Compilando test_phase8_integration.exe (C++20) ==="
 & $ClangPP `
     -std=c++20 -O2 -Wall -Wextra -Werror `
     -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNOMINMAX `
-    -municode -static "-Wl,-Xlink=-swaprun:cd" `
+    -municode -mwindows -static "-Wl,-Xlink=-swaprun:cd" `
     "-I$IncludeDir" `
     (Join-Path $ProjectRoot "tests\test_phase8_integration.cpp") `
     $coreSources $runtimeSources $Phase6Resource `

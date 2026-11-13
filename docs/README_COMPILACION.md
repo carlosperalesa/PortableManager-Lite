@@ -54,3 +54,6 @@ se generan para validación.
 ## 4. Entorno Codex Cloud y CI
 
 Para preparar el compilador Linux portable y compilar de forma cruzada Windows x64, consulta [CODEX_CLOUD.md](CODEX_CLOUD.md). Las pruebas de ejecución de los binarios Win32 se realizan en el runner Windows de GitHub Actions, no en Linux.
+
+COMPILAR:
+.\PortableManager-Lite\build.ps1

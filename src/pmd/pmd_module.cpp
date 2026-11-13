@@ -200,7 +200,9 @@ private:
     void UpdateTrayIcon();
     void RemoveTray();
     void RefreshOrphans();
+    void ChooseOrphanAction();
     void RestoreOrphansInteractive();
+    void DiscardOrphansInteractive();
     void EnsureConfigDefaults();
     void ApplyConfigSettings(bool register_hotkey);
     void SavePosition();
@@ -537,7 +539,7 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
                 }
                 if (zone == HitZone::InstallIcon) InstallPackage(false);
                 else if (zone == HitZone::InstallDest) InstallPackage(true);
-                else if (zone == HitZone::OrphanBadge) RestoreOrphansInteractive();
+                else if (zone == HitZone::OrphanBadge) ChooseOrphanAction();
                 else Show(View::Search);
                 return 0;
             }
@@ -1737,8 +1739,10 @@ void Desktop::Menu(bool application, int index) {
             menu_items.push_back({4, L"Elegir destino del portapapeles\u2026", true, false});
         menu_items.push_back({0, L"", false, true});
         menu_items.push_back({8, L"Configuraci\u00f3n\u2026", !origin_lost_, false});
-        if (!orphan_sessions_.empty())
+        if (!orphan_sessions_.empty()) {
             menu_items.push_back({9, L"Recuperar sesiones hu\u00e9rfanas\u2026", !busy_, false});
+            menu_items.push_back({10, L"Desechar sesiones hu\u00e9rfanas\u2026", !busy_, false});
+        }
         menu_items.push_back({0, L"", false, true});
         menu_items.push_back({5, L"Cierre normal", true, false});
         menu_items.push_back({6, L"Cierre r\u00e1pido", true, false});
@@ -1766,6 +1770,11 @@ void Desktop::Menu(bool application, int index) {
         if (choice == 9) {
             modal_ = false;
             RestoreOrphansInteractive();
+            return;
+        }
+        if (choice == 10) {
+            modal_ = false;
+            DiscardOrphansInteractive();
             return;
         }
         if (choice >= 5 && choice <= 7)
@@ -1850,6 +1859,21 @@ void Desktop::RefreshOrphans() {
     }
 }
 
+void Desktop::ChooseOrphanAction() {
+    if (orphan_sessions_.empty() || busy_ || closing_) return;
+    std::vector<gfx::MenuEntry> menu_items;
+    menu_items.push_back({1, L"Recuperar sesiones hu\u00e9rfanas\u2026", true, false});
+    menu_items.push_back({2, L"Desechar sesiones hu\u00e9rfanas\u2026", true, false});
+    POINT cursor{};
+    ::GetCursorPos(&cursor);
+    ::SetForegroundWindow(hwnd_);
+    modal_ = true;
+    const auto choice = gfx::ShowGlassMenu(hwnd_, cursor, menu_items, dpi_);
+    modal_ = false;
+    if (choice == 1) RestoreOrphansInteractive();
+    else if (choice == 2) DiscardOrphansInteractive();
+}
+
 void Desktop::RestoreOrphansInteractive() {
     if (orphan_sessions_.empty() || busy_ || closing_) return;
     const bool was_modal = modal_;
@@ -1871,6 +1895,30 @@ void Desktop::RestoreOrphansInteractive() {
             }
             const auto r = cleanup::CleanupEngine::Recover(s, true);
             if (!r.ok && !err) err = r.error ? r.error : ERROR_CAN_NOT_COMPLETE;
+        }
+        return err;
+    });
+}
+
+void Desktop::DiscardOrphansInteractive() {
+    if (orphan_sessions_.empty() || busy_ || closing_) return;
+    const bool was_modal = modal_;
+    modal_ = true;
+    const auto msg = L"Se detectaron " + std::to_wstring(orphan_sessions_.size()) +
+        L" sesi\u00f3n(es) hu\u00e9rfana(s) en %TEMP%.\n\nEsta acci\u00f3n eliminar\u00e1 \u00fanicamente los registros temporales sin modificar archivos ni el Registro del equipo.\n\n\u00bfDeseas desecharlas ahora?";
+    const int answer = ::MessageBoxW(hwnd_, msg.c_str(), L"PortableManager Lite", MB_YESNO | MB_ICONWARNING);
+    modal_ = was_modal;
+    if (answer != IDYES) return;
+
+    const auto ids = orphan_sessions_;
+    const auto sessions_root = fs::path(runtime::SessionManager::QuerySystemTempDir()) /
+        L"PortableManager" / L"Session";
+    StartOperation([ids, sessions_root]() -> DWORD {
+        DWORD err = 0;
+        for (const auto& id : ids) {
+            std::error_code ec;
+            fs::remove_all(sessions_root / id, ec);
+            if (ec && !err) err = static_cast<DWORD>(ec.value() ? ec.value() : ERROR_ACCESS_DENIED);
         }
         return err;
     });

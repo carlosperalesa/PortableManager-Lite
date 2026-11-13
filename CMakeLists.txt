@@ -66,6 +66,8 @@ target_include_directories(pml PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+target_link_options(pml PRIVATE -mwindows "-Wl,-Xlink=-swaprun:cd")
+
 target_link_libraries(pml PRIVATE
     kernel32
     user32
