@@ -7,8 +7,8 @@ IDI_PML_ICON     ICON "pml.ico"
 IDI_PML_ICON_RED ICON "pml_red.ico"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,2,2,0
- PRODUCTVERSION 0,2,2,0
+ FILEVERSION 0,2,2,1
+ PRODUCTVERSION 0,2,2,1
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS 0x40004L
@@ -21,11 +21,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "PortableManager Lite Project"
             VALUE "FileDescription", "PortableManager Lite"
-            VALUE "FileVersion", "0.2.2.0"
+            VALUE "FileVersion", "0.2.2-beta.1"
             VALUE "InternalName", "pml.exe"
             VALUE "OriginalFilename", "pml.exe"
             VALUE "ProductName", "PortableManager Lite"
-            VALUE "ProductVersion", "0.2.2.0"
+            VALUE "ProductVersion", "0.2.2-beta.1"
         END
     END
     BLOCK "VarFileInfo"
