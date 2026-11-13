@@ -418,4 +418,44 @@ bool RegistryManager::ReleaseBackup(const ManifestOperation& op, DWORD& error) {
     if (digest != op.registry_backup_sha256) return Fail(error, ERROR_INVALID_DATA);
     return RemoveOpenedFile(backup.get(), error);
 }
+
+bool RegistryManager::ExportPortableData(std::wstring_view key, std::wstring_view reg_file, DWORD& error) {
+    error = ERROR_SUCCESS;
+    if (!SafeKey(key) || reg_file.empty()) return Fail(error, ERROR_INVALID_PARAMETER);
+    const std::wstring key_str(key);
+    const std::wstring out_str(reg_file);
+    Key parent, leaf;
+    std::wstring leaf_name;
+    if (!InspectKey(key_str, false, parent, leaf, leaf_name, error)) return false;
+    if (!leaf) {
+        ::DeleteFileW(out_str.c_str());
+        error = ERROR_SUCCESS;
+        return true;
+    }
+    const std::wstring tmp_file = out_str + L".pmtmp";
+    ::DeleteFileW(tmp_file.c_str());
+    if (!Export(key_str, tmp_file, error)) {
+        ::DeleteFileW(tmp_file.c_str());
+        return false;
+    }
+    if (!::MoveFileExW(tmp_file.c_str(), out_str.c_str(),
+                       MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        error = ::GetLastError();
+        ::DeleteFileW(tmp_file.c_str());
+        return false;
+    }
+    return true;
+}
+
+bool RegistryManager::ImportPortableData(std::wstring_view key, std::wstring_view reg_file, DWORD& error) {
+    error = ERROR_SUCCESS;
+    if (!SafeKey(key) || reg_file.empty()) return Fail(error, ERROR_INVALID_PARAMETER);
+    ManifestOperation scope{};
+    scope.reg_key_path = std::wstring(key);
+    Handle pinned;
+    std::wstring digest;
+    if (!ReadBackup(scope, std::wstring(reg_file), 0, pinned, digest, error)) return false;
+    pinned.reset();
+    return RunReg(L"import " + jobs::QuoteArgument(std::wstring(reg_file)) + L" /reg:64", error);
+}
 }

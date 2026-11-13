@@ -1,5 +1,6 @@
 #include "applications/app_command.h"
 #include "pmd/pmd_module.h"
+#include "cleanup/cleanup_module.h"
 #include "core/atomic_file.h"
 #include "core/config_manager.h"
 #include "core/path_resolver.h"
@@ -109,6 +110,43 @@ int wmain(int argc, wchar_t *argv[]) {
       return 0;
     }
 
+    if (arg1 == L"--restore-orphans") {
+      const bool confirmed_flag =
+          (argc == 3 && std::wstring_view(argv[2]) == L"--confirm");
+      if (argc > 3 || (argc == 3 && !confirmed_flag)) return 2;
+      pm::runtime::SessionManager discovery;
+      const auto orphans = discovery.DiscoverOrphanSessions();
+      if (orphans.empty()) {
+        std::wprintf(L"[PM] No se encontraron sesiones huerfanas en %%TEMP%%.\n");
+        return 0;
+      }
+      std::wprintf(L"[PM] Sesiones huerfanas detectadas (%zu):\n", orphans.size());
+      for (const auto &id : orphans) std::wprintf(L"  - %ls\n", id.c_str());
+      if (!confirmed_flag) {
+        std::wprintf(L"Restaurar el anfitrion y retirar estas sesiones? [s/N]: ");
+        std::fflush(stdout);
+        wchar_t ans[16]{};
+        if (!std::fgetws(ans, static_cast<int>(std::size(ans)), stdin) ||
+            (ans[0] != L's' && ans[0] != L'S' && ans[0] != L'y' && ans[0] != L'Y')) {
+          std::wprintf(L"[PM] Operacion cancelada.\n");
+          return 0;
+        }
+      }
+      int failures = 0;
+      for (const auto &id : orphans) {
+        pm::runtime::SessionManager session;
+        if (!session.OpenExistingSession(id).ok) {
+          ++failures;
+          continue;
+        }
+        const auto res = pm::cleanup::CleanupEngine::Recover(session, true);
+        if (!res.ok) ++failures;
+      }
+      std::wprintf(L"[PM] Recuperacion finalizada (fallos=%d).\n", failures);
+      return failures == 0 ? 0 : 1;
+    }
+
+#ifdef PM_ENABLE_TEST_PROBES
     // Phase-3 diagnostic, not application management (phase 8). The controlled
     // process is our own smoke probe; no real user application is touched.
     if (arg1 == L"--job-probe") {
@@ -177,6 +215,7 @@ int wmain(int argc, wchar_t *argv[]) {
                    init_res.session_id.c_str());
       return 0;
     }
+#endif
     return pm::applications::RunCommand(resolver, arg1, argc, argv);
   }
 

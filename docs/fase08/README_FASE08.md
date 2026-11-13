@@ -138,3 +138,14 @@ La suite local también pasó completa. La retirada física final queda `not_run
 
 Las pruebas con un instalador PAF real y la revisión visual en múltiples
 monitores quedan fuera de la suite sintética.
+
+## Endurecimiento arquitectónico, bandeja del sistema e iconos (2026-11-12)
+
+- **Iconos y `VERSIONINFO`:** `src/core/pml.rc` embebe el icono oficial en dos variantes (`101` verde para estado protegido, `102` rojo para pérdida de origen o falta de guardia PMG) junto con el bloque `VS_VERSION_INFO`.
+- **Bandeja del sistema (`Shell_NotifyIconW`):** PMD muestra un icono en el área de notificación junto al reloj sincronizado con el estado del LED (verde/rojo); clic abre el buscador, doble clic abre el escritorio y clic derecho despliega el menú contextual personalizado (`ShowGlassMenu`).
+- **Recuperación manual de sesiones huérfanas:**
+  - CLI: `pml.exe --restore-orphans [--confirm]` enumera o restaura sesiones pendientes detectadas por `DiscoverOrphanSessions()`.
+  - PMD: cuando existen sesiones huérfanas distintas de la sesión activa, la píldora muestra un distintivo ámbar antes del LED y el menú contextual añade `Recuperar sesiones huérfanas…` con confirmación explícita.
+- **Persistencia opcional de Registro (`PersistRegKey`):** en el `wrapper.ini` de cada aplicación, `PersistRegKey=true` (por defecto `false`) importa `Data\apps\<id>\registry\persisted.reg` al iniciar y exporta la clave propia de la app antes de restaurar el anfitrión en un cierre normal no crítico.
+- **Vigilancia y aprendizaje:** `RunGuardMode` vigila la accesibilidad del origen mediante `WaitForReleaseOrOriginLoss` junto al handle del padre; `LearningEngine::Run` espera a que el Job quede completamente vacío (`JobManager::IsEmpty`) antes de terminar procesos residuales; los comandos de prueba `--job-probe` y `--session-probe` quedan aislados bajo `#ifdef PM_ENABLE_TEST_PROBES`.
+

@@ -21,5 +21,10 @@ public:
                                     std::wstring_view session_dir);
     static bool Rollback(const runtime::ManifestOperation& op, DWORD& error);
     static bool ReleaseBackup(const runtime::ManifestOperation& op, DWORD& error);
+
+    // Optional portable registry persistence (when PersistRegKey=true in wrapper.ini).
+    // Validates key scope and .reg section scope before exporting/importing.
+    static bool ExportPortableData(std::wstring_view key, std::wstring_view reg_file, DWORD& error);
+    static bool ImportPortableData(std::wstring_view key, std::wstring_view reg_file, DWORD& error);
 };
 }

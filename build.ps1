@@ -30,6 +30,7 @@ if (-not [string]::IsNullOrWhiteSpace($ReportJsonPath) -and (Test-Path -LiteralP
 $ToolchainBin = Join-Path $ProjectRoot "tools\toolchains\llvm-mingw\bin"
 $ClangPP      = Join-Path $ToolchainBin "clang++.exe"
 $ReadObj      = Join-Path $ToolchainBin "llvm-readobj.exe"
+$Windres      = Join-Path $ToolchainBin "x86_64-w64-mingw32-windres.exe"
 
 if (-not (Test-Path $ClangPP)) {
     throw "No se encontró el compilador LLVM-MinGW en la ruta relativa: $ClangPP"
@@ -59,12 +60,13 @@ $Phase7Report = Join-Path $OutputDir ("phase7_windows_" + (Get-Date -Format "yyy
 $Phase8TestExe = Join-Path $OutputDir "test_phase8_integration.exe"
 $Phase8Report = Join-Path $OutputDir ("phase8_windows_" + (Get-Date -Format "yyyyMMddTHHmmssfff") + ".json")
 $Phase6Resource = Join-Path $OutputDir "phase6_fixture.o"
+$PmlResource    = Join-Path $OutputDir "pml_res.o"
 $GuardSupervisorSource = Join-Path $ProjectRoot "src\guard\guard_supervisor.cpp"
 $LearningSource = Join-Path $ProjectRoot "src\learning\learning_engine.cpp"
 $IncludeDir    = Join-Path $ProjectRoot "src"
 
 # 1. Compilación limpia
-foreach ($bin in @($PmlExe, $SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe, $Phase4TestExe, $Phase5TestExe, $Phase6TestExe, $Phase7TestExe, $Phase8TestExe, $Phase6Resource)) {
+foreach ($bin in @($PmlExe, $SmokeTestExe, $Phase1TestExe, $Phase2TestExe, $Phase3TestExe, $Phase4TestExe, $Phase5TestExe, $Phase6TestExe, $Phase7TestExe, $Phase8TestExe, $Phase6Resource, $PmlResource)) {
     if (Test-Path $bin) { Remove-Item $bin -Force }
 }
 
@@ -88,6 +90,10 @@ $guardSources = @(
 )
 
 Write-Host "=== [1/6] Compilando pml.exe (C++20, Windows x64, Unicode, -static, /SWAPRUN:CD) ==="
+& $Windres -O coff -i (Join-Path $ProjectRoot "src\core\pml.rc") -o $PmlResource
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $PmlResource)) {
+    throw "Fallo al compilar pml.rc (ExitCode=$LASTEXITCODE)"
+}
 $pmlSources = @(
     $LearningSource,
     $GuardSupervisorSource,
@@ -107,7 +113,7 @@ $pmlSources = @(
     -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNOMINMAX `
     -municode -static "-Wl,-Xlink=-swaprun:cd" `
     "-I$IncludeDir" `
-    $pmlSources `
+    $pmlSources $PmlResource `
     -o $PmlExe `
     -lkernel32 -luser32 -lgdi32 -lgdiplus -ldwmapi -lcomdlg32 -ladvapi32 -lshell32 -lshlwapi -lversion -lole32 -lbcrypt
 

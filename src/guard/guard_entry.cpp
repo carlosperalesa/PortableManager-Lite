@@ -36,12 +36,38 @@ int RunGuardMode(std::wstring_view session_id, std::wstring_view pm_handle_arg,
     // running, PMG either stays blocked or exits after PM has restored the host.
     if (!::SetEvent(ready)) return 5;
     ::CloseHandle(ready);
-    const HANDLE waits[]{parent, stop};
-    const DWORD waited = ::WaitForMultipleObjects(stop ? 2 : 1, waits, FALSE, INFINITE);
+
+    wchar_t origin_buf[32768]{};
+    DWORD origin_len = static_cast<DWORD>(std::size(origin_buf));
+    const bool has_origin = ::QueryFullProcessImageNameW(parent, 0, origin_buf, &origin_len) != FALSE && origin_len > 0;
+
+    bool should_recover = false;
+    bool clean_stop = false;
+    bool wait_failed = false;
+
+    if (has_origin) {
+        DWORD wait_err = ERROR_SUCCESS;
+        const auto res = WaitForReleaseOrOriginLoss(
+            std::wstring(origin_buf, origin_len), parent, INFINITE, wait_err, stop);
+        if (res == OriginWaitResult::Stopped) {
+            clean_stop = true;
+        } else if (res == OriginWaitResult::Released || res == OriginWaitResult::OriginLost) {
+            should_recover = true;
+        } else {
+            wait_failed = true;
+        }
+    } else {
+        const HANDLE waits[]{parent, stop};
+        const DWORD waited = ::WaitForMultipleObjects(stop ? 2 : 1, waits, FALSE, INFINITE);
+        if (stop && waited == WAIT_OBJECT_0 + 1) clean_stop = true;
+        else if (waited == WAIT_OBJECT_0) should_recover = true;
+        else wait_failed = true;
+    }
+
     ::CloseHandle(parent);
     if (stop) ::CloseHandle(stop);
-    if (stop && waited == WAIT_OBJECT_0 + 1) return 0;
-    if (waited != WAIT_OBJECT_0) return 6;
+    if (clean_stop) return 0;
+    if (wait_failed || !should_recover) return 6;
     return cleanup::CleanupEngine::Recover(session, stop != nullptr).ok ? 0 : 7;
 }
 }

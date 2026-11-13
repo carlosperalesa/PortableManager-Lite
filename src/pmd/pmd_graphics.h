@@ -80,6 +80,9 @@ void DrawCapsuleProgress(HDC hdc, const RECT& bounds, float corner_radius, float
 // Draws a glowing status LED centered at (cx, cy).
 void DrawGlowingLed(HDC hdc, float cx, float cy, float radius, Color4 color, bool hovered = false);
 
+// Draws a clean amber orphan-session warning badge centered at (cx, cy).
+void DrawOrphanBadge(HDC hdc, float cx, float cy, float size, bool hovered);
+
 // Draws the heraldic PMG status shield centered at (cx, cy).
 void DrawStatusShield(HDC hdc, float cx, float cy, float size, Color4 color);
 

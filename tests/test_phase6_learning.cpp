@@ -439,7 +439,7 @@ int wmain(int argc, wchar_t** argv) {
             return controller ? Controller(root, argv[3]) : Writer(root, argv[3]);
         }
         if (argc == 2 && std::wstring_view(argv[1]) == L"--descendant") {
-            ::Sleep(INFINITE);
+            ::Sleep(150);
             return 0;
         }
         if (argc != 2) return 2;

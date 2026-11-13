@@ -396,13 +396,26 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         const auto cwd = executable.substr(0, executable.rfind(L'\\'));
         if (!job.Launch(executable, request.arguments, cwd, process, error)) return error;
         Handle child(process.hProcess), thread(process.hThread);
-        const auto waited = guard::WaitForReleaseOrOriginLoss(origin, child.get(), request.timeout_ms, error);
+        const ULONGLONG deadline = request.timeout_ms == INFINITE
+            ? 0 : (::GetTickCount64() + request.timeout_ms);
+        auto waited = guard::WaitForReleaseOrOriginLoss(origin, child.get(), request.timeout_ms, error);
         if (waited == guard::OriginWaitResult::OriginLost) return ERROR_DEVICE_NOT_CONNECTED;
         if (waited == guard::OriginWaitResult::TimedOut) return ERROR_TIMEOUT;
         if (waited != guard::OriginWaitResult::Released) return error;
-        if (!jobs::JobManager::TerminateAndWait(job.name(), error)) return error;
         DWORD code = 0;
         if (!::GetExitCodeProcess(child.get(), &code)) return ::GetLastError();
+        while (!jobs::JobManager::IsEmpty(job.name())) {
+            DWORD slice = 200;
+            if (request.timeout_ms != INFINITE) {
+                const ULONGLONG now = ::GetTickCount64();
+                if (now >= deadline) return ERROR_TIMEOUT;
+                slice = static_cast<DWORD>(std::min<ULONGLONG>(200, deadline - now));
+            }
+            waited = guard::WaitForReleaseOrOriginLoss(origin, nullptr, slice, error);
+            if (waited == guard::OriginWaitResult::OriginLost) return ERROR_DEVICE_NOT_CONNECTED;
+            if (waited == guard::OriginWaitResult::Failed) return error;
+        }
+        if (!jobs::JobManager::TerminateAndWait(job.name(), error)) return error;
         if (code) return ERROR_PROCESS_ABORTED;
         if (registry_approved) {
             for (const auto& op : session.manifest().operations()) {

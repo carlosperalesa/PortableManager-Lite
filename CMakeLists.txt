@@ -56,6 +56,7 @@ add_executable(pml
     ${PM_GUARD_SOURCES}
     src/learning/learning_engine.cpp
     src/core/main.cpp
+    src/core/pml.rc
     src/guard/guard_entry.cpp
     ${PM_CORE_SOURCES}
     ${PM_RUNTIME_SOURCES}

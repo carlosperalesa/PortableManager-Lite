@@ -68,6 +68,7 @@ struct Policy {
     std::wstring roaming;
     std::wstring local;
     std::wstring registry;
+    bool persist_reg_key = false;
     Handle lease;
 };
 
@@ -98,6 +99,8 @@ DWORD LoadPolicy(const PathResolver& resolver, const App& app, const std::wstrin
     policy.roaming = app.exclusive_roaming;
     policy.local = app.exclusive_local;
     policy.registry = app.exclusive_registry;
+    const auto persist_val = doc.GetValue(section, L"PersistRegKey", doc.GetValue(L"Learning", L"PersistRegKey", L"false"));
+    policy.persist_reg_key = Equal(persist_val, L"true") || persist_val == L"1";
     auto resource = candidates->company + L"/" + candidates->product;
     for (auto& ch : resource)
         if (ch >= L'A' && ch <= L'Z') ch += L'a' - L'A';
@@ -125,8 +128,16 @@ DWORD PreparePolicy(runtime::SessionManager& session, const PathResolver& resolv
             return error;
     }
     DWORD error = ERROR_SUCCESS;
-    if (!policy.registry.empty() && !registry::RegistryManager::Prepare(session, policy.registry, error, true, app.id))
-        return error;
+    if (!policy.registry.empty()) {
+        if (!registry::RegistryManager::Prepare(session, policy.registry, error, true, app.id))
+            return error;
+        if (policy.persist_reg_key) {
+            const auto reg_file = resolver.ResolvePmRelativePath(L"Data\\apps\\" + app.id + L"\\registry\\persisted.reg");
+            if (reg_file.ok && ::GetFileAttributesW(reg_file.resolved_path.c_str()) != INVALID_FILE_ATTRIBUTES &&
+                !registry::RegistryManager::ImportPortableData(policy.registry, reg_file.resolved_path, error))
+                return error;
+        }
+    }
     return ERROR_SUCCESS;
 }
 
@@ -362,6 +373,16 @@ RunResult Run(const PathResolver& resolver, const App& selected, std::wstring_vi
     }
     if (host.closing()) return result; // The owner closes all Jobs together.
     const auto mode = result.error ? cleanup::Mode::Critical : stop.mode.load();
+    if (policy.persist_reg_key && !policy.registry.empty() && result.error == ERROR_SUCCESS &&
+        mode != cleanup::Mode::Critical && guard::IsOriginAccessible(origin)) {
+        Pins reg_pins;
+        const auto reg_dir = L"Data\\apps\\" + app.id + L"\\registry";
+        DWORD export_err = EnsureDirectory(resolver, reg_dir, reg_pins);
+        if (!export_err) {
+            const auto reg_file = resolver.ResolvePmRelativePath(reg_dir + L"\\persisted.reg");
+            if (reg_file.ok) registry::RegistryManager::ExportPortableData(policy.registry, reg_file.resolved_path, export_err);
+        }
+    }
     const auto cleaned = cleanup::CleanupEngine::RunApplication(session, app.id, mode);
     result.rollback_error = cleaned.error;
     if (cleaned.ok) {

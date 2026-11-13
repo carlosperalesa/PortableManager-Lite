@@ -2,6 +2,7 @@
 #include "pmd/pmd_graphics.h"
 #include "applications/app_paths.h"
 #include "applications/session_host.h"
+#include "cleanup/cleanup_module.h"
 #include "core/config_manager.h"
 #include "guard/guard_process.h"
 #include "jobs/job_manager.h"
@@ -31,6 +32,8 @@ constexpr UINT kFinished = WM_APP + 1;
 constexpr UINT kOperation = WM_APP + 2;
 constexpr UINT kOpen = WM_APP + 3;
 constexpr UINT kGuardChanged = WM_APP + 4;
+constexpr UINT kTrayCallback = WM_APP + 10;
+constexpr UINT kTrayId = 1;
 
 constexpr UINT_PTR kOriginTimerId = 1;
 constexpr UINT_PTR kAnimTimerId = 2;
@@ -39,7 +42,7 @@ constexpr UINT_PTR kBusyTimerId = 4;
 
 enum class View { Pill, Search, Files };
 enum class Kind { App, File, Folder };
-enum class HitZone { None, InstallIcon, InstallDest, WebSearch, BackButton, Item };
+enum class HitZone { None, InstallIcon, InstallDest, OrphanBadge, WebSearch, BackButton, Item };
 
 struct Item {
     Kind kind;
@@ -193,6 +196,11 @@ private:
     std::wstring GhostSuffix(const std::wstring& typed) const;
 
     void Show(View view);
+    void InitTray();
+    void UpdateTrayIcon();
+    void RemoveTray();
+    void RefreshOrphans();
+    void RestoreOrphansInteractive();
     void EnsureConfigDefaults();
     void ApplyConfigSettings(bool register_hotkey);
     void SavePosition();
@@ -292,9 +300,16 @@ private:
 
     RECT rect_install_{};
     RECT rect_dest_{};
+    RECT rect_orphan_{};
     RECT rect_web_{};
     RECT rect_back_{};
     RECT rect_edit_draw_{};
+
+    HICON tray_icon_green_ = nullptr;
+    HICON tray_icon_red_ = nullptr;
+    bool tray_added_ = false;
+    bool tray_is_red_ = false;
+    std::vector<std::wstring> orphan_sessions_;
 };
 
 bool Desktop::IsAppRunning(std::wstring_view id) const {
@@ -343,6 +358,14 @@ int Desktop::Run() {
     }
 
     ApplyConfigSettings(true);
+    const int icon_w = ::GetSystemMetrics(SM_CXSMICON);
+    const int icon_h = ::GetSystemMetrics(SM_CYSMICON);
+    tray_icon_green_ = static_cast<HICON>(::LoadImageW(
+        instance, MAKEINTRESOURCEW(101), IMAGE_ICON, icon_w, icon_h, 0));
+    tray_icon_red_ = static_cast<HICON>(::LoadImageW(
+        instance, MAKEINTRESOURCEW(102), IMAGE_ICON, icon_w, icon_h, 0));
+    RefreshOrphans();
+    InitTray();
     ::AddClipboardFormatListener(hwnd_);
     ::SetTimer(hwnd_, kOriginTimerId, 500, nullptr);
     ::SetTimer(hwnd_, kCaretTimerId, 530, nullptr);
@@ -514,6 +537,7 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
                 }
                 if (zone == HitZone::InstallIcon) InstallPackage(false);
                 else if (zone == HitZone::InstallDest) InstallPackage(true);
+                else if (zone == HitZone::OrphanBadge) RestoreOrphansInteractive();
                 else Show(View::Search);
                 return 0;
             }
@@ -569,10 +593,13 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
         case WM_ACTIVATE:
             if (LOWORD(wp) == WA_INACTIVE) {
                 if (!modal_ && view_ != View::Pill) Show(View::Pill);
-            } else if (config_.LoadConfigIni(false).ok) {
-                ApplyConfigSettings(true);
-                ApplyWindowGeometry();
-                Render();
+            } else {
+                RefreshOrphans();
+                if (config_.LoadConfigIni(false).ok) {
+                    ApplyConfigSettings(true);
+                    ApplyWindowGeometry();
+                }
+                Layout();
             }
             return 0;
         case WM_DISPLAYCHANGE: Layout(); return 0;
@@ -622,7 +649,20 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         case WM_CLOSE: Close(Mode::Normal); return 0;
         case WM_QUERYENDSESSION: Close(Mode::Critical); return TRUE;
-        case kGuardChanged: Render(); return 0;
+        case kGuardChanged: UpdateTrayIcon(); Render(); return 0;
+        case kTrayCallback: {
+            const UINT tray_msg = LOWORD(lp);
+            if (tray_msg == WM_LBUTTONUP) {
+                Show(View::Search);
+            } else if (tray_msg == WM_LBUTTONDBLCLK) {
+                Show(View::Files);
+            } else if (tray_msg == WM_RBUTTONUP) {
+                ::SetForegroundWindow(hwnd_);
+                Menu(false);
+                ::PostMessageW(hwnd_, WM_NULL, 0, 0);
+            }
+            return 0;
+        }
         case kOpen: Open(static_cast<int>(wp)); return 0;
         case kFinished: Finish(reinterpret_cast<Worker*>(lp)); return 0;
         case kOperation:
@@ -635,10 +675,16 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             }
             selection_.reset();
             Report(static_cast<DWORD>(wp));
-            if (!closing_) Populate();
+            if (!closing_) {
+                RefreshOrphans();
+                Populate();
+            }
             CloseWhenReady();
             return 0;
         case WM_DESTROY:
+            RemoveTray();
+            if (tray_icon_green_) { ::DestroyIcon(tray_icon_green_); tray_icon_green_ = nullptr; }
+            if (tray_icon_red_) { ::DestroyIcon(tray_icon_red_); tray_icon_red_ = nullptr; }
             ::UnregisterHotKey(hwnd_, 1);
             ::RemoveClipboardFormatListener(hwnd_);
             ::KillTimer(hwnd_, kOriginTimerId);
@@ -736,7 +782,7 @@ void Desktop::Layout() {
             target_w_ = std::clamp(S(68) + text_w, S(188), std::min(S(320), avail_w));
             target_h_ = S(34);
         } else {
-            target_w_ = S(96);
+            target_w_ = orphan_sessions_.empty() ? S(96) : S(116);
             target_h_ = S(32);
         }
     } else if (view_ == View::Search) {
@@ -830,6 +876,7 @@ void Desktop::ApplyWindowGeometry() {
 
 void Desktop::Render() {
     if (!hwnd_) return;
+    UpdateTrayIcon();
     const int pad = ShadowPad();
     const int total_w = cur_w_ + pad * 2;
     const int total_h = cur_h_ + pad * 2;
@@ -857,6 +904,7 @@ void Desktop::Render() {
     rect_web_ = {};
     rect_back_ = {};
     rect_edit_draw_ = {};
+    rect_orphan_ = {};
 
     if (view_ == View::Pill) {
         if (busy_ || closing_) {
@@ -884,6 +932,10 @@ void Desktop::Render() {
             const gfx::Color4 text_color = hover_zone_ == HitZone::InstallDest
                 ? gfx::Color4{255, 255, 255, 255} : gfx::Color4{226, 232, 240, 255};
             gfx::DrawTextLine(hdc, dest_label, rect_dest_, Sf(13.0f), true, text_color, 0);
+        } else if (!orphan_sessions_.empty()) {
+            const float bx = led_cx - Sf(22.0f);
+            rect_orphan_ = {static_cast<LONG>(bx - Sf(10.0f)), capsule.top, static_cast<LONG>(bx + Sf(10.0f)), capsule.bottom};
+            gfx::DrawOrphanBadge(hdc, bx, led_cy, Sf(14.0f), hover_zone_ == HitZone::OrphanBadge);
         }
 
         gfx::DrawGlowingLed(hdc, led_cx, led_cy, Sf(5.2f), led_color, tracking_mouse_ && !IsOfferVisible());
@@ -1060,6 +1112,8 @@ HitZone Desktop::HitTest(POINT client, int& item_index) const {
         if (IsOfferVisible()) {
             if (in(rect_install_)) return HitZone::InstallIcon;
             if (in(rect_dest_)) return HitZone::InstallDest;
+        } else if (!orphan_sessions_.empty() && in(rect_orphan_)) {
+            return HitZone::OrphanBadge;
         }
         return HitZone::None;
     }
@@ -1514,6 +1568,7 @@ void Desktop::CloseWhenReady() {
 
 void Desktop::LoseOrigin() {
     origin_lost_ = true;
+    UpdateTrayIcon();
     Close(Mode::Critical);
     Render();
 }
@@ -1682,6 +1737,8 @@ void Desktop::Menu(bool application, int index) {
             menu_items.push_back({4, L"Elegir destino del portapapeles\u2026", true, false});
         menu_items.push_back({0, L"", false, true});
         menu_items.push_back({8, L"Configuraci\u00f3n\u2026", !origin_lost_, false});
+        if (!orphan_sessions_.empty())
+            menu_items.push_back({9, L"Recuperar sesiones hu\u00e9rfanas\u2026", !busy_, false});
         menu_items.push_back({0, L"", false, true});
         menu_items.push_back({5, L"Cierre normal", true, false});
         menu_items.push_back({6, L"Cierre r\u00e1pido", true, false});
@@ -1705,6 +1762,11 @@ void Desktop::Menu(bool application, int index) {
             const auto result = reinterpret_cast<INT_PTR>(::ShellExecuteW(
                 hwnd_, L"open", file.resolved_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
             if (result <= 32) Report(static_cast<DWORD>(result));
+        }
+        if (choice == 9) {
+            modal_ = false;
+            RestoreOrphansInteractive();
+            return;
         }
         if (choice >= 5 && choice <= 7)
             Close(choice == 5 ? Mode::Normal : choice == 6 ? Mode::Fast : Mode::Critical);
@@ -1740,6 +1802,78 @@ void Desktop::Menu(bool application, int index) {
         }
     }
     modal_ = false;
+}
+
+void Desktop::InitTray() {
+    if (!hwnd_ || tray_added_) return;
+    NOTIFYICONDATAW nid{};
+    nid.cbSize = sizeof(nid);
+    nid.hWnd = hwnd_;
+    nid.uID = kTrayId;
+    nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+    nid.uCallbackMessage = kTrayCallback;
+    tray_is_red_ = origin_lost_ || !session_.protected_by_guard();
+    nid.hIcon = tray_is_red_ ? tray_icon_red_ : tray_icon_green_;
+    wcscpy_s(nid.szTip, L"PortableManager Lite");
+    tray_added_ = ::Shell_NotifyIconW(NIM_ADD, &nid) != FALSE;
+}
+
+void Desktop::UpdateTrayIcon() {
+    if (!tray_added_) return;
+    const bool is_red = origin_lost_ || !session_.protected_by_guard();
+    if (is_red == tray_is_red_) return;
+    tray_is_red_ = is_red;
+    NOTIFYICONDATAW nid{};
+    nid.cbSize = sizeof(nid);
+    nid.hWnd = hwnd_;
+    nid.uID = kTrayId;
+    nid.uFlags = NIF_ICON;
+    nid.hIcon = is_red ? tray_icon_red_ : tray_icon_green_;
+    ::Shell_NotifyIconW(NIM_MODIFY, &nid);
+}
+
+void Desktop::RemoveTray() {
+    if (!tray_added_) return;
+    NOTIFYICONDATAW nid{};
+    nid.cbSize = sizeof(nid);
+    nid.hWnd = hwnd_;
+    nid.uID = kTrayId;
+    ::Shell_NotifyIconW(NIM_DELETE, &nid);
+    tray_added_ = false;
+}
+
+void Desktop::RefreshOrphans() {
+    orphan_sessions_.clear();
+    const auto active_id = session_.session().session_id();
+    for (const auto& id : session_.session().DiscoverOrphanSessions()) {
+        if (id != active_id) orphan_sessions_.push_back(id);
+    }
+}
+
+void Desktop::RestoreOrphansInteractive() {
+    if (orphan_sessions_.empty() || busy_ || closing_) return;
+    const bool was_modal = modal_;
+    modal_ = true;
+    const auto msg = L"Se detectaron " + std::to_wstring(orphan_sessions_.size()) +
+        L" sesi\u00f3n(es) hu\u00e9rfana(s) sin restaurar en el sistema.\n\n\u00bfDeseas restaurar el anfitri\u00f3n ahora?";
+    const int answer = ::MessageBoxW(hwnd_, msg.c_str(), L"PortableManager Lite", MB_YESNO | MB_ICONWARNING);
+    modal_ = was_modal;
+    if (answer != IDYES) return;
+
+    const auto ids = orphan_sessions_;
+    StartOperation([ids]() -> DWORD {
+        DWORD err = 0;
+        for (const auto& id : ids) {
+            runtime::SessionManager s;
+            if (!s.OpenExistingSession(id).ok) {
+                if (!err) err = ERROR_INVALID_DATA;
+                continue;
+            }
+            const auto r = cleanup::CleanupEngine::Recover(s, true);
+            if (!r.ok && !err) err = r.error ? r.error : ERROR_CAN_NOT_COMPLETE;
+        }
+        return err;
+    });
 }
 
 } // namespace
