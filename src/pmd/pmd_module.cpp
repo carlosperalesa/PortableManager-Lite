@@ -41,7 +41,7 @@ constexpr UINT_PTR kCaretTimerId = 3;
 constexpr UINT_PTR kBusyTimerId = 4;
 
 enum class View { Pill, Search, Files };
-enum class Kind { App, File, Folder };
+enum class Kind { App, File, Folder, Url };
 enum class HitZone { None, InstallIcon, InstallDest, OrphanBadge, WebSearch, BackButton, Item };
 
 struct Item {
@@ -110,6 +110,45 @@ gfx::Color4 PrivacyColor(std::wstring_view color_name) {
     if (Equal(color_name, L"Yellow")) return {251, 191, 36, 255};
     if (Equal(color_name, L"Red")) return {248, 113, 113, 255};
     return {148, 163, 184, 255};
+}
+
+std::wstring ExpandWeb(std::wstring_view pattern, const std::wstring& input);
+
+bool IsHttpUrl(std::wstring_view text) {
+    if (text.size() <= 8) return false;
+    if (!text.starts_with(L"https://") && !text.starts_with(L"http://")) return false;
+    for (const wchar_t ch : text) {
+        if (ch <= L' ' || ch == L'"' || ch == L'\r' || ch == L'\n') return false;
+    }
+    const auto sep = text.find(L"://");
+    return sep != std::wstring_view::npos && sep + 3 < text.size();
+}
+
+std::wstring SanitizeUrlName(std::wstring_view raw) {
+    std::wstring out;
+    for (const wchar_t ch : raw) {
+        if (ch == L'[' || ch == L']' || ch == L'=' || ch == L'\r' || ch == L'\n') continue;
+        if (ch == L' ' || ch == L'\t') {
+            if (!out.empty() && out.back() != L'-') out.push_back(L'-');
+        } else {
+            out.push_back(static_cast<wchar_t>(std::towlower(ch)));
+        }
+    }
+    while (!out.empty() && out.back() == L'-') out.pop_back();
+    return out;
+}
+
+std::wstring SuggestedUrlName(std::wstring_view url) {
+    const auto sep = url.find(L"://");
+    if (sep == std::wstring_view::npos) return L"web";
+    auto host = url.substr(sep + 3);
+    const auto slash = host.find_first_of(L"/?#:");
+    if (slash != std::wstring_view::npos) host = host.substr(0, slash);
+    if (host.starts_with(L"www.")) host.remove_prefix(4);
+    const auto dot = host.find(L'.');
+    if (dot != std::wstring_view::npos && dot > 0) host = host.substr(0, dot);
+    auto cleaned = SanitizeUrlName(host);
+    return cleaned.empty() ? L"web" : cleaned;
 }
 
 class Calculator {
@@ -190,7 +229,8 @@ private:
     int S(int px) const { return gfx::Scale(px, dpi_); }
     float Sf(float px) const { return gfx::ScaleF(px, dpi_); }
     int ShadowPad() const { return S(14); }
-    bool IsOfferVisible() const { return view_ == View::Pill && !package_.empty() && !closing_ && !busy_; }
+    bool IsOfferVisible() const { return view_ == View::Pill && (!package_.empty() || !clipboard_url_.empty()) && !closing_ && !busy_; }
+    bool IsUrlOfferVisible() const { return view_ == View::Pill && package_.empty() && !clipboard_url_.empty() && !closing_ && !busy_; }
     bool IsAppRunning(std::wstring_view id) const;
     const App* FindLoadedApp(std::wstring_view id) const;
     std::wstring GhostSuffix(const std::wstring& typed) const;
@@ -220,6 +260,8 @@ private:
     void LoseOrigin();
     void Finish(Worker* worker);
     void UpdateClipboard();
+    void StartUrlNaming();
+    void SaveUrlAlias();
     void PickPackage(std::wstring id = {});
     void InstallPackage(bool choose_destination);
     void StartInstall(std::wstring id, std::wstring package, std::wstring executable = {});
@@ -250,6 +292,9 @@ private:
     std::wstring origin_;
     std::wstring package_;
     std::wstring dismissed_package_;
+    std::wstring clipboard_url_;
+    std::wstring dismissed_url_;
+    bool url_naming_ = false;
     std::vector<App> apps_;
     std::vector<Item> items_;
     std::vector<std::unique_ptr<Worker>> workers_;
@@ -403,6 +448,10 @@ LRESULT CALLBACK Desktop::InputProc(HWND control, UINT msg, WPARAM wp, LPARAM lp
 
     if (msg == WM_KEYDOWN && wp == VK_ESCAPE) { self->Back(); return 0; }
     if (msg == WM_KEYDOWN && wp == VK_RETURN) {
+        if (edit && self->url_naming_) {
+            self->SaveUrlAlias();
+            return 0;
+        }
         const auto value = Text(self->edit_);
         if (edit && Equal(value, L"exit")) self->Close(Mode::Normal);
         else if (edit && value.starts_with(L"=")) {
@@ -422,7 +471,7 @@ LRESULT CALLBACK Desktop::InputProc(HWND control, UINT msg, WPARAM wp, LPARAM lp
         }
         return 0;
     }
-    if (edit && msg == WM_CHAR && wp == L' ' && Text(control).empty()) {
+    if (edit && msg == WM_CHAR && wp == L' ' && Text(control).empty() && !self->url_naming_) {
         self->Show(View::Files);
         return 0;
     }
@@ -537,9 +586,13 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
                     ::SetCapture(hwnd_);
                     return 0;
                 }
-                if (zone == HitZone::InstallIcon) InstallPackage(false);
-                else if (zone == HitZone::InstallDest) InstallPackage(true);
-                else if (zone == HitZone::OrphanBadge) ChooseOrphanAction();
+                if (zone == HitZone::InstallIcon) {
+                    if (IsUrlOfferVisible()) StartUrlNaming();
+                    else InstallPackage(false);
+                } else if (zone == HitZone::InstallDest) {
+                    if (IsUrlOfferVisible()) StartUrlNaming();
+                    else InstallPackage(true);
+                } else if (zone == HitZone::OrphanBadge) ChooseOrphanAction();
                 else Show(View::Search);
                 return 0;
             }
@@ -582,7 +635,10 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         }
         case WM_COMMAND:
-            if (LOWORD(wp) == 1 && HIWORD(wp) == EN_CHANGE && view_ == View::Search) Populate();
+            if (LOWORD(wp) == 1 && HIWORD(wp) == EN_CHANGE) {
+                if (view_ == View::Search) Populate();
+                else if (url_naming_) Render();
+            }
             return 0;
         case WM_HOTKEY:
             if (config_.LoadConfigIni(false).ok) ApplyConfigSettings(true);
@@ -595,6 +651,11 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
         case WM_ACTIVATE:
             if (LOWORD(wp) == WA_INACTIVE) {
                 if (!modal_ && view_ != View::Pill) Show(View::Pill);
+                else if (!modal_ && url_naming_) {
+                    url_naming_ = false;
+                    ::SetWindowTextW(edit_, L"");
+                    Layout();
+                }
             } else {
                 RefreshOrphans();
                 if (config_.LoadConfigIni(false).ok) {
@@ -778,8 +839,13 @@ void Desktop::Layout() {
     const int pad = ShadowPad();
 
     if (view_ == View::Pill) {
-        if (IsOfferVisible()) {
-            const auto dest = SuggestedId(package_) + L" \u25be";
+        if (url_naming_) {
+            target_w_ = std::min(S(248), avail_w);
+            target_h_ = S(34);
+        } else if (IsOfferVisible()) {
+            const auto dest = IsUrlOfferVisible()
+                ? (SuggestedUrlName(clipboard_url_) + L" (URL)")
+                : (SuggestedId(package_) + L" \u25be");
             const int text_w = static_cast<int>(std::ceil(gfx::MeasureTextWidth(surface_.hdc(), dest, Sf(13.0f), true)));
             target_w_ = std::clamp(S(68) + text_w, S(188), std::min(S(320), avail_w));
             target_h_ = S(34);
@@ -851,7 +917,11 @@ void Desktop::Layout() {
     // Update child control positions and visibility immediately for tests and input handling
     const int search_h = S(40);
     const int header_h = S(40);
-    ::MoveWindow(edit_, pad + S(36), pad + S(8), std::max(S(40), target_w_ - S(72)), S(24), FALSE);
+    if (view_ == View::Pill && url_naming_) {
+        ::MoveWindow(edit_, pad + S(34), pad + S(5), std::max(S(40), target_w_ - S(64)), S(24), FALSE);
+    } else {
+        ::MoveWindow(edit_, pad + S(36), pad + S(8), std::max(S(40), target_w_ - S(72)), S(24), FALSE);
+    }
     if (view_ == View::Search) {
         ::MoveWindow(list_, pad, pad + search_h, target_w_, std::max(0, target_h_ - search_h), FALSE);
     } else if (view_ == View::Files) {
@@ -860,7 +930,7 @@ void Desktop::Layout() {
         ::MoveWindow(list_, 0, 0, 0, 0, FALSE);
     }
 
-    ::ShowWindow(edit_, view_ == View::Search ? SW_SHOW : SW_HIDE);
+    ::ShowWindow(edit_, (view_ == View::Search || url_naming_) ? SW_SHOW : SW_HIDE);
     ::ShowWindow(list_, view_ != View::Pill ? SW_SHOW : SW_HIDE);
 
     Render();
@@ -919,7 +989,27 @@ void Desktop::Render() {
         const float led_cx = static_cast<float>(capsule.right) - Sf(18.0f);
         const float led_cy = static_cast<float>(capsule.top + capsule.bottom) * 0.5f;
 
-        if (IsOfferVisible()) {
+        if (url_naming_) {
+            const float wcx = static_cast<float>(capsule.left + S(20));
+            gfx::DrawWebIcon(hdc, wcx, led_cy, Sf(15.0f), {52, 211, 153, 255}, false);
+            rect_edit_draw_ = {capsule.left + S(34), capsule.top + S(3), capsule.right - S(30), capsule.bottom - S(3)};
+            DWORD sel_a = 0, sel_b = 0;
+            ::SendMessageW(edit_, EM_GETSEL, reinterpret_cast<WPARAM>(&sel_a), reinterpret_cast<LPARAM>(&sel_b));
+            const bool focused = ::GetFocus() == edit_;
+            gfx::DrawSearchText(hdc, Text(edit_), L"", static_cast<int>(sel_a), static_cast<int>(sel_b),
+                                caret_visible_, focused, rect_edit_draw_, Sf(13.0f), dpi_);
+        } else if (IsUrlOfferVisible()) {
+            rect_install_ = {capsule.left + S(6), capsule.top, capsule.left + S(36), capsule.bottom};
+            const float icx = static_cast<float>(rect_install_.left + rect_install_.right) * 0.5f;
+            const float icy = static_cast<float>(rect_install_.top + rect_install_.bottom) * 0.5f;
+            gfx::DrawWebIcon(hdc, icx, icy, Sf(15.5f), {52, 211, 153, 255}, hover_zone_ == HitZone::InstallIcon);
+
+            rect_dest_ = {capsule.left + S(36), capsule.top, capsule.right - S(30), capsule.bottom};
+            const auto dest_label = SuggestedUrlName(clipboard_url_) + L" (URL)";
+            const gfx::Color4 text_color = hover_zone_ == HitZone::InstallDest
+                ? gfx::Color4{255, 255, 255, 255} : gfx::Color4{226, 232, 240, 255};
+            gfx::DrawTextLine(hdc, dest_label, rect_dest_, Sf(13.0f), true, text_color, 0);
+        } else if (IsOfferVisible()) {
             const auto id = SuggestedId(package_);
             const bool target_busy = IsAppRunning(id);
             const gfx::Color4 icon_color = target_busy ? gfx::Color4{248, 113, 113, 255} : gfx::Color4{52, 211, 153, 255};
@@ -988,26 +1078,32 @@ void Desktop::Render() {
                 }
 
                 const auto& item = items_[static_cast<std::size_t>(i)];
-                std::wstring rel = item.value;
-                bool has_dot = false;
-                gfx::Color4 dot_color{148, 163, 184, 255};
-                bool running = false;
-                if (item.kind == Kind::App) {
-                    has_dot = true;
-                    running = IsAppRunning(item.value);
-                    if (const auto* app = FindLoadedApp(item.value)) {
-                        rel = app->executable;
-                        dot_color = PrivacyColor(app->color);
-                    } else {
-                        rel.clear();
+                if (item.kind == Kind::Url) {
+                    const float wcx = static_cast<float>(capsule.left + S(30));
+                    const float wcy = static_cast<float>(ry) + static_cast<float>(row_h) * 0.5f;
+                    gfx::DrawWebIcon(hdc, wcx, wcy, Sf(15.0f), {52, 211, 153, 235}, is_sel || is_hov);
+                } else {
+                    std::wstring rel = item.value;
+                    bool has_dot = false;
+                    gfx::Color4 dot_color{148, 163, 184, 255};
+                    bool running = false;
+                    if (item.kind == Kind::App) {
+                        has_dot = true;
+                        running = IsAppRunning(item.value);
+                        if (const auto* app = FindLoadedApp(item.value)) {
+                            rel = app->executable;
+                            dot_color = PrivacyColor(app->color);
+                        } else {
+                            rel.clear();
+                        }
                     }
+                    const auto resolved = resolver_.ResolvePmRelativePath(rel);
+                    const int icon_sz = S(20);
+                    gfx::DrawItemIcon(hdc, resolved.ok ? resolved.resolved_path : L"",
+                                      item.kind == Kind::App, item.kind == Kind::Folder,
+                                      capsule.left + S(20), ry + (row_h - icon_sz) / 2, icon_sz,
+                                      has_dot, dot_color, running, dpi_);
                 }
-                const auto resolved = resolver_.ResolvePmRelativePath(rel);
-                const int icon_sz = S(20);
-                gfx::DrawItemIcon(hdc, resolved.ok ? resolved.resolved_path : L"",
-                                  item.kind == Kind::App, item.kind == Kind::Folder,
-                                  capsule.left + S(20), ry + (row_h - icon_sz) / 2, icon_sz,
-                                  has_dot, dot_color, running, dpi_);
 
                 const RECT text_rect{capsule.left + S(48), ry, capsule.right - S(16), ry + row_h};
                 gfx::DrawTextLine(hdc, item.label, text_rect, Sf(13.5f), is_sel,
@@ -1111,6 +1207,7 @@ HitZone Desktop::HitTest(POINT client, int& item_index) const {
     const int pad = ShadowPad();
 
     if (view_ == View::Pill) {
+        if (url_naming_) return HitZone::None;
         if (IsOfferVisible()) {
             if (in(rect_install_)) return HitZone::InstallIcon;
             if (in(rect_dest_)) return HitZone::InstallDest;
@@ -1189,6 +1286,7 @@ void Desktop::MoveSelection(int dx, int dy) {
 void Desktop::Show(View view) {
     if (closing_) return;
     view_ = view;
+    url_naming_ = false;
     if (view == View::Pill) ::SetWindowTextW(edit_, L"");
     if (view == View::Files) folder_ = L"Other";
     scroll_row_ = 0;
@@ -1246,6 +1344,26 @@ void Desktop::Populate() {
         }
         items_.insert(items_.end(), partial.begin(), partial.end());
     }
+    if (view_ == View::Search) {
+        config_.LoadAppsIni(false);
+        const auto& apps_doc = config_.apps_doc();
+        std::vector<Item> url_exact, url_partial;
+        for (const auto& line : apps_doc.lines()) {
+            if (line.kind != core::IniDocument::LineKind::Section || !Prefix(line.section_name, L"Url.")) continue;
+            const auto name = line.section_name.substr(4);
+            const auto url = apps_doc.GetValue(line.section_name, L"URL");
+            if (name.empty() || url.empty()) continue;
+            Item item{Kind::Url, name, url, {}};
+            if (Equal(typed, name) || (Prefix(typed, name) && typed.size() > name.size() && typed[name.size()] == L' ')) {
+                if (typed.size() > name.size()) item.args = typed.substr(name.size() + 1);
+                url_exact.push_back(std::move(item));
+            } else if (Prefix(name, typed)) {
+                url_partial.push_back(std::move(item));
+            }
+        }
+        items_.insert(items_.end(), url_exact.begin(), url_exact.end());
+        items_.insert(items_.end(), url_partial.begin(), url_partial.end());
+    }
     const auto folder = view_ == View::Files ? folder_ : L"Other";
     const auto full = resolver_.ResolvePmRelativePath(folder);
     applications::Pins pins;
@@ -1270,6 +1388,15 @@ void Desktop::Populate() {
 
 void Desktop::Back() {
     if (view_ == View::Pill) {
+        if (url_naming_) {
+            url_naming_ = false;
+            ::SetWindowTextW(edit_, L"");
+        }
+        if (!clipboard_url_.empty()) {
+            dismissed_url_ = clipboard_url_;
+            clipboard_url_.clear();
+            Layout();
+        }
         if (!package_.empty()) {
             dismissed_package_ = package_;
             package_.clear();
@@ -1301,6 +1428,20 @@ void Desktop::Open(int index) {
         ::SetFocus(list_);
     } else if (item.kind == Kind::File) {
         BrowseDocument(item);
+    } else if (item.kind == Kind::Url) {
+        const auto final_url = item.value.find(L"$W$") != std::wstring::npos
+            ? ExpandWeb(item.value, item.args) : item.value;
+        if (!IsHttpUrl(final_url)) { Report(ERROR_INVALID_NAME); return; }
+        applications::List(resolver_, apps_);
+        const auto browser = std::find_if(apps_.begin(), apps_.end(), [](const App& a) { return a.browser && !a.archived; });
+        if (browser != apps_.end()) {
+            Launch(*browser, jobs::QuoteArgument(final_url));
+        } else {
+            const auto result = reinterpret_cast<INT_PTR>(::ShellExecuteW(
+                hwnd_, L"open", final_url.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+            if (result <= 32) Report(static_cast<DWORD>(result));
+            else Show(View::Pill);
+        }
     } else {
         App app;
         const auto error = applications::Find(resolver_, item.value, app);
@@ -1616,6 +1757,15 @@ void Desktop::UpdateClipboard() {
         ::DragQueryFileW(drop, 0, candidate.data(), size + 1);
         candidate.resize(size);
     }
+    std::wstring text_candidate;
+    if (candidate.empty()) {
+        if (const auto text_mem = static_cast<HGLOBAL>(::GetClipboardData(CF_UNICODETEXT))) {
+            if (const auto* raw = static_cast<const wchar_t*>(::GlobalLock(text_mem))) {
+                text_candidate = raw;
+                ::GlobalUnlock(text_mem);
+            }
+        }
+    }
     ::CloseClipboard();
     const auto attrs = candidate.empty() ? INVALID_FILE_ATTRIBUTES : ::GetFileAttributesW(candidate.c_str());
     const bool valid_pkg = attrs != INVALID_FILE_ATTRIBUTES &&
@@ -1628,8 +1778,65 @@ void Desktop::UpdateClipboard() {
         package_.clear();
     } else {
         package_ = std::move(candidate);
+        clipboard_url_.clear();
+        url_naming_ = false;
+    }
+
+    while (!text_candidate.empty() && (text_candidate.front() == L' ' || text_candidate.front() == L'\t' ||
+           text_candidate.front() == L'\r' || text_candidate.front() == L'\n'))
+        text_candidate.erase(text_candidate.begin());
+    while (!text_candidate.empty() && (text_candidate.back() == L' ' || text_candidate.back() == L'\t' ||
+           text_candidate.back() == L'\r' || text_candidate.back() == L'\n'))
+        text_candidate.pop_back();
+
+    const bool valid_url = !valid_pkg && IsHttpUrl(text_candidate);
+    if (!valid_url) {
+        clipboard_url_.clear();
+        dismissed_url_.clear();
+        if (url_naming_) {
+            url_naming_ = false;
+            ::SetWindowTextW(edit_, L"");
+        }
+    } else if (text_candidate == dismissed_url_) {
+        clipboard_url_.clear();
+    } else {
+        if (clipboard_url_ != text_candidate) url_naming_ = false;
+        clipboard_url_ = std::move(text_candidate);
     }
     Layout();
+}
+
+void Desktop::StartUrlNaming() {
+    if (!IsUrlOfferVisible()) return;
+    url_naming_ = true;
+    const auto suggested = SuggestedUrlName(clipboard_url_);
+    ::SetWindowTextW(edit_, suggested.c_str());
+    ::SendMessageW(edit_, EM_SETSEL, 0, -1);
+    Layout();
+    ::SetForegroundWindow(hwnd_);
+    ::SetFocus(edit_);
+}
+
+void Desktop::SaveUrlAlias() {
+    if (!url_naming_ || clipboard_url_.empty() || origin_lost_) return;
+    const auto name = SanitizeUrlName(Text(edit_));
+    if (name.empty()) {
+        Report(ERROR_INVALID_NAME);
+        return;
+    }
+    config_.LoadAppsIni(true);
+    std::wstring error;
+    const auto section = L"Url." + name;
+    if (!config_.apps_doc().SetValue(section, L"URL", clipboard_url_, error) ||
+        !config_.SaveAppsIniIfModified(true).ok) {
+        Report(ERROR_WRITE_FAULT);
+        return;
+    }
+    dismissed_url_ = clipboard_url_;
+    clipboard_url_.clear();
+    url_naming_ = false;
+    ::SetWindowTextW(edit_, L"");
+    Populate();
 }
 
 void Desktop::PickPackage(std::wstring id) {
