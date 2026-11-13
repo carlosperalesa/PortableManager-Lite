@@ -139,6 +139,9 @@ DWORD InspectInstallation(const PathResolver& resolver, const LearningRequest& r
     if (info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))
         return ERROR_INVALID_DATA;
     candidates = LearningEngine::Inspect(executable);
+    if (!candidates && request.allow_fallback) {
+        candidates = LearningEngine::InspectWithFallback(executable, request.app_id);
+    }
     return candidates ? ERROR_SUCCESS : ERROR_INVALID_PARAMETER;
 }
 
@@ -203,7 +206,7 @@ struct Folder {
 
 DWORD Publish(const PathResolver& resolver, const std::wstring& app_dir,
               const Candidates& candidates, std::array<Folder, 2>& folders,
-              bool registry_changed, LearningResult& result) {
+              bool registry_changed, bool allow_clean_marker, LearningResult& result) {
     // A wrapper contains cleanup metadata only.
     for (auto& folder : folders) {
         if (!folder.approved) continue;
@@ -216,8 +219,9 @@ DWORD Publish(const PathResolver& resolver, const std::wstring& app_dir,
         folder.learned = !folder.affected_entries.empty();
     }
     if (!registry_changed &&
-        std::none_of(folders.begin(), folders.end(), [](const Folder& folder) { return folder.learned; }))
-        return ERROR_SUCCESS;
+        std::none_of(folders.begin(), folders.end(), [](const Folder& folder) { return folder.learned; })) {
+        if (!allow_clean_marker) return ERROR_SUCCESS;
+    }
 
     PinnedDirectories pinned;
     const DWORD error = PinPortableDirectory(resolver, app_dir, false, pinned);
@@ -292,6 +296,54 @@ std::optional<Candidates> LearningEngine::Inspect(const std::wstring& executable
         result.company = std::move(company);
         result.product = std::move(product);
     }
+    const auto suffix = L"\\" + result.company + L"\\" + result.product;
+    result.roaming = L"%APPDATA%" + suffix;
+    result.local = L"%LOCALAPPDATA%" + suffix;
+    result.registry = L"HKCU\\Software" + suffix;
+    return result;
+}
+
+Candidates LearningEngine::InspectWithFallback(const std::wstring& executable, std::wstring_view app_id) {
+    if (auto strict = Inspect(executable)) return *strict;
+
+    auto sanitize = [](std::wstring_view raw) -> std::wstring {
+        constexpr std::wstring_view allowed =
+            L"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ._-";
+        std::wstring out;
+        for (const wchar_t ch : raw) {
+            if (allowed.find(ch) != std::wstring_view::npos) out.push_back(ch);
+        }
+        while (!out.empty() && (out.front() == L'.' || out.front() == L' ')) out.erase(out.begin());
+        while (!out.empty() && (out.back() == L'.' || out.back() == L' ')) out.pop_back();
+        if (out.size() > 80) out.resize(80);
+        return SafeComponent(out) ? out : std::wstring{};
+    };
+
+    std::wstring company, product;
+    DWORD ignored = 0;
+    const DWORD size = DrivePath(executable) ? ::GetFileVersionInfoSizeW(executable.c_str(), &ignored) : 0;
+    if (size && size <= 1024 * 1024) {
+        std::vector<unsigned char> info(size);
+        struct Translation { WORD language; WORD codepage; };
+        void* values = nullptr;
+        UINT bytes = 0;
+        if (::GetFileVersionInfoW(executable.c_str(), 0, size, info.data()) &&
+            ::VerQueryValueW(info.data(), L"\\VarFileInfo\\Translation", &values, &bytes) &&
+            values && bytes >= sizeof(Translation)) {
+            const auto& [language, codepage] = *static_cast<const Translation*>(values);
+            company = sanitize(VersionValue(info.data(), language, codepage, L"CompanyName"));
+            product = sanitize(VersionValue(info.data(), language, codepage, L"ProductName"));
+        }
+    }
+
+    auto fallback = sanitize(app_id);
+    if (fallback.empty()) fallback = L"portable_app";
+    if (company.empty() || SharedCompany(company)) company = fallback;
+    if (product.empty()) product = fallback;
+
+    Candidates result;
+    result.company = std::move(company);
+    result.product = std::move(product);
     const auto suffix = L"\\" + result.company + L"\\" + result.product;
     result.roaming = L"%APPDATA%" + suffix;
     result.local = L"%LOCALAPPDATA%" + suffix;
@@ -442,7 +494,7 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         result.error = ERROR_DEVICE_NOT_CONNECTED;
         return result;
     }
-    result.error = Publish(resolver, app_dir, *candidates, folders, registry_changed, result);
+    result.error = Publish(resolver, app_dir, *candidates, folders, registry_changed, request.allow_fallback, result);
     return result;
 }
 }

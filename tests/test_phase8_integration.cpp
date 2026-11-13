@@ -271,7 +271,7 @@ struct Fixture {
         Send(window, WM_HOTKEY, 1);
         Check(::IsWindowVisible(input), "hotkey opens search");
         Send(input, WM_CHAR, L' ');
-        Check(!::IsWindowVisible(input) && ::IsWindowVisible(list), "space opens desktop");
+        Check(::IsWindowVisible(input) && ::IsWindowVisible(list), "space opens desktop");
         Send(list, WM_KEYDOWN, VK_ESCAPE);
         Check(!::IsWindowVisible(list), "escape collapses desktop");
         Check(::PostMessageW(window, WM_CLOSE, 0, 0) && process.Wait() == 0, "close PMD normally");

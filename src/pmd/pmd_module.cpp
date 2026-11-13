@@ -4,6 +4,7 @@
 #include "applications/session_host.h"
 #include "cleanup/cleanup_module.h"
 #include "core/config_manager.h"
+#include "core/pm_version.h"
 #include "guard/guard_process.h"
 #include "jobs/job_manager.h"
 #include "learning/learning_engine.h"
@@ -28,6 +29,8 @@ using cleanup::Mode;
 using core::PathResolver;
 
 constexpr wchar_t kWindowClass[] = L"PML_PortableManagerDesktop";
+constexpr wchar_t kKillOverlayClass[] = L"PML_KillOverlay";
+constexpr wchar_t kNoteHostClass[] = L"PML_NoteHost";
 constexpr UINT kFinished = WM_APP + 1;
 constexpr UINT kOperation = WM_APP + 2;
 constexpr UINT kOpen = WM_APP + 3;
@@ -41,8 +44,19 @@ constexpr UINT_PTR kCaretTimerId = 3;
 constexpr UINT_PTR kBusyTimerId = 4;
 
 enum class View { Pill, Search, Files };
-enum class Kind { App, File, Folder, Url };
-enum class HitZone { None, InstallIcon, InstallDest, OrphanBadge, WebSearch, BackButton, Item };
+enum class Tab { Desktop, Notes, Config };
+enum class Kind { App, File, Folder, Url, Kill };
+enum class HitZone {
+    None, InstallIcon, InstallDest, OrphanBadge, WebSearch, BackButton, Item,
+    TopTabDesktop, TopTabNotes, TopTabConfig, NoteTab, NoteClose, NoteAdd, ResizeGrip, ConfigAction
+};
+
+struct NoteEntry {
+    std::wstring name;
+    std::wstring path;
+    std::wstring content;
+    bool dirty = false;
+};
 
 struct Item {
     Kind kind;
@@ -254,7 +268,6 @@ private:
     void Back();
     void BrowseDocument(const Item& item);
     void SearchWeb(bool fallback);
-    void Launch(const App& app, std::wstring arguments);
     void Close(Mode mode);
     void CloseWhenReady();
     void LoseOrigin();
@@ -262,11 +275,23 @@ private:
     void UpdateClipboard();
     void StartUrlNaming();
     void SaveUrlAlias();
+    void StartKillPick();
+    void LoadNotes();
+    void SaveActiveNote();
+    void SwitchNote(int index);
+    void CreateNote();
+    void DeleteNote(int index);
+    void StartNoteRename();
+    void CommitNoteRename();
+    void FindNextInNote();
+    void EnsureNoteHost();
+    void UpdateNoteHostBounds();
     void PickPackage(std::wstring id = {});
     void InstallPackage(bool choose_destination);
     void StartInstall(std::wstring id, std::wstring package, std::wstring executable = {});
     bool ChooseExecutable();
     void Menu(bool application, int index = -1);
+    void Launch(const App& app, std::wstring arguments, bool force_evaluate = false);
     void StartOperation(std::function<DWORD()> operation);
     void Report(DWORD error);
 
@@ -288,6 +313,7 @@ private:
     WNDPROC list_proc_ = nullptr;
 
     View view_ = View::Pill;
+    Tab tab_ = Tab::Desktop;
     std::wstring folder_ = L"Other";
     std::wstring origin_;
     std::wstring package_;
@@ -351,6 +377,29 @@ private:
     RECT rect_web_{};
     RECT rect_back_{};
     RECT rect_edit_draw_{};
+    RECT rect_tab_desktop_{};
+    RECT rect_tab_notes_{};
+    RECT rect_tab_config_{};
+    RECT rect_note_add_{};
+    RECT rect_resize_grip_{};
+    std::vector<RECT> rect_note_tabs_;
+    std::vector<RECT> rect_note_closes_;
+    std::vector<RECT> rect_config_rows_;
+
+    HWND note_host_ = nullptr;
+    HWND note_edit_ = nullptr;
+    HBRUSH note_bg_brush_ = nullptr;
+    HFONT note_font_ = nullptr;
+    std::vector<NoteEntry> notes_;
+    int active_note_ = 0;
+    bool note_renaming_ = false;
+    int notes_w_ = 440;
+    int notes_h_ = 360;
+    bool resizing_notes_ = false;
+    POINT resize_start_screen_{};
+    int resize_start_w_ = 440;
+    int resize_start_h_ = 360;
+    bool kill_picking_ = false;
 
     HICON tray_icon_green_ = nullptr;
     HICON tray_icon_red_ = nullptr;
@@ -446,14 +495,32 @@ LRESULT CALLBACK Desktop::InputProc(HWND control, UINT msg, WPARAM wp, LPARAM lp
     const bool edit = control == self->edit_;
     const auto base = edit ? self->edit_proc_ : self->list_proc_;
 
-    if (msg == WM_KEYDOWN && wp == VK_ESCAPE) { self->Back(); return 0; }
+    if (msg == WM_KEYDOWN && wp == VK_ESCAPE) {
+        if (edit && self->note_renaming_) {
+            self->note_renaming_ = false;
+            ::SetWindowTextW(self->edit_, L"");
+            self->Layout();
+            return 0;
+        }
+        self->Back();
+        return 0;
+    }
     if (msg == WM_KEYDOWN && wp == VK_RETURN) {
         if (edit && self->url_naming_) {
             self->SaveUrlAlias();
             return 0;
         }
+        if (edit && self->note_renaming_) {
+            self->CommitNoteRename();
+            return 0;
+        }
+        if (edit && self->view_ == View::Files && self->tab_ == Tab::Notes) {
+            self->FindNextInNote();
+            return 0;
+        }
         const auto value = Text(self->edit_);
         if (edit && Equal(value, L"exit")) self->Close(Mode::Normal);
+        else if (edit && Equal(value, L"kill")) self->StartKillPick();
         else if (edit && value.starts_with(L"=")) {
             double result = 0;
             if (!Calculator(std::wstring_view(value).substr(1)).Evaluate(result)) self->Report(ERROR_INVALID_DATA);
@@ -471,14 +538,22 @@ LRESULT CALLBACK Desktop::InputProc(HWND control, UINT msg, WPARAM wp, LPARAM lp
         }
         return 0;
     }
-    if (edit && msg == WM_CHAR && wp == L' ' && Text(control).empty() && !self->url_naming_) {
+    if (edit && msg == WM_CHAR && wp == L' ' && Text(control).empty() &&
+        self->view_ == View::Search && !self->url_naming_ && !self->note_renaming_) {
         self->Show(View::Files);
         return 0;
     }
     if (edit && msg == WM_CHAR && (wp == VK_ESCAPE || wp == VK_RETURN)) return 0;
-    if (edit && msg == WM_KEYDOWN && (wp == VK_UP || wp == VK_DOWN) && !self->items_.empty()) {
-        self->MoveSelection(0, wp == VK_UP ? -1 : 1);
-        return 0;
+    if (edit && msg == WM_KEYDOWN && !self->items_.empty() &&
+        (self->view_ == View::Search || (self->view_ == View::Files && self->tab_ == Tab::Desktop))) {
+        if (wp == VK_UP || wp == VK_DOWN) {
+            self->MoveSelection(0, wp == VK_UP ? -1 : 1);
+            return 0;
+        }
+        if (self->view_ == View::Files && Text(control).empty() && (wp == VK_LEFT || wp == VK_RIGHT)) {
+            self->MoveSelection(wp == VK_LEFT ? -1 : 1, 0);
+            return 0;
+        }
     }
     if (!edit && msg == WM_KEYDOWN) {
         if (wp == VK_UP) { self->MoveSelection(0, -1); return 0; }
@@ -531,6 +606,10 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
         }
         case WM_SETCURSOR: {
             if (LOWORD(lp) == HTCLIENT) {
+                if (hover_zone_ == HitZone::ResizeGrip) {
+                    ::SetCursor(::LoadCursorW(nullptr, IDC_SIZENWSE));
+                    return TRUE;
+                }
                 const bool clickable = hover_zone_ != HitZone::None || view_ == View::Pill;
                 ::SetCursor(::LoadCursorW(nullptr, clickable ? IDC_HAND : IDC_ARROW));
                 return TRUE;
@@ -538,6 +617,16 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             break;
         }
         case WM_MOUSEMOVE: {
+            if (resizing_notes_) {
+                POINT cursor{};
+                ::GetCursorPos(&cursor);
+                const int dx = static_cast<int>(std::lround((cursor.x - resize_start_screen_.x) * 96.0 / dpi_));
+                const int dy = static_cast<int>(std::lround((cursor.y - resize_start_screen_.y) * 96.0 / dpi_));
+                notes_w_ = std::clamp(resize_start_w_ + dx, 320, 920);
+                notes_h_ = std::clamp(resize_start_h_ + dy, 250, 740);
+                Layout();
+                return 0;
+            }
             if (dragging_) {
                 POINT cursor{};
                 ::GetCursorPos(&cursor);
@@ -596,9 +685,28 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
                 else Show(View::Search);
                 return 0;
             }
+            if (view_ == View::Files && tab_ == Tab::Notes && zone == HitZone::ResizeGrip) {
+                POINT screen = client;
+                ::ClientToScreen(hwnd_, &screen);
+                resizing_notes_ = true;
+                resize_start_screen_ = screen;
+                resize_start_w_ = notes_w_;
+                resize_start_h_ = notes_h_;
+                ::SetCapture(hwnd_);
+                return 0;
+            }
             return 0;
         }
         case WM_LBUTTONUP: {
+            if (resizing_notes_) {
+                resizing_notes_ = false;
+                ::ReleaseCapture();
+                std::wstring err;
+                config_.config_doc().SetValue(L"Desktop", L"NotesWidth", std::to_wstring(notes_w_), err);
+                config_.config_doc().SetValue(L"Desktop", L"NotesHeight", std::to_wstring(notes_h_), err);
+                config_.SaveConfigIniIfModified(false);
+                return 0;
+            }
             if (dragging_) {
                 dragging_ = false;
                 ::ReleaseCapture();
@@ -608,7 +716,64 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             POINT client{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
             int idx = -1;
             const auto zone = HitTest(client, idx);
-            if (zone == HitZone::WebSearch) SearchWeb(false);
+            if (zone == HitZone::TopTabDesktop) {
+                SaveActiveNote();
+                note_renaming_ = false;
+                tab_ = Tab::Desktop;
+                ::SetWindowTextW(edit_, L"");
+                Populate();
+                ::SetFocus(edit_);
+            } else if (zone == HitZone::TopTabNotes) {
+                note_renaming_ = false;
+                tab_ = Tab::Notes;
+                ::SetWindowTextW(edit_, L"");
+                LoadNotes();
+                Layout();
+            } else if (zone == HitZone::TopTabConfig) {
+                SaveActiveNote();
+                note_renaming_ = false;
+                tab_ = Tab::Config;
+                ::SetWindowTextW(edit_, L"");
+                Layout();
+            } else if (zone == HitZone::NoteTab && idx >= 0) {
+                if (idx == active_note_) StartNoteRename();
+                else SwitchNote(idx);
+            } else if (zone == HitZone::NoteClose && idx >= 0) {
+                DeleteNote(idx);
+            } else if (zone == HitZone::NoteAdd) {
+                CreateNote();
+            } else if (zone == HitZone::ConfigAction && idx >= 0) {
+                auto& doc = config_.config_doc();
+                std::wstring err;
+                if (idx == 0) {
+                    const std::vector<std::wstring> presets{L"Ctrl+Space", L"Alt+Space", L"Ctrl+Shift+Space", L"Ctrl+Alt+Space"};
+                    const auto cur = doc.GetValue(L"Desktop", L"Hotkey", L"Ctrl+Space");
+                    std::size_t next = 0;
+                    for (std::size_t i = 0; i < presets.size(); ++i) {
+                        if (Equal(cur, presets[i])) { next = (i + 1) % presets.size(); break; }
+                    }
+                    doc.SetValue(L"Desktop", L"Hotkey", presets[next], err);
+                } else if (idx == 1) {
+                    doc.SetValue(L"Desktop", L"AlwaysOnTop", always_on_top_ ? L"false" : L"true", err);
+                } else if (idx == 2) {
+                    const int next_pct = translucent_pct_ <= 50 ? 100 : (translucent_pct_ - 10);
+                    doc.SetValue(L"Desktop", L"Translucent", std::to_wstring(next_pct) + L"%", err);
+                } else if (idx == 3) {
+                    doc.SetValue(L"Desktop", L"RememberPosition", remember_pos_ ? L"false" : L"true", err);
+                } else if (idx == 4) {
+                    config_.SaveConfigIniIfModified(true);
+                    const auto file = resolver_.ResolvePmRelativePath(L"Data\\config.ini");
+                    const auto res = reinterpret_cast<INT_PTR>(::ShellExecuteW(
+                        hwnd_, L"open", file.resolved_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+                    if (res <= 32) Report(static_cast<DWORD>(res));
+                }
+                if (idx >= 0 && idx <= 3) {
+                    config_.SaveConfigIniIfModified(false);
+                    ApplyConfigSettings(true);
+                    ApplyWindowGeometry();
+                    Render();
+                }
+            } else if (zone == HitZone::WebSearch) SearchWeb(false);
             else if (zone == HitZone::BackButton) Back();
             else if (zone == HitZone::Item && idx >= 0) {
                 selected_ = idx;
@@ -636,8 +801,8 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
         }
         case WM_COMMAND:
             if (LOWORD(wp) == 1 && HIWORD(wp) == EN_CHANGE) {
-                if (view_ == View::Search) Populate();
-                else if (url_naming_) Render();
+                if (view_ == View::Search || (view_ == View::Files && tab_ == Tab::Desktop)) Populate();
+                else if (url_naming_ || note_renaming_ || (view_ == View::Files && tab_ == Tab::Notes)) Render();
             }
             return 0;
         case WM_HOTKEY:
@@ -650,11 +815,16 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         case WM_ACTIVATE:
             if (LOWORD(wp) == WA_INACTIVE) {
-                if (!modal_ && view_ != View::Pill) Show(View::Pill);
-                else if (!modal_ && url_naming_) {
-                    url_naming_ = false;
-                    ::SetWindowTextW(edit_, L"");
-                    Layout();
+                if (!modal_ && !kill_picking_) {
+                    const HWND new_fg = reinterpret_cast<HWND>(lp);
+                    if (note_host_ && (new_fg == note_host_ || new_fg == note_edit_)) return 0;
+                    SaveActiveNote();
+                    if (view_ != View::Pill) Show(View::Pill);
+                    else if (url_naming_) {
+                        url_naming_ = false;
+                        ::SetWindowTextW(edit_, L"");
+                        Layout();
+                    }
                 }
             } else {
                 RefreshOrphans();
@@ -745,6 +915,10 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             CloseWhenReady();
             return 0;
         case WM_DESTROY:
+            SaveActiveNote();
+            if (note_host_) { ::DestroyWindow(note_host_); note_host_ = nullptr; note_edit_ = nullptr; }
+            if (note_bg_brush_) { ::DeleteObject(note_bg_brush_); note_bg_brush_ = nullptr; }
+            if (note_font_) { ::DeleteObject(note_font_); note_font_ = nullptr; }
             RemoveTray();
             if (tray_icon_green_) { ::DestroyIcon(tray_icon_green_); tray_icon_green_ = nullptr; }
             if (tray_icon_red_) { ::DestroyIcon(tray_icon_red_); tray_icon_red_ = nullptr; }
@@ -787,6 +961,15 @@ void Desktop::ApplyConfigSettings(bool register_hotkey) {
     const long parsed_pct = trans_val.empty() ? 90 : std::wcstol(trans_val.c_str(), &end, 10);
     translucent_pct_ = (end != trans_val.c_str() && *end == L'\0')
         ? std::clamp(static_cast<int>(parsed_pct), 15, 100) : 90;
+
+    const auto parse_dim = [&](const wchar_t* key, int fallback, int low, int high) {
+        const auto v = doc.GetValue(L"Desktop", key);
+        wchar_t* e = nullptr;
+        const long n = v.empty() ? 0 : std::wcstol(v.c_str(), &e, 10);
+        return (!v.empty() && e == v.c_str() + v.size()) ? std::clamp(static_cast<int>(n), low, high) : fallback;
+    };
+    notes_w_ = parse_dim(L"NotesWidth", 440, 320, 920);
+    notes_h_ = parse_dim(L"NotesHeight", 360, 250, 740);
 
     if (register_hotkey && hwnd_) {
         const auto key = doc.GetValue(L"Desktop", L"Hotkey", L"Ctrl+Space");
@@ -860,6 +1043,12 @@ void Desktop::Layout() {
         const int max_rows = std::max(1, (avail_h - search_h - S(18)) / row_h);
         visible_rows_ = std::min(static_cast<int>(items_.size()), max_rows);
         target_h_ = visible_rows_ > 0 ? (search_h + S(8) + visible_rows_ * row_h + S(8)) : search_h;
+    } else if (tab_ == Tab::Notes) {
+        target_w_ = std::clamp(S(notes_w_), S(320), avail_w);
+        target_h_ = std::clamp(S(notes_h_), S(250), avail_h);
+    } else if (tab_ == Tab::Config) {
+        target_w_ = std::min(S(388), avail_w);
+        target_h_ = S(40) + S(246);
     } else {
         const auto col_str = config_.config_doc().GetValue(L"Desktop", L"Columns");
         wchar_t* end = nullptr;
@@ -869,16 +1058,17 @@ void Desktop::Layout() {
             ? static_cast<int>(parsed_cols) : 4;
         cols_ = std::clamp(desired_cols, 1, max_cols_fit);
         const int count = std::max(1, static_cast<int>(items_.size()));
-        if (col_str.empty()) cols_ = std::clamp(count, 2, cols_);
+        if (col_str.empty()) cols_ = std::clamp(count, 3, cols_);
         const int header_h = S(40);
+        const int search_h = S(36);
         const int cell_w = S(86);
         const int cell_h = S(84);
         const int total_rows = (count + cols_ - 1) / cols_;
-        const int max_rows = std::max(1, (avail_h - header_h - S(16)) / cell_h);
+        const int max_rows = std::max(1, (avail_h - header_h - search_h - S(16)) / cell_h);
         visible_rows_ = std::clamp(total_rows, 1, max_rows);
         scroll_row_ = std::clamp(scroll_row_, 0, std::max(0, total_rows - visible_rows_));
-        target_w_ = std::clamp(cols_ * cell_w + S(24), S(220), avail_w);
-        target_h_ = header_h + visible_rows_ * cell_h + S(12);
+        target_w_ = std::clamp(cols_ * cell_w + S(24), S(300), avail_w);
+        target_h_ = header_h + search_h + visible_rows_ * cell_h + S(12);
     }
 
     if (!has_pill_anchor_) {
@@ -917,21 +1107,29 @@ void Desktop::Layout() {
     // Update child control positions and visibility immediately for tests and input handling
     const int search_h = S(40);
     const int header_h = S(40);
+    const int desk_search_h = S(36);
     if (view_ == View::Pill && url_naming_) {
         ::MoveWindow(edit_, pad + S(34), pad + S(5), std::max(S(40), target_w_ - S(64)), S(24), FALSE);
+    } else if (view_ == View::Files && tab_ == Tab::Desktop) {
+        ::MoveWindow(edit_, pad + S(36), pad + header_h + S(6), std::max(S(40), target_w_ - S(72)), S(24), FALSE);
+    } else if (view_ == View::Files && tab_ == Tab::Notes) {
+        ::MoveWindow(edit_, pad + S(36), pad + target_h_ - S(30), std::max(S(40), target_w_ - S(66)), S(22), FALSE);
     } else {
         ::MoveWindow(edit_, pad + S(36), pad + S(8), std::max(S(40), target_w_ - S(72)), S(24), FALSE);
     }
     if (view_ == View::Search) {
         ::MoveWindow(list_, pad, pad + search_h, target_w_, std::max(0, target_h_ - search_h), FALSE);
-    } else if (view_ == View::Files) {
-        ::MoveWindow(list_, pad, pad + header_h, target_w_, std::max(0, target_h_ - header_h), FALSE);
+    } else if (view_ == View::Files && tab_ == Tab::Desktop) {
+        ::MoveWindow(list_, pad, pad + header_h + desk_search_h, target_w_, std::max(0, target_h_ - header_h - desk_search_h), FALSE);
     } else {
         ::MoveWindow(list_, 0, 0, 0, 0, FALSE);
     }
 
-    ::ShowWindow(edit_, (view_ == View::Search || url_naming_) ? SW_SHOW : SW_HIDE);
-    ::ShowWindow(list_, view_ != View::Pill ? SW_SHOW : SW_HIDE);
+    const bool show_edit = (view_ == View::Search) || url_naming_ ||
+        (view_ == View::Files && (tab_ == Tab::Desktop || tab_ == Tab::Notes));
+    ::ShowWindow(edit_, show_edit ? SW_SHOW : SW_HIDE);
+    ::ShowWindow(list_, (view_ == View::Search || (view_ == View::Files && tab_ == Tab::Desktop)) ? SW_SHOW : SW_HIDE);
+    UpdateNoteHostBounds();
 
     Render();
 
@@ -944,6 +1142,7 @@ void Desktop::ApplyWindowGeometry() {
     const int pad = ShadowPad();
     ::SetWindowPos(hwnd_, always_on_top_ ? HWND_TOPMOST : HWND_NOTOPMOST,
                    win_x_, win_y_, cur_w_ + pad * 2, cur_h_ + pad * 2, SWP_NOACTIVATE);
+    UpdateNoteHostBounds();
 }
 
 void Desktop::Render() {
@@ -1082,6 +1281,10 @@ void Desktop::Render() {
                     const float wcx = static_cast<float>(capsule.left + S(30));
                     const float wcy = static_cast<float>(ry) + static_cast<float>(row_h) * 0.5f;
                     gfx::DrawWebIcon(hdc, wcx, wcy, Sf(15.0f), {52, 211, 153, 235}, is_sel || is_hov);
+                } else if (item.kind == Kind::Kill) {
+                    const float kcx = static_cast<float>(capsule.left + S(30));
+                    const float kcy = static_cast<float>(ry) + static_cast<float>(row_h) * 0.5f;
+                    gfx::DrawGlowingLed(hdc, kcx, kcy, Sf(5.5f), {248, 113, 113, 255}, is_sel || is_hov);
                 } else {
                     std::wstring rel = item.value;
                     bool has_dot = false;
@@ -1112,20 +1315,46 @@ void Desktop::Render() {
         }
     } else {
         // View::Files (PM-Desktop)
+        rect_back_ = {};
+        rect_tab_desktop_ = {};
+        rect_tab_notes_ = {};
+        rect_tab_config_ = {};
+        rect_note_add_ = {};
+        rect_resize_grip_ = {};
+        rect_note_tabs_.clear();
+        rect_note_closes_.clear();
+        rect_config_rows_.clear();
+
         const int header_h = S(40);
-        const bool sub = folder_ != L"Other";
-        int title_left = capsule.left + S(16);
+        const bool sub = (tab_ == Tab::Desktop && folder_ != L"Other");
+        int tab_x = capsule.left + S(12);
         if (sub) {
             rect_back_ = {capsule.left + S(8), capsule.top + S(6), capsule.left + S(34), capsule.top + header_h - S(6)};
             gfx::DrawBackIcon(hdc, static_cast<float>(rect_back_.left + rect_back_.right) * 0.5f,
                               static_cast<float>(capsule.top) + static_cast<float>(header_h) * 0.5f,
                               Sf(14.0f), {148, 163, 184, 230}, hover_zone_ == HitZone::BackButton);
-            title_left = capsule.left + S(36);
+            tab_x = capsule.left + S(36);
         }
 
-        const std::wstring title = sub ? folder_ : L"Escritorio";
-        const RECT title_rect{title_left, capsule.top, capsule.right - S(42), capsule.top + header_h};
-        gfx::DrawTextLine(hdc, title, title_rect, Sf(13.5f), true, {241, 245, 249, 255}, -1);
+        auto draw_top_tab = [&](const wchar_t* label, Tab t, HitZone hz, RECT& out_rect) {
+            const int tw = static_cast<int>(gfx::MeasureTextWidth(hdc, label, Sf(13.0f), true)) + S(22);
+            out_rect = {tab_x, capsule.top + S(6), tab_x + tw, capsule.top + header_h - S(6)};
+            const bool active = (tab_ == t);
+            const bool hov = (hover_zone_ == hz);
+            if (active || hov) {
+                const gfx::Color4 fill = active ? gfx::Color4{59, 130, 246, 55} : gfx::Color4{255, 255, 255, 18};
+                const gfx::Color4 border = active ? gfx::Color4{96, 165, 250, 140} : gfx::Color4{0, 0, 0, 0};
+                gfx::DrawRoundedHighlight(hdc, static_cast<float>(out_rect.left), static_cast<float>(out_rect.top),
+                                          static_cast<float>(tw), static_cast<float>(out_rect.bottom - out_rect.top),
+                                          Sf(8.0f), fill, border);
+            }
+            gfx::DrawTextLine(hdc, label, out_rect, Sf(13.0f), active,
+                              active ? gfx::Color4{248, 250, 252, 255} : gfx::Color4{148, 163, 184, 235}, 0);
+            tab_x += tw + S(4);
+        };
+        draw_top_tab(sub ? folder_.c_str() : L"Escritorio", Tab::Desktop, HitZone::TopTabDesktop, rect_tab_desktop_);
+        draw_top_tab(L"Notas", Tab::Notes, HitZone::TopTabNotes, rect_tab_notes_);
+        draw_top_tab(L"Config", Tab::Config, HitZone::TopTabConfig, rect_tab_config_);
 
         // Shield exclusively in PMD top-right
         gfx::DrawStatusShield(hdc, static_cast<float>(capsule.right) - Sf(22.0f),
@@ -1134,62 +1363,205 @@ void Desktop::Render() {
         gfx::DrawDivider(hdc, static_cast<float>(capsule.left + S(12)), static_cast<float>(capsule.right - S(12)),
                          static_cast<float>(capsule.top + header_h), 22);
 
-        const int cell_w = S(86);
-        const int cell_h = S(84);
-        const int grid_x = capsule.left + S(12);
-        const int grid_y = capsule.top + header_h + S(4);
-        const int first_idx = scroll_row_ * cols_;
-        const int max_visible = visible_rows_ * cols_;
+        if (tab_ == Tab::Desktop) {
+            const int desk_search_h = S(36);
+            const RECT sb{capsule.left + S(12), capsule.top + header_h + S(4),
+                          capsule.right - S(12), capsule.top + header_h + desk_search_h - S(2)};
+            gfx::DrawRoundedHighlight(hdc, static_cast<float>(sb.left), static_cast<float>(sb.top),
+                                      static_cast<float>(sb.right - sb.left), static_cast<float>(sb.bottom - sb.top),
+                                      Sf(8.0f), {15, 23, 42, 135}, {148, 163, 184, 55});
+            const float scy = static_cast<float>(sb.top + sb.bottom) * 0.5f;
+            gfx::DrawSearchIcon(hdc, static_cast<float>(sb.left + S(16)), scy, Sf(13.5f), {148, 163, 184, 220});
 
-        if (items_.empty()) {
-            const RECT empty_rect{capsule.left + S(16), grid_y, capsule.right - S(16), capsule.bottom - S(12)};
-            gfx::DrawTextLine(hdc, L"Carpeta vac\u00eda", empty_rect, Sf(12.5f), false, {148, 163, 184, 180}, 0);
-        } else {
-            for (int offset = 0; offset < max_visible && first_idx + offset < static_cast<int>(items_.size()); ++offset) {
-                const int idx = first_idx + offset;
-                const int row = offset / cols_;
-                const int col = offset % cols_;
-                const int cx = grid_x + col * cell_w;
-                const int cy = grid_y + row * cell_h;
-                if (cy + cell_h > capsule.bottom) break;
+            const auto typed = Text(edit_);
+            rect_edit_draw_ = {sb.left + S(30), sb.top + S(2), sb.right - S(8), sb.bottom - S(2)};
+            DWORD sel_a = 0, sel_b = 0;
+            ::SendMessageW(edit_, EM_GETSEL, reinterpret_cast<WPARAM>(&sel_a), reinterpret_cast<LPARAM>(&sel_b));
+            const bool focused = ::GetFocus() == edit_;
+            gfx::DrawSearchText(hdc, typed, GhostSuffix(typed), static_cast<int>(sel_a), static_cast<int>(sel_b),
+                                caret_visible_, focused, rect_edit_draw_, Sf(13.0f), dpi_);
 
-                const bool is_sel = (idx == selected_);
-                const bool is_hov = (hover_zone_ == HitZone::Item && hover_index_ == idx);
-                // No permanent card borders around icons; subtle glow only on active hover/focus
-                if (is_sel || is_hov) {
-                    const gfx::Color4 fill = is_sel ? gfx::Color4{59, 130, 246, 38} : gfx::Color4{255, 255, 255, 18};
-                    const gfx::Color4 border = is_sel ? gfx::Color4{96, 165, 250, 120} : gfx::Color4{0, 0, 0, 0};
-                    gfx::DrawRoundedHighlight(hdc, static_cast<float>(cx + S(4)), static_cast<float>(cy + S(4)),
-                                              static_cast<float>(cell_w - S(8)), static_cast<float>(cell_h - S(8)),
-                                              Sf(10.0f), fill, border);
-                }
+            const int cell_w = S(86);
+            const int cell_h = S(84);
+            const int grid_x = capsule.left + S(12);
+            const int grid_y = capsule.top + header_h + desk_search_h + S(4);
+            const int first_idx = scroll_row_ * cols_;
+            const int max_visible = visible_rows_ * cols_;
 
-                const auto& item = items_[static_cast<std::size_t>(idx)];
-                std::wstring rel = item.value;
-                bool has_dot = false;
-                gfx::Color4 dot_color{148, 163, 184, 255};
-                bool running = false;
-                if (item.kind == Kind::App) {
-                    has_dot = true;
-                    running = IsAppRunning(item.value);
-                    if (const auto* app = FindLoadedApp(item.value)) {
-                        rel = app->executable;
-                        dot_color = PrivacyColor(app->color);
-                    } else {
-                        rel.clear();
+            if (items_.empty()) {
+                const RECT empty_rect{capsule.left + S(16), grid_y, capsule.right - S(16), capsule.bottom - S(12)};
+                gfx::DrawTextLine(hdc, typed.empty() ? L"Carpeta vac\u00eda" : L"Sin resultados",
+                                  empty_rect, Sf(12.5f), false, {148, 163, 184, 180}, 0);
+            } else {
+                for (int offset = 0; offset < max_visible && first_idx + offset < static_cast<int>(items_.size()); ++offset) {
+                    const int idx = first_idx + offset;
+                    const int row = offset / cols_;
+                    const int col = offset % cols_;
+                    const int cx = grid_x + col * cell_w;
+                    const int cy = grid_y + row * cell_h;
+                    if (cy + cell_h > capsule.bottom) break;
+
+                    const bool is_sel = (idx == selected_);
+                    const bool is_hov = (hover_zone_ == HitZone::Item && hover_index_ == idx);
+                    if (is_sel || is_hov) {
+                        const gfx::Color4 fill = is_sel ? gfx::Color4{59, 130, 246, 38} : gfx::Color4{255, 255, 255, 18};
+                        const gfx::Color4 border = is_sel ? gfx::Color4{96, 165, 250, 120} : gfx::Color4{0, 0, 0, 0};
+                        gfx::DrawRoundedHighlight(hdc, static_cast<float>(cx + S(4)), static_cast<float>(cy + S(4)),
+                                                  static_cast<float>(cell_w - S(8)), static_cast<float>(cell_h - S(8)),
+                                                  Sf(10.0f), fill, border);
                     }
-                }
-                const auto resolved = resolver_.ResolvePmRelativePath(rel);
-                const int icon_sz = S(36);
-                const int ix = cx + (cell_w - icon_sz) / 2;
-                const int iy = cy + S(12);
-                gfx::DrawItemIcon(hdc, resolved.ok ? resolved.resolved_path : L"",
-                                  item.kind == Kind::App, item.kind == Kind::Folder,
-                                  ix, iy, icon_sz, has_dot, dot_color, running, dpi_);
 
-                const RECT lbl_rect{cx + S(4), iy + icon_sz + S(5), cx + cell_w - S(4), cy + cell_h - S(2)};
-                gfx::DrawGridLabel(hdc, item.label, lbl_rect, Sf(11.5f),
-                                   is_sel ? gfx::Color4{255, 255, 255, 255} : gfx::Color4{226, 232, 240, 245});
+                    const auto& item = items_[static_cast<std::size_t>(idx)];
+                    const int icon_sz = S(36);
+                    const int ix = cx + (cell_w - icon_sz) / 2;
+                    const int iy = cy + S(12);
+                    if (item.kind == Kind::Url) {
+                        gfx::DrawWebIcon(hdc, static_cast<float>(ix) + static_cast<float>(icon_sz) * 0.5f,
+                                         static_cast<float>(iy) + static_cast<float>(icon_sz) * 0.5f,
+                                         Sf(24.0f), {52, 211, 153, 235}, is_sel || is_hov);
+                    } else if (item.kind == Kind::Kill) {
+                        gfx::DrawRoundedHighlight(hdc, static_cast<float>(ix + S(4)), static_cast<float>(iy + S(4)),
+                                                  static_cast<float>(icon_sz - S(8)), static_cast<float>(icon_sz - S(8)),
+                                                  Sf(14.0f), {220, 38, 38, 190}, {248, 113, 113, 255});
+                        const RECT xr{ix, iy, ix + icon_sz, iy + icon_sz};
+                        gfx::DrawTextLine(hdc, L"\u00d7", xr, Sf(18.0f), true, {255, 255, 255, 255}, 0);
+                    } else {
+                        std::wstring rel = item.value;
+                        bool has_dot = false;
+                        gfx::Color4 dot_color{148, 163, 184, 255};
+                        bool running = false;
+                        if (item.kind == Kind::App) {
+                            has_dot = true;
+                            running = IsAppRunning(item.value);
+                            if (const auto* app = FindLoadedApp(item.value)) {
+                                rel = app->executable;
+                                dot_color = PrivacyColor(app->color);
+                            } else {
+                                rel.clear();
+                            }
+                        }
+                        const auto resolved = resolver_.ResolvePmRelativePath(rel);
+                        gfx::DrawItemIcon(hdc, resolved.ok ? resolved.resolved_path : L"",
+                                          item.kind == Kind::App, item.kind == Kind::Folder,
+                                          ix, iy, icon_sz, has_dot, dot_color, running, dpi_);
+                    }
+
+                    const RECT lbl_rect{cx + S(4), iy + icon_sz + S(5), cx + cell_w - S(4), cy + cell_h - S(2)};
+                    gfx::DrawGridLabel(hdc, item.label, lbl_rect, Sf(11.5f),
+                                       is_sel ? gfx::Color4{255, 255, 255, 255} : gfx::Color4{226, 232, 240, 245});
+                }
+            }
+        } else if (tab_ == Tab::Notes) {
+            const int note_tab_h = S(32);
+            const int find_h = S(34);
+            const int bottom_pad = S(10);
+            const int tabs_y = capsule.bottom - bottom_pad - find_h - note_tab_h;
+            const int find_y = capsule.bottom - bottom_pad - find_h;
+
+            gfx::DrawDivider(hdc, static_cast<float>(capsule.left + S(12)), static_cast<float>(capsule.right - S(12)),
+                             static_cast<float>(tabs_y - S(2)), 20);
+
+            int nx = capsule.left + S(12);
+            const int max_tab_x = capsule.right - S(44);
+            for (int i = 0; i < static_cast<int>(notes_.size()); ++i) {
+                const bool active = (i == active_note_);
+                const bool hov = (hover_zone_ == HitZone::NoteTab && hover_index_ == i);
+                const int text_w = static_cast<int>(gfx::MeasureTextWidth(
+                    hdc, notes_[static_cast<std::size_t>(i)].name, Sf(12.0f), active));
+                const int tw = std::clamp(text_w + S(38), S(74), S(140));
+                if (nx + tw > max_tab_x) break;
+                const RECT tr{nx, tabs_y + S(3), nx + tw, tabs_y + note_tab_h - S(3)};
+                rect_note_tabs_.push_back(tr);
+                const RECT cr{tr.right - S(22), tr.top + S(2), tr.right - S(4), tr.bottom - S(2)};
+                rect_note_closes_.push_back(cr);
+
+                if (active || hov) {
+                    const gfx::Color4 fill = active ? gfx::Color4{30, 41, 59, 220} : gfx::Color4{255, 255, 255, 18};
+                    const gfx::Color4 border = active ? gfx::Color4{59, 130, 246, 150} : gfx::Color4{0, 0, 0, 0};
+                    gfx::DrawRoundedHighlight(hdc, static_cast<float>(tr.left), static_cast<float>(tr.top),
+                                              static_cast<float>(tw), static_cast<float>(tr.bottom - tr.top),
+                                              Sf(7.0f), fill, border);
+                }
+
+                if (active && note_renaming_) {
+                    const RECT er{tr.left + S(6), tr.top + S(2), cr.left - S(2), tr.bottom - S(2)};
+                    DWORD sel_a = 0, sel_b = 0;
+                    ::SendMessageW(edit_, EM_GETSEL, reinterpret_cast<WPARAM>(&sel_a), reinterpret_cast<LPARAM>(&sel_b));
+                    gfx::DrawSearchText(hdc, Text(edit_), L"", static_cast<int>(sel_a), static_cast<int>(sel_b),
+                                        caret_visible_, ::GetFocus() == edit_, er, Sf(12.0f), dpi_);
+                } else {
+                    const RECT lr{tr.left + S(8), tr.top, cr.left, tr.bottom};
+                    gfx::DrawTextLine(hdc, notes_[static_cast<std::size_t>(i)].name, lr, Sf(12.0f), active,
+                                      active ? gfx::Color4{248, 250, 252, 255} : gfx::Color4{148, 163, 184, 235}, -1);
+                }
+
+                const bool c_hov = (hover_zone_ == HitZone::NoteClose && hover_index_ == i);
+                gfx::DrawTextLine(hdc, L"\u00d7", cr, Sf(12.5f), c_hov,
+                                  c_hov ? gfx::Color4{248, 113, 113, 255} : gfx::Color4{148, 163, 184, 210}, 0);
+                nx += tw + S(4);
+            }
+
+            if (nx + S(28) <= capsule.right - S(12)) {
+                rect_note_add_ = {nx, tabs_y + S(3), nx + S(26), tabs_y + note_tab_h - S(3)};
+                const bool add_hov = (hover_zone_ == HitZone::NoteAdd);
+                if (add_hov) {
+                    gfx::DrawRoundedHighlight(hdc, static_cast<float>(rect_note_add_.left), static_cast<float>(rect_note_add_.top),
+                                              static_cast<float>(S(26)), static_cast<float>(rect_note_add_.bottom - rect_note_add_.top),
+                                              Sf(7.0f), {255, 255, 255, 22}, {0, 0, 0, 0});
+                }
+                gfx::DrawTextLine(hdc, L"+", rect_note_add_, Sf(15.0f), true, {203, 213, 225, 255}, 0);
+            }
+
+            const RECT fb{capsule.left + S(12), find_y + S(3), capsule.right - S(28), find_y + find_h - S(2)};
+            gfx::DrawRoundedHighlight(hdc, static_cast<float>(fb.left), static_cast<float>(fb.top),
+                                      static_cast<float>(fb.right - fb.left), static_cast<float>(fb.bottom - fb.top),
+                                      Sf(8.0f), {15, 23, 42, 135}, {148, 163, 184, 55});
+            const float fcy = static_cast<float>(fb.top + fb.bottom) * 0.5f;
+            gfx::DrawSearchIcon(hdc, static_cast<float>(fb.left + S(16)), fcy, Sf(13.0f), {148, 163, 184, 220});
+
+            if (!note_renaming_) {
+                rect_edit_draw_ = {fb.left + S(30), fb.top + S(2), fb.right - S(8), fb.bottom - S(2)};
+                DWORD sel_a = 0, sel_b = 0;
+                ::SendMessageW(edit_, EM_GETSEL, reinterpret_cast<WPARAM>(&sel_a), reinterpret_cast<LPARAM>(&sel_b));
+                gfx::DrawSearchText(hdc, Text(edit_), L"", static_cast<int>(sel_a), static_cast<int>(sel_b),
+                                    caret_visible_, ::GetFocus() == edit_, rect_edit_draw_, Sf(12.5f), dpi_);
+            }
+
+            rect_resize_grip_ = {capsule.right - S(24), capsule.bottom - S(24), capsule.right - S(2), capsule.bottom - S(2)};
+            const bool grip_hov = (hover_zone_ == HitZone::ResizeGrip || resizing_notes_);
+            gfx::DrawTextLine(hdc, L"\u25e2", rect_resize_grip_, Sf(12.0f), false,
+                              grip_hov ? gfx::Color4{148, 163, 184, 255} : gfx::Color4{148, 163, 184, 140}, 0);
+        } else {
+            // Tab::Config
+            const auto& cfg = config_.config_doc();
+            const std::wstring hotkey_val = cfg.GetValue(L"PMD", L"Hotkey", L"Ctrl+Space");
+            const auto bool_str = [&](const wchar_t* key, const wchar_t* def) -> std::wstring {
+                const auto v = cfg.GetValue(L"PMD", key, def);
+                return (Equal(v, L"true") || v == L"1") ? L"Activado" : L"Desactivado";
+            };
+            struct CfgRow { const wchar_t* label; std::wstring value; };
+            const CfgRow rows[] = {
+                {L"Atajo de teclado (Hotkey)", hotkey_val + L"  (clic para cambiar)"},
+                {L"Siempre visible (AlwaysOnTop)", bool_str(L"AlwaysOnTop", L"true")},
+                {L"Translucidez (Translucent)", bool_str(L"Translucent", L"true")},
+                {L"Recordar posici\u00f3n (RememberPosition)", bool_str(L"RememberPosition", L"false")},
+                {L"Editar archivo Data\\config.ini", L"Abrir\u2026"},
+            };
+            const int row_h = S(42);
+            int ry = capsule.top + header_h + S(12);
+            for (int i = 0; i < 5; ++i) {
+                const RECT rr{capsule.left + S(16), ry, capsule.right - S(16), ry + row_h - S(4)};
+                rect_config_rows_.push_back(rr);
+                const bool hov = (hover_zone_ == HitZone::ConfigAction && hover_index_ == i);
+                gfx::DrawRoundedHighlight(hdc, static_cast<float>(rr.left), static_cast<float>(rr.top),
+                                          static_cast<float>(rr.right - rr.left), static_cast<float>(rr.bottom - rr.top),
+                                          Sf(9.0f), hov ? gfx::Color4{30, 41, 59, 190} : gfx::Color4{15, 23, 42, 110},
+                                          hov ? gfx::Color4{59, 130, 246, 130} : gfx::Color4{148, 163, 184, 35});
+                const RECT lr{rr.left + S(12), rr.top, rr.right - S(150), rr.bottom};
+                const RECT vr{rr.right - S(150), rr.top, rr.right - S(12), rr.bottom};
+                gfx::DrawTextLine(hdc, rows[i].label, lr, Sf(12.5f), false, {226, 232, 240, 250}, -1);
+                gfx::DrawTextLine(hdc, rows[i].value, vr, Sf(12.0f), true, {96, 165, 250, 255}, 1);
+                ry += row_h;
             }
         }
     }
@@ -1232,12 +1604,45 @@ HitZone Desktop::HitTest(POINT client, int& item_index) const {
         return HitZone::None;
     }
 
+    if (in(rect_tab_desktop_)) return HitZone::TopTabDesktop;
+    if (in(rect_tab_notes_)) return HitZone::TopTabNotes;
+    if (in(rect_tab_config_)) return HitZone::TopTabConfig;
+
+    if (tab_ == Tab::Notes) {
+        if (in(rect_resize_grip_)) return HitZone::ResizeGrip;
+        if (in(rect_note_add_)) return HitZone::NoteAdd;
+        for (int i = 0; i < static_cast<int>(rect_note_closes_.size()); ++i) {
+            if (in(rect_note_closes_[static_cast<std::size_t>(i)])) {
+                item_index = i;
+                return HitZone::NoteClose;
+            }
+        }
+        for (int i = 0; i < static_cast<int>(rect_note_tabs_.size()); ++i) {
+            if (in(rect_note_tabs_[static_cast<std::size_t>(i)])) {
+                item_index = i;
+                return HitZone::NoteTab;
+            }
+        }
+        return HitZone::None;
+    }
+
+    if (tab_ == Tab::Config) {
+        for (int i = 0; i < static_cast<int>(rect_config_rows_.size()); ++i) {
+            if (in(rect_config_rows_[static_cast<std::size_t>(i)])) {
+                item_index = i;
+                return HitZone::ConfigAction;
+            }
+        }
+        return HitZone::None;
+    }
+
     if (folder_ != L"Other" && in(rect_back_)) return HitZone::BackButton;
     const int header_h = S(40);
+    const int desk_search_h = S(36);
     const int cell_w = S(86);
     const int cell_h = S(84);
     const int grid_x = pad + S(12);
-    const int grid_y = pad + header_h + S(4);
+    const int grid_y = pad + header_h + desk_search_h + S(4);
     if (client.x >= grid_x && client.x < grid_x + cols_ * cell_w &&
         client.y >= grid_y && client.y < grid_y + visible_rows_ * cell_h) {
         const int col = (client.x - grid_x) / cell_w;
@@ -1285,32 +1690,43 @@ void Desktop::MoveSelection(int dx, int dy) {
 
 void Desktop::Show(View view) {
     if (closing_) return;
+    if (view_ == View::Files && tab_ == Tab::Notes && view != View::Files) {
+        SaveActiveNote();
+        note_renaming_ = false;
+    }
     view_ = view;
     url_naming_ = false;
     if (view == View::Pill) ::SetWindowTextW(edit_, L"");
-    if (view == View::Files) folder_ = L"Other";
+    if (view == View::Files) {
+        tab_ = Tab::Desktop;
+        note_renaming_ = false;
+        folder_ = L"Other";
+    }
     scroll_row_ = 0;
     selected_ = 0;
     hover_zone_ = HitZone::None;
     hover_index_ = -1;
     if (view != View::Pill) ::SetForegroundWindow(hwnd_);
     Populate();
-    if (view == View::Search) {
+    if (view == View::Search || (view == View::Files && tab_ == Tab::Desktop)) {
         caret_visible_ = true;
         ::SetFocus(edit_);
     }
-    if (view == View::Files) ::SetFocus(list_);
 }
 
 void Desktop::Populate() {
     items_.clear();
     scroll_row_ = 0;
     if (view_ == View::Pill) { Layout(); return; }
-    const auto typed = view_ == View::Search ? Text(edit_) : L"";
+    if (view_ == View::Files && tab_ != Tab::Desktop) { Layout(); return; }
+    const auto typed = Text(edit_);
     if (view_ == View::Search && typed.empty()) {
         selected_ = -1;
         Layout();
         return;
+    }
+    if (!typed.empty() && Prefix(L"kill", typed)) {
+        items_.push_back({Kind::Kill, L"kill \u2014 Matar ventana con un clic", L"kill", {}});
     }
     applications::List(resolver_, apps_);
     if (view_ == View::Search || folder_ == L"Other") {
@@ -1344,7 +1760,7 @@ void Desktop::Populate() {
         }
         items_.insert(items_.end(), partial.begin(), partial.end());
     }
-    if (view_ == View::Search) {
+    if (view_ == View::Search || (view_ == View::Files && folder_ == L"Other" && !typed.empty())) {
         config_.LoadAppsIni(false);
         const auto& apps_doc = config_.apps_doc();
         std::vector<Item> url_exact, url_partial;
@@ -1413,6 +1829,32 @@ void Desktop::Back() {
         }
         return;
     }
+    if (tab_ == Tab::Notes) {
+        if (note_renaming_) {
+            note_renaming_ = false;
+            ::SetWindowTextW(edit_, L"");
+            if (note_edit_) ::SetFocus(note_edit_);
+            Render();
+            return;
+        }
+        if (!Text(edit_).empty()) {
+            ::SetWindowTextW(edit_, L"");
+            Render();
+            return;
+        }
+        SaveActiveNote();
+        Show(View::Pill);
+        return;
+    }
+    if (tab_ == Tab::Config) {
+        Show(View::Pill);
+        return;
+    }
+    if (!Text(edit_).empty()) {
+        ::SetWindowTextW(edit_, L"");
+        Populate();
+        return;
+    }
     if (folder_ == L"Other") { Show(View::Pill); return; }
     folder_.resize(folder_.rfind(L'\\'));
     Populate();
@@ -1421,11 +1863,15 @@ void Desktop::Back() {
 void Desktop::Open(int index) {
     if (closing_ || index < 0 || static_cast<std::size_t>(index) >= items_.size()) return;
     const auto item = items_[static_cast<std::size_t>(index)];
-    if (item.kind == Kind::Folder) {
+    if (item.kind == Kind::Kill) {
+        StartKillPick();
+    } else if (item.kind == Kind::Folder) {
         view_ = View::Files;
+        tab_ = Tab::Desktop;
         folder_ = item.value;
+        ::SetWindowTextW(edit_, L"");
         Populate();
-        ::SetFocus(list_);
+        ::SetFocus(edit_);
     } else if (item.kind == Kind::File) {
         BrowseDocument(item);
     } else if (item.kind == Kind::Url) {
@@ -1556,7 +2002,7 @@ void Desktop::SearchWeb(bool fallback) {
     modal_ = false;
 }
 
-void Desktop::Launch(const App& app, std::wstring arguments) {
+void Desktop::Launch(const App& app, std::wstring arguments, bool force_evaluate) {
     if (closing_) return;
     if (Equal(app.color, L"Red")) {
         const bool old_modal = modal_;
@@ -1577,8 +2023,8 @@ void Desktop::Launch(const App& app, std::wstring arguments) {
     std::error_code ec;
     const bool no_wrapper = resolved_dir.ok &&
         !fs::exists(fs::path(resolved_dir.resolved_path) / L"wrapper.ini", ec);
-    const auto candidates = (no_wrapper && workers_.empty() && session_.protected_by_guard())
-        ? learning::LearningEngine::Inspect(executable)
+    const auto candidates = ((no_wrapper || force_evaluate) && workers_.empty() && session_.protected_by_guard())
+        ? std::make_optional(learning::LearningEngine::InspectWithFallback(executable, app.id))
         : std::nullopt;
     entry->learning_run = candidates.has_value();
     entry->event.reset(::CreateEventW(nullptr, TRUE, FALSE, nullptr));
@@ -1600,7 +2046,8 @@ void Desktop::Launch(const App& app, std::wstring arguments) {
                         executable,
                         full_args,
                         worker->app.id,
-                        {candidates->roaming, candidates->local, candidates->registry}
+                        {candidates->roaming, candidates->local, candidates->registry},
+                        true
                     };
                     worker->learning_result = learning::LearningEngine::Run(resolver_, req);
                 } else {
@@ -1642,18 +2089,20 @@ void Desktop::Finish(Worker* worker) {
             if (lr.host_restored && lr.rollback_error == 0 && lr.error == 0) {
                 bool has_learned_resources = false;
                 core::IniDocument wrapper_doc;
-                const auto wrapper_path = lr.wrapper_path.empty()
-                    ? (fs::path(resolver_.ResolvePmRelativePath(app.directory).resolved_path) / L"wrapper.ini").native()
-                    : lr.wrapper_path;
+                const auto resolved_wrapper = lr.wrapper_path.empty()
+                    ? resolver_.ResolvePmRelativePath(app.directory + L"\\wrapper.ini")
+                    : resolver_.ResolvePmRelativePath(lr.wrapper_path);
+                const auto wrapper_path = resolved_wrapper.ok
+                    ? resolved_wrapper.resolved_path
+                    : (fs::path(resolver_.ResolvePmRelativePath(app.directory).resolved_path) / L"wrapper.ini").native();
                 const auto read_res = core::AtomicFile::ReadUtf8Text(wrapper_path);
                 std::wstring parse_err;
-                if (!lr.session_id.empty() && read_res.ok && wrapper_doc.ParseUtf8(read_res.content, parse_err)) {
-                    const std::wstring sec = L"Learning." + lr.session_id;
-                    bool in_sec = false;
+                if (read_res.ok && wrapper_doc.ParseUtf8(read_res.content, parse_err)) {
+                    bool in_learning_sec = false;
                     for (const auto& line : wrapper_doc.lines()) {
                         if (line.kind == core::IniDocument::LineKind::Section) {
-                            in_sec = Equal(line.section_name, sec);
-                        } else if (in_sec && line.kind == core::IniDocument::LineKind::KeyValue && !line.value.empty()) {
+                            in_learning_sec = Prefix(line.section_name, L"Learning.");
+                        } else if (in_learning_sec && line.kind == core::IniDocument::LineKind::KeyValue && !line.value.empty()) {
                             if (Equal(line.key, L"RegistryKey") ||
                                 (line.key.size() >= 4 && Equal(line.key.substr(line.key.size() - 4), L"Host"))) {
                                 has_learned_resources = true;
@@ -1932,8 +2381,9 @@ void Desktop::Menu(bool application, int index) {
         for (auto& entry : workers_) if (entry->app.id == app.id) worker = entry.get();
         menu_items.push_back({1, app.archived ? L"Reinstalar\u2026" : L"Abrir", true, false});
         menu_items.push_back({2, L"Cerrar", worker != nullptr, false});
-        menu_items.push_back({3, L"Configurar\u2026", true, false});
         const bool can_maintain = !worker && !busy_;
+        menu_items.push_back({8, L"Evaluar", can_maintain && !app.archived && session_.protected_by_guard(), false});
+        menu_items.push_back({3, L"Configurar\u2026", true, false});
         menu_items.push_back({4, L"Actualizar\u2026", can_maintain, false});
         menu_items.push_back({5, L"Restablecer\u2026", can_maintain, false});
         menu_items.push_back({6, L"Archivar\u2026", can_maintain, false});
@@ -1954,6 +2404,8 @@ void Desktop::Menu(bool application, int index) {
         menu_items.push_back({5, L"Cierre normal", true, false});
         menu_items.push_back({6, L"Cierre r\u00e1pido", true, false});
         menu_items.push_back({7, L"Cierre cr\u00edtico", true, false});
+        menu_items.push_back({0, L"", false, true});
+        menu_items.push_back({0, std::wstring(L"v") + core::kVersionString, false, false});
     }
     POINT cursor{};
     ::GetCursorPos(&cursor);
@@ -1991,6 +2443,11 @@ void Desktop::Menu(bool application, int index) {
         if (choice == 2) {
             for (auto& entry : workers_)
                 if (entry->app.id == app.id) ::SetEvent(entry->event.get());
+        }
+        if (choice == 8) {
+            modal_ = false;
+            Launch(app, {}, true);
+            return;
         }
         if (choice == 3 && ::MessageBoxW(hwnd_, L"\u00bfAbrir apps.ini en el editor de Windows?",
                 L"PortableManager Desktop", MB_YESNO | MB_ICONQUESTION) == IDYES) {
@@ -2129,6 +2586,317 @@ void Desktop::DiscardOrphansInteractive() {
         }
         return err;
     });
+}
+
+void Desktop::StartKillPick() {
+    if (closing_) return;
+    Show(View::Pill);
+
+    static bool registered = false;
+    if (!registered) {
+        WNDCLASSEXW wc{};
+        wc.cbSize = sizeof(wc);
+        wc.hInstance = ::GetModuleHandleW(nullptr);
+        wc.lpszClassName = kKillOverlayClass;
+        wc.hCursor = ::LoadCursorW(nullptr, IDC_CROSS);
+        wc.lpfnWndProc = [](HWND h, UINT m, WPARAM w, LPARAM l) -> LRESULT {
+            if (m == WM_KEYDOWN && w == VK_ESCAPE) {
+                ::DestroyWindow(h);
+                return 0;
+            }
+            if (m == WM_RBUTTONUP) {
+                ::DestroyWindow(h);
+                return 0;
+            }
+            if (m == WM_LBUTTONUP) {
+                POINT pt{};
+                ::GetCursorPos(&pt);
+                ::SetWindowLongPtrW(h, GWLP_USERDATA, 1);
+                ::DestroyWindow(h);
+                if (HWND hit = ::WindowFromPoint(pt)) {
+                    HWND root = ::GetAncestor(hit, GA_ROOT);
+                    if (!root) root = hit;
+                    wchar_t cls[64]{};
+                    ::GetClassNameW(root, cls, 64);
+                    const std::wstring_view c(cls);
+                    if (c != L"Shell_TrayWnd" && c != L"Progman" && c != L"WorkerW" && c != L"DV2ControlHost") {
+                        DWORD pid = 0;
+                        ::GetWindowThreadProcessId(root, &pid);
+                        if (pid && pid != ::GetCurrentProcessId()) {
+                            if (HANDLE proc = ::OpenProcess(PROCESS_TERMINATE, FALSE, pid)) {
+                                ::TerminateProcess(proc, 1);
+                                ::CloseHandle(proc);
+                            }
+                        }
+                    }
+                }
+                return 0;
+            }
+            return ::DefWindowProcW(h, m, w, l);
+        };
+        ::RegisterClassExW(&wc);
+        registered = true;
+    }
+
+    const int vx = ::GetSystemMetrics(SM_XVIRTUALSCREEN);
+    const int vy = ::GetSystemMetrics(SM_YVIRTUALSCREEN);
+    const int vw = ::GetSystemMetrics(SM_CXVIRTUALSCREEN);
+    const int vh = ::GetSystemMetrics(SM_CYVIRTUALSCREEN);
+    ::ShowWindow(hwnd_, SW_HIDE);
+    HWND overlay = ::CreateWindowExW(
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+        kKillOverlayClass, L"", WS_POPUP | WS_VISIBLE,
+        vx, vy, vw, vh, nullptr, nullptr, ::GetModuleHandleW(nullptr), nullptr);
+    if (overlay) {
+        ::SetLayeredWindowAttributes(overlay, 0, 1, LWA_ALPHA);
+        ::SetForegroundWindow(overlay);
+        ::SetCapture(overlay);
+        MSG msg{};
+        while (::IsWindow(overlay) && ::GetMessageW(&msg, nullptr, 0, 0) > 0) {
+            ::TranslateMessage(&msg);
+            ::DispatchMessageW(&msg);
+        }
+        ::ReleaseCapture();
+    }
+    ::ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+    Render();
+}
+
+void Desktop::EnsureNoteHost() {
+    if (note_host_) return;
+    static bool registered = false;
+    if (!registered) {
+        WNDCLASSEXW wc{};
+        wc.cbSize = sizeof(wc);
+        wc.hInstance = ::GetModuleHandleW(nullptr);
+        wc.lpszClassName = kNoteHostClass;
+        wc.lpfnWndProc = [](HWND h, UINT m, WPARAM w, LPARAM l) -> LRESULT {
+            auto* self = reinterpret_cast<Desktop*>(::GetWindowLongPtrW(h, GWLP_USERDATA));
+            if (m == WM_CTLCOLOREDIT && self && self->note_bg_brush_) {
+                HDC hdc = reinterpret_cast<HDC>(w);
+                ::SetTextColor(hdc, RGB(241, 245, 249));
+                ::SetBkColor(hdc, RGB(15, 23, 42));
+                return reinterpret_cast<LRESULT>(self->note_bg_brush_);
+            }
+            if (m == WM_KEYDOWN && w == VK_ESCAPE && self) {
+                self->Back();
+                return 0;
+            }
+            return ::DefWindowProcW(h, m, w, l);
+        };
+        ::RegisterClassExW(&wc);
+        registered = true;
+    }
+
+    if (!note_bg_brush_) note_bg_brush_ = ::CreateSolidBrush(RGB(15, 23, 42));
+    if (!note_font_) {
+        note_font_ = ::CreateFontW(-S(14), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                                   DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                                   CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+    }
+    const DWORD ex = WS_EX_TOOLWINDOW | (always_on_top_ ? WS_EX_TOPMOST : 0);
+    note_host_ = ::CreateWindowExW(ex, kNoteHostClass, L"", WS_POPUP | WS_CLIPCHILDREN,
+                                   0, 0, 100, 100, hwnd_, nullptr, ::GetModuleHandleW(nullptr), nullptr);
+    if (note_host_) {
+        ::SetWindowLongPtrW(note_host_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+        note_edit_ = ::CreateWindowExW(
+            0, L"EDIT", L"",
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
+            0, 0, 100, 100, note_host_, nullptr, ::GetModuleHandleW(nullptr), nullptr);
+        if (note_edit_ && note_font_) {
+            ::SendMessageW(note_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(note_font_), TRUE);
+        }
+    }
+}
+
+void Desktop::UpdateNoteHostBounds() {
+    if (view_ == View::Files && tab_ == Tab::Notes) {
+        EnsureNoteHost();
+        if (!note_host_ || !note_edit_) return;
+        const int pad = ShadowPad();
+        const int header_h = S(40);
+        const int note_tab_h = S(32);
+        const int find_h = S(34);
+        const int bottom_pad = S(10);
+        const int nx = win_x_ + pad + S(14);
+        const int ny = win_y_ + pad + header_h + S(8);
+        const int nw = std::max(S(120), cur_w_ - S(28));
+        const int nh = std::max(S(60), cur_h_ - header_h - note_tab_h - find_h - bottom_pad - S(16));
+        ::SetWindowPos(note_host_, always_on_top_ ? HWND_TOPMOST : HWND_TOP,
+                       nx, ny, nw, nh, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        ::MoveWindow(note_edit_, 0, 0, nw, nh, TRUE);
+    } else if (note_host_) {
+        ::ShowWindow(note_host_, SW_HIDE);
+    }
+}
+
+void Desktop::LoadNotes() {
+    notes_.clear();
+    const auto dir_res = resolver_.ResolvePmRelativePath(L"Data\\notes");
+    if (!dir_res.ok) return;
+    std::error_code ec;
+    fs::create_directories(dir_res.resolved_path, ec);
+    for (fs::directory_iterator it(dir_res.resolved_path, ec), end; !ec && it != end; it.increment(ec)) {
+        if (!it->is_regular_file(ec)) continue;
+        if (Equal(it->path().extension().native(), L".txt")) {
+            notes_.push_back({it->path().stem().native(), it->path().native(), {}, false});
+        }
+    }
+    std::sort(notes_.begin(), notes_.end(), [](const NoteEntry& a, const NoteEntry& b) {
+        return _wcsicmp(a.name.c_str(), b.name.c_str()) < 0;
+    });
+    if (notes_.empty()) {
+        const auto p = (fs::path(dir_res.resolved_path) / L"Nota 1.txt").native();
+        core::AtomicFile::WriteUtf8Text(p, "");
+        notes_.push_back({L"Nota 1", p, {}, false});
+    }
+    active_note_ = std::clamp(active_note_, 0, static_cast<int>(notes_.size()) - 1);
+    SwitchNote(active_note_);
+}
+
+void Desktop::SaveActiveNote() {
+    if (!note_edit_ || active_note_ < 0 || static_cast<std::size_t>(active_note_) >= notes_.size()) return;
+    const auto raw = Text(note_edit_);
+    std::wstring norm;
+    norm.reserve(raw.size());
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        if (raw[i] == L'\r' && i + 1 < raw.size() && raw[i + 1] == L'\n') continue;
+        norm.push_back(raw[i]);
+    }
+    core::AtomicFile::WriteUtf8Text(notes_[static_cast<std::size_t>(active_note_)].path,
+                                    core::IniDocument::WideToUtf8(norm));
+}
+
+void Desktop::SwitchNote(int index) {
+    if (index < 0 || static_cast<std::size_t>(index) >= notes_.size()) return;
+    if (note_edit_ && active_note_ >= 0 && static_cast<std::size_t>(active_note_) < notes_.size() && index != active_note_) {
+        SaveActiveNote();
+    }
+    active_note_ = index;
+    EnsureNoteHost();
+    if (!note_edit_) return;
+    const auto read_res = core::AtomicFile::ReadUtf8Text(notes_[static_cast<std::size_t>(index)].path);
+    const auto wide = read_res.ok ? core::IniDocument::Utf8ToWide(read_res.content) : L"";
+    std::wstring crlf;
+    crlf.reserve(wide.size() + 16);
+    for (std::size_t i = 0; i < wide.size(); ++i) {
+        if (wide[i] == L'\n' && (i == 0 || wide[i - 1] != L'\r')) crlf.push_back(L'\r');
+        crlf.push_back(wide[i]);
+    }
+    ::SetWindowTextW(note_edit_, crlf.c_str());
+    ::SendMessageW(note_edit_, EM_SETSEL, 0, 0);
+    Render();
+}
+
+void Desktop::CreateNote() {
+    SaveActiveNote();
+    const auto dir_res = resolver_.ResolvePmRelativePath(L"Data\\notes");
+    if (!dir_res.ok) return;
+    std::error_code ec;
+    fs::create_directories(dir_res.resolved_path, ec);
+    int n = static_cast<int>(notes_.size()) + 1;
+    fs::path p;
+    std::wstring title;
+    do {
+        title = L"Nota " + std::to_wstring(n++);
+        p = fs::path(dir_res.resolved_path) / (title + L".txt");
+    } while (fs::exists(p, ec));
+    core::AtomicFile::WriteUtf8Text(p.native(), "");
+    notes_.push_back({title, p.native(), {}, false});
+    SwitchNote(static_cast<int>(notes_.size()) - 1);
+    if (note_edit_) ::SetFocus(note_edit_);
+}
+
+void Desktop::DeleteNote(int index) {
+    if (index < 0 || static_cast<std::size_t>(index) >= notes_.size()) return;
+    bool has_text = false;
+    if (index == active_note_ && note_edit_) {
+        has_text = !Text(note_edit_).empty();
+    } else {
+        const auto r = core::AtomicFile::ReadUtf8Text(notes_[static_cast<std::size_t>(index)].path);
+        has_text = r.ok && !r.content.empty();
+    }
+    if (has_text) {
+        const bool old_modal = modal_;
+        modal_ = true;
+        const auto msg = L"\u00bfEliminar la nota \"" + notes_[static_cast<std::size_t>(index)].name + L"\"?";
+        const int ans = ::MessageBoxW(hwnd_, msg.c_str(), L"Notas", MB_YESNO | MB_ICONQUESTION);
+        modal_ = old_modal;
+        if (ans != IDYES) return;
+    }
+    std::error_code ec;
+    fs::remove(notes_[static_cast<std::size_t>(index)].path, ec);
+    notes_.erase(notes_.begin() + index);
+    if (notes_.empty()) {
+        const auto dir_res = resolver_.ResolvePmRelativePath(L"Data\\notes");
+        const auto p = (fs::path(dir_res.resolved_path) / L"Nota 1.txt").native();
+        core::AtomicFile::WriteUtf8Text(p, "");
+        notes_.push_back({L"Nota 1", p, {}, false});
+        active_note_ = 0;
+    } else if (active_note_ >= static_cast<int>(notes_.size())) {
+        active_note_ = static_cast<int>(notes_.size()) - 1;
+    }
+    SwitchNote(active_note_);
+}
+
+void Desktop::StartNoteRename() {
+    if (active_note_ < 0 || static_cast<std::size_t>(active_note_) >= notes_.size()) return;
+    note_renaming_ = true;
+    ::SetWindowTextW(edit_, notes_[static_cast<std::size_t>(active_note_)].name.c_str());
+    ::SendMessageW(edit_, EM_SETSEL, 0, -1);
+    ::SetFocus(edit_);
+    Render();
+}
+
+void Desktop::CommitNoteRename() {
+    if (!note_renaming_) return;
+    note_renaming_ = false;
+    std::wstring next = Text(edit_);
+    ::SetWindowTextW(edit_, L"");
+    if (!next.empty() && active_note_ >= 0 && static_cast<std::size_t>(active_note_) < notes_.size()) {
+        for (wchar_t& ch : next) {
+            if (ch == L'\\' || ch == L'/' || ch == L':' || ch == L'*' ||
+                ch == L'?' || ch == L'"' || ch == L'<' || ch == L'>' || ch == L'|') ch = L'_';
+        }
+        auto& note = notes_[static_cast<std::size_t>(active_note_)];
+        if (next != note.name) {
+            SaveActiveNote();
+            const fs::path old_p(note.path);
+            const fs::path new_p = old_p.parent_path() / (next + L".txt");
+            std::error_code ec;
+            if (!fs::exists(new_p, ec)) {
+                fs::rename(old_p, new_p, ec);
+                if (!ec) {
+                    note.name = next;
+                    note.path = new_p.native();
+                }
+            }
+        }
+    }
+    if (note_edit_) ::SetFocus(note_edit_);
+    Render();
+}
+
+void Desktop::FindNextInNote() {
+    if (!note_edit_) return;
+    const auto needle = Text(edit_);
+    if (needle.empty()) return;
+    const auto hay = Text(note_edit_);
+    if (hay.empty()) return;
+    auto lower = [](std::wstring s) {
+        ::CharLowerBuffW(s.data(), static_cast<DWORD>(s.size()));
+        return s;
+    };
+    const auto h_low = lower(hay);
+    const auto n_low = lower(needle);
+    DWORD sel_a = 0, sel_b = 0;
+    ::SendMessageW(note_edit_, EM_GETSEL, reinterpret_cast<WPARAM>(&sel_a), reinterpret_cast<LPARAM>(&sel_b));
+    std::size_t pos = h_low.find(n_low, sel_b);
+    if (pos == std::wstring::npos) pos = h_low.find(n_low, 0);
+    if (pos != std::wstring::npos) {
+        ::SendMessageW(note_edit_, EM_SETSEL, static_cast<WPARAM>(pos), static_cast<LPARAM>(pos + n_low.size()));
+        ::SendMessageW(note_edit_, EM_SCROLLCARET, 0, 0);
+    }
 }
 
 } // namespace

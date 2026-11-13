@@ -29,6 +29,7 @@ struct LearningRequest {
     std::array<std::wstring, 3> exclusive_paths;
     DWORD timeout_ms = INFINITE;
     HANDLE app_reservation = nullptr;
+    bool allow_fallback = false;
 };
 
 struct LearningResult {
@@ -43,6 +44,7 @@ struct LearningResult {
 class LearningEngine {
 public:
     static std::optional<Candidates> Inspect(const std::wstring& executable);
+    static Candidates InspectWithFallback(const std::wstring& executable, std::wstring_view app_id);
 
     // Phase 6 API for a dedicated learning process. A reservation persists in
     // its PMGuard until the process exits. Unapproved candidates are untouched

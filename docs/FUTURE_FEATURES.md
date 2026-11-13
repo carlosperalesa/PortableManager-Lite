@@ -28,3 +28,8 @@ Actualmente `LearningEngine` infiere candidatos de Registro a partir de los meta
 ## 5. Aislamiento avanzado (alcance Pro, fuera de Lite)
 
 - Interceptación/redirección de rutas absolutas con letra de unidad (como las 23 entradas `HKCU` con la ruta del USB detectadas en FirefoxPortable) o virtualización de sistema de archivos cuando el lanzador de la aplicación no las abstrae por sí solo.
+
+## 6. Instalador desde repositorio en línea y actualizador integrado
+
+- Comando tipo `install portableapps firefox` (o catálogo portable) que consulte un repositorio en línea, descargue el paquete con barra de progreso/verificación y lo entregue al instalador de PML.
+- Buscador de actualizaciones para las aplicaciones ya instaladas directamente desde PML.
