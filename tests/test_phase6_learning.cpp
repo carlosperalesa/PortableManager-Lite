@@ -122,7 +122,7 @@ struct Fixture {
     fs::path roaming = root / L"roaming" / company / product;
     fs::path local = root / L"local" / company / product;
     fs::path portable = root / L"portable";
-    fs::path installation = portable / L"App" / L"fixture";
+    fs::path installation = portable / L"Apps" / L"fixture";
     fs::path executable = installation / L"bin" / L"fixture.exe";
     std::wstring reg_parent = L"Software\\" + company;
     std::wstring reg = reg_parent + L"\\" + product;
@@ -175,11 +175,11 @@ void TestEnvironment(const fs::path& root) {
 }
 
 LearningRequest Request(const fs::path& root, std::wstring_view mode) {
-    const auto exe = (root / L"portable" / L"App" / L"fixture" / L"bin" / L"fixture.exe").wstring();
+    const auto exe = (root / L"portable" / L"Apps" / L"fixture" / L"bin" / L"fixture.exe").wstring();
     const auto candidates = LearningEngine::Inspect(exe);
     Check(candidates && Guid(candidates->company) && Guid(candidates->product) &&
           root.filename().wstring() == L"pm6-" + candidates->company, "bind synthetic executable to root");
-    LearningRequest request{L"App/fixture", exe,
+    LearningRequest request{L"Apps/fixture", exe,
         L"--write " + pm::jobs::QuoteArgument(root.wstring()) + L" " + std::wstring(mode),
         L"fixture", {candidates->roaming, candidates->local, candidates->registry}, 12000};
     if (mode == L"ambiguous") {
@@ -222,7 +222,7 @@ int Controller(const fs::path& root, std::wstring_view mode) {
     Check(result.host_restored, "restore host");
     const bool publish_fails = mode == L"failure" || mode == L"hardlink";
     if (!publish_fails)
-        Check(result.error == ERROR_SUCCESS && result.wrapper_path == L"App\\fixture\\wrapper.ini",
+        Check(result.error == ERROR_SUCCESS && result.wrapper_path == L"Apps\\fixture\\wrapper.ini",
               "publish at installation root, above the executable subdirectory");
     if (mode == L"normal") {
         const auto pid = static_cast<DWORD>(std::stoul(Read(root / L"descendant.txt")));
@@ -267,7 +267,7 @@ void Scenario(std::wstring_view mode) {
     fixture.Prepare();
     if (mode == L"existing") SetKey(fixture.reg, 7);
     const auto wrapper = fixture.installation / L"wrapper.ini";
-    const auto sibling = fixture.portable / L"App" / L"other" / L"wrapper.ini";
+    const auto sibling = fixture.portable / L"Apps" / L"other" / L"wrapper.ini";
     fs::create_directory(sibling.parent_path());
     Write(sibling, "[Other]\r\nSentinel=keep\r\n");
     if (mode == L"failure") {
@@ -387,21 +387,21 @@ void UnsafeInstallation() {
         Check(result.error == error && result.session_id.empty() && result.wrapper_path.empty(),
               "reject unsafe installation before changing the host");
     };
-    request.app_dir = L"App/other/../fixture";
+    request.app_dir = L"Apps/other/../fixture";
     rejected(ERROR_INVALID_NAME);
     request.app_dir = L"../outside";
     rejected(ERROR_INVALID_NAME);
     request.app_dir = fixture.installation.wstring();
     rejected(ERROR_INVALID_NAME);
-    request.app_dir = L"App/other";
+    request.app_dir = L"Apps/other";
     rejected(ERROR_INVALID_NAME);
-    request.app_dir = L"App/fixture";
+    request.app_dir = L"Apps/fixture";
     request.executable = (fixture.installation / L"bin" / L".." / L"bin" / L"fixture.exe").wstring();
     rejected(ERROR_INVALID_NAME);
 
     SessionManager session((fixture.root / L"temp").wstring());
     Check(session.InitializeNewSession().ok, "initialize synthetic junction session");
-    const auto alias = fixture.portable / L"App" / L"alias";
+    const auto alias = fixture.portable / L"Apps" / L"alias";
     DWORD error = ERROR_SUCCESS;
     const auto other_root = fixture.root / L"junction-target";
     const auto target = other_root / L"Data" / L"apps" / L"fixture";
@@ -412,7 +412,7 @@ void UnsafeInstallation() {
         session, other_resolver, L"fixture", alias.wstring(), L"Data\\apps\\fixture", error);
     ::SetLastError(error);
     Check(created, "create synthetic installation junction");
-    request.app_dir = L"App/alias";
+    request.app_dir = L"Apps/alias";
     request.executable = (alias / L"fixture.exe").wstring();
     const auto result = LearningEngine::Run(resolver, request);
     const bool cleaned = pm::guard::CleanupSession(session, error);

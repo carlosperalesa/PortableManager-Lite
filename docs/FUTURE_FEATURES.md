@@ -21,9 +21,9 @@ Actualmente `LearningEngine` infiere candidatos de Registro a partir de los meta
 - Importador integrado de archivos `.srl` (SlickRun) desde la UI o CLI hacia secciones `[Url.<nombre>]` en `Data\apps.ini`.
 - Soporte de múltiples alias separados por coma dentro de un mismo `[Url.*]` o edición/eliminación directa desde el menú contextual de PMD sin abrir `Data\apps.ini`.
 
-## 4. Panel gráfico de configuración en PMD
+## 4. Panel gráfico de configuración en PMD *(Implementado en `v0.2.2-beta.3`)*
 
-- Reemplazar la apertura directa de `Data\config.ini` en el editor de texto por un panel visual integrado para `Hotkey`, `AlwaysOnTop`, `Translucent`, `RememberPosition` y buscador web por defecto (`[Web]`).
+- ~~Reemplazar la apertura directa de `Data\config.ini` en el editor de texto por un panel visual integrado para `Hotkey`, `AlwaysOnTop`, `Translucent`, `RememberPosition` y buscador web por defecto (`[Web]`).~~ Implementado mediante el entorno `Config` de PMD y el modal glass de configuración por aplicación.
 
 ## 5. Aislamiento avanzado (alcance Pro, fuera de Lite)
 

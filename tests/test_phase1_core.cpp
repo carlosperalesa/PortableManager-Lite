@@ -352,7 +352,7 @@ int wmain(int argc, wchar_t* argv[]) {
             return fail_and_cleanup(L"3.2 Fallo al inicializar apps.ini nuevo.", 37);
         }
         if (!mgr1.apps_doc().SetValue(L"App.putty", L"Name", L"PuTTY Portátil (Sesión Ñ)", set_err) ||
-            !mgr1.apps_doc().SetRelativePathValue(L"App.putty", L"Executable", L"App\\PuTTY\\PUTTY.EXE", set_err) ||
+            !mgr1.apps_doc().SetRelativePathValue(L"App.putty", L"Executable", L"Apps\\PuTTY\\PUTTY.EXE", set_err) ||
             !mgr1.apps_doc().SetRelativePathValue(L"App.putty", L"PortableDataDir", L"Data\\apps\\putty", set_err)) {
             return fail_and_cleanup(L"3.2 Fallo al registrar app en apps.ini.", 38);
         }
@@ -371,7 +371,7 @@ int wmain(int argc, wchar_t* argv[]) {
             mgr2.config_doc().GetValue(L"General", L"UnknownLegacyFlag") != L"keep_me_intact_42" ||
             mgr2.config_doc().GetValue(L"General", L"ExampleDir") != L"Data/example" ||
             mgr2.config_doc().GetValue(L"FutureSection_v9", L"FutureSetting") != L"experimental_value" ||
-            mgr2.apps_doc().GetValue(L"App.putty", L"Executable") != L"App/PuTTY/PUTTY.EXE") {
+            mgr2.apps_doc().GetValue(L"App.putty", L"Executable") != L"Apps/PuTTY/PUTTY.EXE") {
             return fail_and_cleanup(L"3.3 Valores o claves desconocidas no se preservaron tras reinicio.", 41);
         }
 

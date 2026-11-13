@@ -144,15 +144,14 @@ pendientes.** PMD interpreta el registro:
 
 El nombre por defecto procede del EXE elegido **sin `.exe`**:
 `MiPrograma64.exe` → `MiPrograma64`. **Ese nombre siempre sirve para
-buscar y ejecutar** (MagicWord); no puede quedar sin identidad de
+buscar y ejecutar**; no puede quedar sin identidad de
 búsqueda. Los alias son **adicionales, opcionales y editables** en el
-INI; no sustituyen la búsqueda por nombre.
+INI (separados por coma en `Name=`); no sustituyen la búsqueda por nombre.
 
 ``` ini
 [App.MiPrograma]
 Name=MiPrograma64
-Executable=App/MiPrograma/MiPrograma64.exe
-Aliases=
+Executable=Apps/MiPrograma/MiPrograma64.exe
 ```
 
 Si una carpeta registrada desaparece manualmente, **el icono permanece

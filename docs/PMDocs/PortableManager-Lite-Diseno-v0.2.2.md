@@ -131,3 +131,22 @@ PML implementa tres modos deterministas de finalización:
   - PML y PMG finalizan sin bloquear el sistema.
 
 El [protocolo nativo de Fase 7](../fase07/README_FASE07.md) describe el drenaje de Jobs, la recuperación de PMGuard y la finalización de temporales.
+
+---
+
+## 24. Consolidación v0.2.2-beta.3 (PMD, Navegación por Árbol UI y LearningEngine)
+
+1. **Árbol explícito de UI (`UiNode`) en PMD**:
+   - Jerarquía determinista: `Pill` ↔ `Search` ↔ `ModuleBar [Escritorio | Notas | Config]` ↔ rama activa del módulo (`DesktopGrid`, `NotesTabs` ↔ `NoteEditor`, `ConfigList` ↔ `ConfigFieldEdit`).
+   - Navegación espacial coherente: `Down` desciende en la jerarquía, `Up` asciende al nodo padre, `Left`/`Right` recorre hermanos (`ModuleBar`, `NotesTabs`, `DesktopGrid`) o entra/sale de campos (`ConfigList` ↔ `ConfigFieldEdit`), y `Esc` cancela edición o cierra el módulo.
+2. **Estabilidad visual de PMD (sin parpadeo)**:
+   - Caché de `HICON` en `pmd_graphics.cpp` para evitar extracciones repetidas por frame.
+   - Supresión de `WM_ERASEBKGND`/`WM_PAINT` en controles hijos ocultos (`edit_`, `list_`) y temporizador de caret (`kCaretTimerId`) activo únicamente cuando hay edición de texto visible.
+   - `EnsureVisibleSelection()` corregido usando `per_row` (`1` en `List`/`Details`, `cols_` en grillas).
+3. **Configuración de aplicaciones y menú contextual**:
+   - Configuración individual integrada en `Tab::Config` (`Nombre y alias`, `Extensiones`, `Argumentos`, `Navegador predeterminado`) sin botón atrás: se sale con `Esc` o cambiando de pestaña/clic fuera.
+   - Opción `Evaluar` en el menú contextual de app deshabilitada mientras existan aplicaciones en ejecución (`!workers_.empty()`).
+   - Apertura de un `.exe` dentro de una carpeta `Apps\<Carpeta>` no registrada: registro automático y lanzamiento inmediato vía `LearningEngine`.
+4. **LearningEngine y Junctions**:
+   - Creación temporal de directorios padre faltantes en `%APPDATA%`/`%LOCALAPPDATA%` antes de `JunctionPrepare`, con limpieza automática si quedan vacíos al finalizar.
+   - Registro granular de sub-pasos y códigos Win32 en `Data\logs\learning_<app>.log`.

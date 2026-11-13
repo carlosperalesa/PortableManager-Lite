@@ -124,7 +124,7 @@ int RunCommand(const core::PathResolver& resolver, std::wstring_view command, in
     }
     std::fwprintf(stderr,
         L"pml.exe --desktop | --list | --run <id> [argumentos]\n"
-        L"        --register <id> <App/carpeta> <App/carpeta/app.exe> [nombre]\n"
+        L"        --register <id> <Apps/carpeta> <Apps/carpeta/app.exe> [nombre]\n"
         L"        --install <id> <paquete absoluto> [ejecutable relativo]\n"
         L"        --learn <id> --approve <recurso exclusivo> [recursos] [-- argumentos]\n"
         L"        --reset | --archive | --uninstall <id> --confirm\n");

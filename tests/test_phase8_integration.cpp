@@ -119,7 +119,7 @@ struct Fixture {
     fs::path root = fs::path(SessionManager::QuerySystemTempDir()) / (L"pml8-" + SessionManager::GenerateSessionGuid().substr(0, 12));
     fs::path portable = root / L"portable";
     fs::path pml = portable / L"pml.exe";
-    fs::path app = portable / L"App" / L"demo";
+    fs::path app = portable / L"Apps" / L"demo";
     fs::path host = root / L"profile" / L"roaming" / L"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" /
                     L"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
     fs::path tmp = root / L"tmp";
@@ -159,7 +159,7 @@ struct Fixture {
     }
 
     void RegisterAndLearn() const {
-        Check(Run(L"--register demo App/demo App/demo/demo.exe Demo") == 0, "register app through CLI");
+        Check(Run(L"--register demo Apps/demo Apps/demo/demo.exe Demo") == 0, "register app through CLI");
         Check(Run(L"--list") == 0, "read catalog through CLI");
         Check(Run(L"--learn demo --approve " + Quote(kCandidate) + L" -- --exercise " +
                   Quote(root.native()) + L" once") == 0, "learn through CLI");
@@ -270,8 +270,8 @@ struct Fixture {
         const auto list = ::GetDlgItem(window, 2);
         Send(window, WM_HOTKEY, 1);
         Check(::IsWindowVisible(input), "hotkey opens search");
-        Send(input, WM_CHAR, L' ');
-        Check(::IsWindowVisible(input) && ::IsWindowVisible(list), "space opens desktop");
+        Send(input, WM_KEYDOWN, VK_DOWN);
+        Check(::IsWindowVisible(input) && ::IsWindowVisible(list), "down arrow opens desktop");
         Send(list, WM_KEYDOWN, VK_ESCAPE);
         Check(!::IsWindowVisible(list), "escape collapses desktop");
         Check(::PostMessageW(window, WM_CLOSE, 0, 0) && process.Wait() == 0, "close PMD normally");
@@ -292,7 +292,7 @@ struct Fixture {
         const auto second = app.parent_path() / L"second";
         fs::create_directory(second);
         fs::copy_file(PathResolver::QueryExecutablePath(), second / L"second.exe");
-        Check(Run(L"--register second App/second App/second/second.exe Second") == 0, "register second app");
+        Check(Run(L"--register second Apps/second Apps/second/second.exe Second") == 0, "register second app");
         Process owner;
         owner.Start(pml, L"--desktop", tmp);
         const auto window = DesktopWindow(owner);

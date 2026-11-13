@@ -134,7 +134,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
       }
       if (!cfg_mgr.config_doc().HasKey(L"General", L"AppsDir")) {
         cfg_mgr.config_doc().SetRelativePathValue(L"General", L"AppsDir",
-                                                  L"App", err);
+                                                  L"Apps", err);
       }
       if (!cfg_mgr.config_doc().HasKey(L"General", L"DataDir")) {
         cfg_mgr.config_doc().SetRelativePathValue(L"General", L"DataDir",

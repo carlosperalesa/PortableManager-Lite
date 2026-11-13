@@ -139,4 +139,9 @@ struct MenuEntry {
 // Shows a custom 32-bpp ARGB Obsidian Glass popup menu at screen_pt and returns the chosen item id (or 0 if cancelled).
 int ShowGlassMenu(HWND owner, POINT screen_pt, const std::vector<MenuEntry>& items, UINT dpi);
 
+// Shows a custom 32-bpp ARGB Obsidian Glass modal dialog centered on owner/workarea.
+// Returns the 0-based index of the chosen button, or -1 if cancelled with Esc/close.
+int ShowGlassDialog(HWND owner, std::wstring_view title, std::wstring_view message,
+                    const std::vector<std::wstring>& buttons, UINT dpi, int default_button = 0);
+
 } // namespace pm::pmd::gfx

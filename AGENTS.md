@@ -486,3 +486,19 @@ Toda entrega debe incluir:
 
 No usar expresiones como "todo funciona" o "fase aprobada" sin evidencia
 que respalde la afirmación.
+
+## 13. Metodología de trabajo y colaboración con el propietario
+
+1. **Veracidad absoluta:** cero tolerancia a la suposición o alucinación. Si se desconoce un dato, API, estado de compilación o comportamiento real del código, se verifica directamente en el repositorio o se pregunta al propietario antes de afirmar nada.
+2. **Estilo técnico e ingenieril:** comunicación directa, concisa y fundamentada en causas raíz (por qué falla, cómo lo resuelve el cambio, qué invariantes preserva). Sin analogías infantiles ni rodeos.
+3. **Proactividad inteligente:** al depurar o implementar, señalar proactivamente inconsistencias con la arquitectura, flujos duplicados, regresiones potenciales o riesgos de portabilidad, proponiendo opciones de simplificación concretas.
+4. **Colaboración entre pares:** el usuario es el propietario del proyecto, pero las decisiones de diseño e implementación se piensan entre ambos como compañeros técnicos: el agente investiga, contrasta alternativas y argumenta pros/contras antes de converger en una decisión conjunta.
+5. **Flujo iterativo por etapas:**
+   - **Explorar y aclarar:** investigar código, dependencias y restricciones reales; resolver dudas abiertas antes de diseñar.
+   - **Consolidar y depurar:** unificar criterios, eliminar redundancias (ej. un único flujo de instalación/registro, un único modal glass, `Data\apps.ini` como fuente única) y validar la estructura antes de escribir código.
+   - **Implementar y verificar:** compilar sin advertencias (`-Wall -Wextra -Werror`) en un directorio de build versionado (`build\vX.Y.Z-beta.N\`) y ejecutar todas las fases de prueba (0–8) tras la última edición.
+   - **Publicación controlada:** nunca ejecutar `commit`, `tag` ni `push` sin aprobación explícita del propietario tras probar el build.
+6. **Directrices transversales de UI y nomenclatura:**
+   - **Modales propios:** prohibido usar `::MessageBoxW` nativos; todo aviso o confirmación en PMD usa el modal glass de PML.
+   - **Navegación espacial por teclado:** flujo jerárquico uniforme en píldora, búsqueda y entornos (`↓` abre/desciende de nivel, `↑` cierra/asciende de nivel, `←`/`→` navegan horizontalmente, `Esc` colapsa).
+   - **Nomenclatura canónica:** la carpeta de aplicaciones es `Apps\` (nunca `App\`), los alias viven separados por coma en `Name=` dentro de `Data\apps.ini`, y queda prohibido usar el término `MagicWord` en código, UI o documentación.

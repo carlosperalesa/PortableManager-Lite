@@ -69,11 +69,11 @@ struct Stage {
     ~Stage() { if (!preserve && !path.empty()) RemoveTree(path); }
 
     DWORD Create(const PathResolver& resolver) {
-        const DWORD error = EnsureDirectory(resolver, L"App\\.temp", parents);
+        const DWORD error = EnsureDirectory(resolver, L"Apps\\.temp", parents);
         if (error) return error;
         const auto id = runtime::SessionManager::GenerateSessionGuid();
         if (id.empty()) return ERROR_GEN_FAILURE;
-        auto directory = resolver.ResolvePmRelativePath(L"App\\.temp\\" + id);
+        auto directory = resolver.ResolvePmRelativePath(L"Apps\\.temp\\" + id);
         if (!directory.ok) return ERROR_INVALID_NAME;
         if (!::CreateDirectoryW(directory.resolved_path.c_str(), nullptr)) return ::GetLastError();
         path = directory.resolved_path;
@@ -430,7 +430,7 @@ DWORD Install(const PathResolver& resolver, std::wstring_view id,
     if (found == ERROR_NOT_FOUND) {
         app.id = id;
         app.name = id;
-        app.directory = L"App\\" + std::wstring(id);
+        app.directory = L"Apps\\" + std::wstring(id);
         app.paf = paf;
     } else if (found) return found;
     if (app.paf != paf) return ERROR_INVALID_PARAMETER;
@@ -470,7 +470,7 @@ DWORD Install(const PathResolver& resolver, std::wstring_view id,
     const auto backup = stage.path / L"replaced";
     if (!::CreateDirectoryW(backup.c_str(), nullptr)) return ::GetLastError();
     const auto archived = fs::path(resolver.ResolvePmRelativePath(L"Data\\archived\\" + app.id).resolved_path);
-    Transaction txn(stage.path, fs::path(resolver.ResolvePmRelativePath(L"App").resolved_path).parent_path());
+    Transaction txn(stage.path, fs::path(resolver.ResolvePmRelativePath(L"Apps").resolved_path).parent_path());
     if (attrs == INVALID_FILE_ATTRIBUTES) error = txn.Directory(target);
     Pins target_pins;
     if (!error) error = PinDirectory(target.native(), target_pins);
@@ -514,7 +514,7 @@ DWORD Maintain(const PathResolver& resolver, const App& selected, Maintenance ac
     Stage stage;
     error = stage.Create(resolver);
     if (error) return error;
-    Transaction txn(stage.path, fs::path(resolver.ResolvePmRelativePath(L"App").resolved_path).parent_path());
+    Transaction txn(stage.path, fs::path(resolver.ResolvePmRelativePath(L"Apps").resolved_path).parent_path());
     const auto install = fs::path(resolver.ResolvePmRelativePath(app.directory).resolved_path);
     const auto data = fs::path(resolver.ResolvePmRelativePath(L"Data\\apps\\" + app.id).resolved_path);
     const auto archive_rel = L"Data\\archived\\" + app.id;

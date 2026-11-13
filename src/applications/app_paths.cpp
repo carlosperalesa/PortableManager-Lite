@@ -112,21 +112,21 @@ DWORD ValidateApp(const core::PathResolver& resolver, App& app, bool check_on_di
     std::replace(app.directory.begin(), app.directory.end(), L'/', L'\\');
     std::replace(app.executable.begin(), app.executable.end(), L'/', L'\\');
     // Older apps.ini entries may supply only Executable/Launcher. The layout
-    // fixes the installation boundary at the first directory below App.
-    if (app.directory.empty() && Within(app.executable, L"App")) {
-        const auto end = app.executable.find(L'\\', 4);
+    // fixes the installation boundary at the first directory below Apps.
+    if (app.directory.empty() && Within(app.executable, L"Apps")) {
+        const auto end = app.executable.find(L'\\', 5);
         if (end != std::wstring::npos) app.directory = app.executable.substr(0, end);
     }
     const auto directory = core::PathResolver::NormalizePmRelativePath(app.directory);
     const auto exe = core::PathResolver::NormalizePmRelativePath(app.executable);
     if (!directory.ok || directory.resolved_path != app.directory ||
-        !Within(app.directory, L"App") || app.directory.find(L'\\', 4) != std::wstring::npos ||
-        app.directory[4] == L'.' || app.directory.find(L'~') != std::wstring::npos ||
+        !Within(app.directory, L"Apps") || app.directory.find(L'\\', 5) != std::wstring::npos ||
+        app.directory[5] == L'.' || app.directory.find(L'~') != std::wstring::npos ||
         !exe.ok || exe.resolved_path != app.executable || !Within(app.executable, app.directory) ||
         app.executable.size() <= 4 || !Equal(std::wstring_view(app.executable).substr(app.executable.size() - 4), L".exe"))
         return ERROR_INVALID_NAME;
     const auto executable_suffix = app.executable.substr(app.directory.size());
-    app.directory.replace(0, 3, L"App");
+    app.directory.replace(0, 4, L"Apps");
     app.executable = app.directory + executable_suffix;
     if (!check_on_disk || app.archived) return ERROR_SUCCESS;
     const auto resolved = resolver.ResolvePmRelativePath(app.executable);

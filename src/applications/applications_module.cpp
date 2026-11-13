@@ -23,16 +23,42 @@ bool Missing(DWORD error) {
     return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
 }
 
+std::wstring TrimToken(std::wstring_view s) {
+    while (!s.empty() && (s.front() == L' ' || s.front() == L'\t')) s.remove_prefix(1);
+    while (!s.empty() && (s.back() == L' ' || s.back() == L'\t')) s.remove_suffix(1);
+    return std::wstring(s);
+}
+
+void AppendCommaTokens(std::wstring& target, std::wstring_view csv) {
+    for (std::size_t start = 0; start < csv.size();) {
+        const auto end = csv.find(L',', start);
+        const auto token = TrimToken(csv.substr(start, end - start));
+        if (!token.empty()) {
+            if (!target.empty()) target += L", ";
+            target += token;
+        }
+        if (end == std::wstring_view::npos) break;
+        start = end + 1;
+    }
+}
+
 App ReadApp(const IniDocument& doc, const std::wstring& section) {
     const auto get = [&](const wchar_t* key) { return doc.GetValue(section, key); };
     App app;
     app.id = section.substr(4);
-    app.name = get(L"Name");
+    const std::wstring raw_name = get(L"Name");
+    const auto comma = raw_name.find(L',');
+    if (comma == std::wstring::npos) {
+        app.name = TrimToken(raw_name);
+    } else {
+        app.name = TrimToken(std::wstring_view(raw_name).substr(0, comma));
+        AppendCommaTokens(app.aliases, std::wstring_view(raw_name).substr(comma + 1));
+    }
     if (app.name.empty()) app.name = app.id;
     app.directory = get(L"InstallDir");
     app.executable = get(L"Executable");
     if (app.executable.empty()) app.executable = get(L"Launcher");
-    app.aliases = get(L"Aliases");
+    AppendCommaTokens(app.aliases, get(L"Aliases"));
     app.extensions = get(L"Extensions");
     app.arguments = get(L"Arguments");
     app.color = get(L"Color");
@@ -226,8 +252,10 @@ DWORD SaveApp(const PathResolver& resolver, App app, bool removed) {
         for (const auto& key : associations) doc.RemoveKey(L"Associations", key);
         doc.RemoveSection(section);
     } else {
+        std::wstring combined_name = app.name;
+        if (!app.aliases.empty()) combined_name += L", " + app.aliases;
         const std::pair<const wchar_t*, std::wstring_view> fields[] = {
-            {L"Name", app.name}, {L"Aliases", app.aliases}, {L"Extensions", app.extensions},
+            {L"Name", combined_name}, {L"Extensions", app.extensions},
             {L"Arguments", app.arguments}, {L"Color", app.color}, {L"Environment", app.environment},
             {L"ExclusiveRoaming", app.exclusive_roaming}, {L"ExclusiveLocal", app.exclusive_local},
             {L"ExclusiveRegistry", app.exclusive_registry}, {L"Type", app.paf ? L"PAF" : L"Archive"},
@@ -236,9 +264,33 @@ DWORD SaveApp(const PathResolver& resolver, App app, bool removed) {
         };
         for (const auto& [key, value] : fields)
             if (!doc.SetValue(section, key, value, message)) return ERROR_INVALID_DATA;
+        doc.RemoveKey(section, L"Aliases");
         if (!doc.SetRelativePathValue(section, L"InstallDir", app.directory, message) ||
             !doc.SetRelativePathValue(section, L"Executable", app.executable, message))
             return ERROR_INVALID_DATA;
+
+        // Keep [Associations] in Data\apps.ini synchronized with app.extensions.
+        std::vector<std::wstring> old_assoc;
+        for (const auto& line : doc.lines()) {
+            if (line.kind == IniDocument::LineKind::KeyValue && Equal(line.section_name, L"Associations") &&
+                Equal(line.value, app.id)) {
+                old_assoc.push_back(line.key);
+            }
+        }
+        for (const auto& key : old_assoc) doc.RemoveKey(L"Associations", key);
+        for (std::size_t start = 0; start < app.extensions.size();) {
+            const auto end = app.extensions.find_first_of(L",; ", start);
+            auto ext = TrimToken(std::wstring_view(app.extensions).substr(start, end - start));
+            while (!ext.empty() && ext.front() == L'.') ext.erase(ext.begin());
+            if (!ext.empty()) {
+                for (auto& ch : ext) {
+                    if (ch >= L'A' && ch <= L'Z') ch += L'a' - L'A';
+                }
+                if (!doc.SetValue(L"Associations", ext, app.id, message)) return ERROR_INVALID_DATA;
+            }
+            if (end == std::wstring::npos) break;
+            start = end + 1;
+        }
     }
     return config.SaveAppsIniIfModified().win32_error;
 }

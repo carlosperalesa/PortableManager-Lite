@@ -50,7 +50,7 @@ una píldora compacta que abre búsqueda y un escritorio temporal
 ``` text
 <USB>\
 ├── pm.exe
-├── App\                  # Aplicaciones y paquetes
+├── Apps\                 # Aplicaciones y paquetes
 ├── Data\
 │   ├── config.ini        # Configuración general
 │   ├── apps.ini          # Identidad, alias, asociaciones y estado
@@ -82,14 +82,14 @@ No confundir:
 ### Interacción y escritorio
 
 -   Píldora compacta con LED y búsqueda por atajo.
--   Autocompletado por prefijo, MagicWords, alias y `_DEFAULT`.
+-   Autocompletado por prefijo, nombres/alias (`Name=`) y búsqueda por defecto (`[Web]`).
 -   PM-Desktop temporal con iconos de aplicaciones registradas y
     contenido de `Other/`.
 -   Contraer PMD oculta la interfaz; no cierra PM ni las aplicaciones.
 
 ### Aplicaciones y archivos
 
--   Gestión de aplicaciones portables en `App/`.
+-   Gestión de aplicaciones portables en `Apps/`.
 -   Ejecución del lanzador oficial cuando existe.
 -   Instalación/actualización desde paquetes PAF y archivos ZIP, 7z, RAR
     y TAR, según las reglas de cada formato.
@@ -170,7 +170,7 @@ privacidad.
 Consolidado en los documentos:
 
 -   Filosofía y alcance de Lite.
--   Píldora, búsqueda, MagicWords y PM-Desktop.
+-   Píldora, búsqueda, alias y PM-Desktop.
 -   Instalación, actualización, asociaciones y gestión de aplicaciones.
 -   Diferencias entre PAF y aplicaciones ZIP.
 -   Aprendizaje inicial sin IA.

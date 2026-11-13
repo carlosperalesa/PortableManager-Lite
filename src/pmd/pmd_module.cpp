@@ -45,6 +45,9 @@ constexpr UINT_PTR kBusyTimerId = 4;
 
 enum class View { Pill, Search, Files };
 enum class Tab { Desktop, Notes, Config };
+enum class DesktopViewMode { LargeIcons, SmallIcons, List, Details };
+enum class DesktopSortBy { Name, Modified };
+enum class DesktopGroupBy { AppsFirst, FoldersFirst };
 enum class Kind { App, File, Folder, Url, Kill };
 enum class HitZone {
     None, InstallIcon, InstallDest, OrphanBadge, WebSearch, BackButton, Item,
@@ -63,6 +66,7 @@ struct Item {
     std::wstring label;
     std::wstring value;
     std::wstring args;
+    std::uint64_t modified_time = 0;
 };
 
 struct Worker {
@@ -250,6 +254,9 @@ private:
     std::wstring GhostSuffix(const std::wstring& typed) const;
 
     void Show(View view);
+    void OpenTab(Tab tab);
+    void DesktopContextMenu();
+    void HandleHotkeyCapture(WPARAM vk);
     void InitTray();
     void UpdateTrayIcon();
     void RemoveTray();
@@ -267,7 +274,12 @@ private:
     void Open(int index);
     void Back();
     void BrowseDocument(const Item& item);
+    void OpenTargetUrl(const std::wstring& target);
     void SearchWeb(bool fallback);
+    void ConfigureAppModal(const App& app);
+    void CommitAppFieldEdit();
+    void RegisterManualApp(const std::wstring& rel_exe);
+    void ToggleConfigRow(int idx);
     void Close(Mode mode);
     void CloseWhenReady();
     void LoseOrigin();
@@ -295,10 +307,23 @@ private:
     void StartOperation(std::function<DWORD()> operation);
     void Report(DWORD error);
 
+    enum class UiNode {
+        Pill,
+        Search,
+        ModuleBar,
+        DesktopGrid,
+        NotesTabs,
+        NoteEditor,
+        ConfigList,
+        ConfigFieldEdit,
+    };
+
+    void FocusNode(UiNode node);
     HitZone HitTest(POINT client, int& item_index) const;
     void UpdateHover(POINT client);
     void EnsureVisibleSelection();
     void MoveSelection(int dx, int dy);
+    static LRESULT CALLBACK NoteEditProc(HWND control, UINT msg, WPARAM wp, LPARAM lp);
 
     const PathResolver& resolver_;
     core::ConfigManager config_;
@@ -311,6 +336,9 @@ private:
     HWND list_ = nullptr;
     WNDPROC edit_proc_ = nullptr;
     WNDPROC list_proc_ = nullptr;
+    HWND note_find_edit_ = nullptr;
+    WNDPROC note_find_proc_ = nullptr;
+    WNDPROC note_edit_proc_ = nullptr;
 
     View view_ = View::Pill;
     Tab tab_ = Tab::Desktop;
@@ -353,8 +381,24 @@ private:
     int pill_center_x_ = 0;
     int pill_top_y_ = 0;
     bool always_on_top_ = true;
-    int translucent_pct_ = 90;
+    int translucent_pct_ = 10;
     bool remember_pos_ = true;
+    bool clipboard_offers_ = true;
+    bool enable_kill_ = true;
+    bool show_all_close_modes_ = false;
+    UiNode focus_node_ = UiNode::Pill;
+    int config_selected_ = 0;
+    bool app_cfg_editing_ = false;
+    int app_cfg_field_ = 0; // 1: Name/Aliases, 2: Extensions, 3: Arguments
+    App app_cfg_target_{};
+    std::wstring config_app_id_;
+    DesktopViewMode desk_view_ = DesktopViewMode::LargeIcons;
+    DesktopSortBy desk_sort_ = DesktopSortBy::Name;
+    DesktopGroupBy desk_group_ = DesktopGroupBy::AppsFirst;
+    bool hotkey_capturing_ = false;
+    bool hotkey_status_ok_ = false;
+    bool hotkey_status_err_ = false;
+    std::wstring hotkey_error_text_;
     std::wstring registered_hotkey_;
     bool dragging_ = false;
     POINT drag_start_screen_{};
@@ -382,6 +426,7 @@ private:
     RECT rect_tab_config_{};
     RECT rect_note_add_{};
     RECT rect_resize_grip_{};
+    RECT rect_note_find_{};
     std::vector<RECT> rect_note_tabs_;
     std::vector<RECT> rect_note_closes_;
     std::vector<RECT> rect_config_rows_;
@@ -433,6 +478,7 @@ int Desktop::Run() {
     config_.LoadConfigIni(false);
     const auto instance = ::GetModuleHandleW(nullptr);
     WNDCLASSW wc{};
+    wc.style = CS_DBLCLKS;
     wc.hInstance = instance;
     wc.lpfnWndProc = WindowProc;
     wc.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
@@ -489,23 +535,79 @@ LRESULT CALLBACK Desktop::WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) 
     return self ? self->Message(msg, wp, lp) : ::DefWindowProcW(hwnd, msg, wp, lp);
 }
 
+LRESULT CALLBACK Desktop::NoteEditProc(HWND control, UINT msg, WPARAM wp, LPARAM lp) {
+    HWND host = ::GetParent(control);
+    auto* self = reinterpret_cast<Desktop*>(::GetWindowLongPtrW(host, GWLP_USERDATA));
+    if (msg == WM_KEYDOWN && wp == VK_ESCAPE && self) {
+        self->SaveActiveNote();
+        self->Show(View::Pill);
+        return 0;
+    }
+    if (msg == WM_KEYDOWN && wp == VK_UP && self) {
+        DWORD start = 0;
+        ::SendMessageW(control, EM_GETSEL, reinterpret_cast<WPARAM>(&start), 0);
+        const LRESULT line = ::SendMessageW(control, EM_LINEFROMCHAR, static_cast<WPARAM>(start), 0);
+        if (line == 0) {
+            self->SaveActiveNote();
+            self->FocusNode(self->notes_.empty() ? UiNode::ModuleBar : UiNode::NotesTabs);
+            return 0;
+        }
+    }
+    if (msg == WM_CHAR && wp == VK_ESCAPE) return 0;
+    return self && self->note_edit_proc_
+        ? ::CallWindowProcW(self->note_edit_proc_, control, msg, wp, lp)
+        : ::DefWindowProcW(control, msg, wp, lp);
+}
+
 LRESULT CALLBACK Desktop::InputProc(HWND control, UINT msg, WPARAM wp, LPARAM lp) {
     const auto parent = ::GetParent(control);
     auto* self = reinterpret_cast<Desktop*>(::GetWindowLongPtrW(parent, GWLP_USERDATA));
     const bool edit = control == self->edit_;
-    const auto base = edit ? self->edit_proc_ : self->list_proc_;
+    const bool note_find = control == self->note_find_edit_;
+    const auto base = edit ? self->edit_proc_ : (note_find ? self->note_find_proc_ : self->list_proc_);
+
+    if (control == self->edit_ || control == self->list_) {
+        if (msg == WM_ERASEBKGND) return 1;
+        if (msg == WM_PAINT) {
+            PAINTSTRUCT ps{};
+            ::BeginPaint(control, &ps);
+            ::EndPaint(control, &ps);
+            return 0;
+        }
+    }
 
     if (msg == WM_KEYDOWN && wp == VK_ESCAPE) {
+        if (edit && self->app_cfg_editing_) {
+            self->app_cfg_editing_ = false;
+            ::SetWindowTextW(self->edit_, L"");
+            self->FocusNode(UiNode::ConfigList);
+            return 0;
+        }
         if (edit && self->note_renaming_) {
             self->note_renaming_ = false;
             ::SetWindowTextW(self->edit_, L"");
-            self->Layout();
+            if (self->note_edit_) ::SetFocus(self->note_edit_);
+            self->Render();
+            return 0;
+        }
+        if (note_find) {
+            if (!Text(control).empty()) {
+                ::SetWindowTextW(control, L"");
+                self->Render();
+            } else {
+                self->SaveActiveNote();
+                self->Show(View::Pill);
+            }
             return 0;
         }
         self->Back();
         return 0;
     }
     if (msg == WM_KEYDOWN && wp == VK_RETURN) {
+        if (edit && self->app_cfg_editing_) {
+            self->CommitAppFieldEdit();
+            return 0;
+        }
         if (edit && self->url_naming_) {
             self->SaveUrlAlias();
             return 0;
@@ -514,13 +616,13 @@ LRESULT CALLBACK Desktop::InputProc(HWND control, UINT msg, WPARAM wp, LPARAM lp
             self->CommitNoteRename();
             return 0;
         }
-        if (edit && self->view_ == View::Files && self->tab_ == Tab::Notes) {
+        if (note_find) {
             self->FindNextInNote();
             return 0;
         }
         const auto value = Text(self->edit_);
-        if (edit && Equal(value, L"exit")) self->Close(Mode::Normal);
-        else if (edit && Equal(value, L"kill")) self->StartKillPick();
+        if (edit && (Equal(value, L"exit") || Equal(value, L"salir") || Equal(value, L"quit"))) self->Close(Mode::Normal);
+        else if (edit && self->enable_kill_ && Equal(value, L"kill")) self->StartKillPick();
         else if (edit && value.starts_with(L"=")) {
             double result = 0;
             if (!Calculator(std::wstring_view(value).substr(1)).Evaluate(result)) self->Report(ERROR_INVALID_DATA);
@@ -532,27 +634,70 @@ LRESULT CALLBACK Desktop::InputProc(HWND control, UINT msg, WPARAM wp, LPARAM lp
                 self->Render();
             }
         } else {
+            if (edit && self->items_.empty() && !value.empty()) {
+                wchar_t expanded[2048]{};
+                const DWORD n = ::ExpandEnvironmentStringsW(value.c_str(), expanded, static_cast<DWORD>(std::size(expanded)));
+                const std::wstring target = (n > 0 && n <= std::size(expanded)) ? std::wstring(expanded) : value;
+                std::error_code ec;
+                if (IsHttpUrl(target)) {
+                    self->OpenTargetUrl(target);
+                    return 0;
+                }
+                if (fs::exists(target, ec)) {
+                    const auto res = reinterpret_cast<INT_PTR>(::ShellExecuteW(
+                        self->hwnd_, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+                    if (res <= 32) self->Report(static_cast<DWORD>(res));
+                    else self->Show(View::Pill);
+                    return 0;
+                }
+            }
             if (self->selected_ < 0 && edit) self->SearchWeb(true);
             else if (self->items_.empty() && edit) self->SearchWeb(true);
             else self->Open(self->selected_);
         }
         return 0;
     }
-    if (edit && msg == WM_CHAR && wp == L' ' && Text(control).empty() &&
-        self->view_ == View::Search && !self->url_naming_ && !self->note_renaming_) {
-        self->Show(View::Files);
+    if (edit && msg == WM_KEYDOWN && wp == VK_F5 && self->view_ == View::Files && self->tab_ == Tab::Desktop) {
+        self->Populate();
         return 0;
     }
-    if (edit && msg == WM_CHAR && (wp == VK_ESCAPE || wp == VK_RETURN)) return 0;
-    if (edit && msg == WM_KEYDOWN && !self->items_.empty() &&
-        (self->view_ == View::Search || (self->view_ == View::Files && self->tab_ == Tab::Desktop))) {
-        if (wp == VK_UP || wp == VK_DOWN) {
-            self->MoveSelection(0, wp == VK_UP ? -1 : 1);
-            return 0;
-        }
-        if (self->view_ == View::Files && Text(control).empty() && (wp == VK_LEFT || wp == VK_RIGHT)) {
-            self->MoveSelection(wp == VK_LEFT ? -1 : 1, 0);
-            return 0;
+    if ((edit || note_find) && msg == WM_CHAR && (wp == VK_ESCAPE || wp == VK_RETURN)) return 0;
+    if (edit && msg == WM_KEYDOWN && !self->app_cfg_editing_ && !self->url_naming_ && !self->note_renaming_) {
+        if (self->view_ == View::Search) {
+            if (wp == VK_DOWN) {
+                if (!self->items_.empty()) self->MoveSelection(0, 1);
+                else if (Text(control).empty()) {
+                    self->Show(View::Files);
+                    self->FocusNode(UiNode::ModuleBar);
+                }
+                return 0;
+            }
+            if (wp == VK_UP) {
+                if (self->items_.empty() || self->selected_ <= 0) self->Show(View::Pill);
+                else self->MoveSelection(0, -1);
+                return 0;
+            }
+        } else if (self->view_ == View::Files && self->tab_ == Tab::Desktop) {
+            if (wp == VK_DOWN) {
+                if (Text(control).empty()) {
+                    self->FocusNode(UiNode::ModuleBar);
+                } else if (!self->items_.empty()) {
+                    self->MoveSelection(0, 1);
+                }
+                return 0;
+            }
+            if (wp == VK_UP) {
+                if (Text(control).empty()) {
+                    self->Show(View::Search);
+                } else if (!self->items_.empty()) {
+                    self->MoveSelection(0, -1);
+                }
+                return 0;
+            }
+            if (Text(control).empty() && !self->items_.empty() && (wp == VK_LEFT || wp == VK_RIGHT)) {
+                self->MoveSelection(wp == VK_LEFT ? -1 : 1, 0);
+                return 0;
+            }
         }
     }
     if (!edit && msg == WM_KEYDOWN) {
@@ -569,8 +714,8 @@ LRESULT CALLBACK Desktop::InputProc(HWND control, UINT msg, WPARAM wp, LPARAM lp
     }
 
     const auto result = ::CallWindowProcW(base, control, msg, wp, lp);
-    if (edit && (msg == WM_KEYUP || msg == WM_LBUTTONUP || msg == WM_SETFOCUS || msg == WM_KILLFOCUS ||
-                 msg == WM_CHAR || msg == WM_SETTEXT)) {
+    if ((edit || note_find) && (msg == WM_KEYUP || msg == WM_LBUTTONUP || msg == WM_SETFOCUS || msg == WM_KILLFOCUS ||
+                                msg == WM_CHAR || msg == WM_SETTEXT)) {
         self->caret_visible_ = true;
         self->Render();
     }
@@ -586,9 +731,11 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             };
             edit_ = make(L"EDIT", L"", ES_AUTOHSCROLL, 1);
             list_ = make(L"STATIC", L"", SS_NOTIFY, 2);
-            if (!edit_ || !list_) return -1;
+            note_find_edit_ = make(L"EDIT", L"", ES_AUTOHSCROLL, 3);
+            if (!edit_ || !list_ || !note_find_edit_) return -1;
             edit_proc_ = reinterpret_cast<WNDPROC>(::SetWindowLongPtrW(edit_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(InputProc)));
             list_proc_ = reinterpret_cast<WNDPROC>(::SetWindowLongPtrW(list_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(InputProc)));
+            note_find_proc_ = reinterpret_cast<WNDPROC>(::SetWindowLongPtrW(note_find_edit_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(InputProc)));
             return 0;
         }
         case WM_PAINT: {
@@ -717,24 +864,13 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             int idx = -1;
             const auto zone = HitTest(client, idx);
             if (zone == HitZone::TopTabDesktop) {
-                SaveActiveNote();
-                note_renaming_ = false;
-                tab_ = Tab::Desktop;
-                ::SetWindowTextW(edit_, L"");
-                Populate();
-                ::SetFocus(edit_);
+                OpenTab(Tab::Desktop);
             } else if (zone == HitZone::TopTabNotes) {
-                note_renaming_ = false;
-                tab_ = Tab::Notes;
-                ::SetWindowTextW(edit_, L"");
-                LoadNotes();
-                Layout();
+                OpenTab(Tab::Notes);
             } else if (zone == HitZone::TopTabConfig) {
-                SaveActiveNote();
-                note_renaming_ = false;
-                tab_ = Tab::Config;
-                ::SetWindowTextW(edit_, L"");
-                Layout();
+                config_app_id_.clear();
+                app_cfg_editing_ = false;
+                OpenTab(Tab::Config);
             } else if (zone == HitZone::NoteTab && idx >= 0) {
                 if (idx == active_note_) StartNoteRename();
                 else SwitchNote(idx);
@@ -743,36 +879,12 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             } else if (zone == HitZone::NoteAdd) {
                 CreateNote();
             } else if (zone == HitZone::ConfigAction && idx >= 0) {
-                auto& doc = config_.config_doc();
-                std::wstring err;
-                if (idx == 0) {
-                    const std::vector<std::wstring> presets{L"Ctrl+Space", L"Alt+Space", L"Ctrl+Shift+Space", L"Ctrl+Alt+Space"};
-                    const auto cur = doc.GetValue(L"Desktop", L"Hotkey", L"Ctrl+Space");
-                    std::size_t next = 0;
-                    for (std::size_t i = 0; i < presets.size(); ++i) {
-                        if (Equal(cur, presets[i])) { next = (i + 1) % presets.size(); break; }
-                    }
-                    doc.SetValue(L"Desktop", L"Hotkey", presets[next], err);
-                } else if (idx == 1) {
-                    doc.SetValue(L"Desktop", L"AlwaysOnTop", always_on_top_ ? L"false" : L"true", err);
-                } else if (idx == 2) {
-                    const int next_pct = translucent_pct_ <= 50 ? 100 : (translucent_pct_ - 10);
-                    doc.SetValue(L"Desktop", L"Translucent", std::to_wstring(next_pct) + L"%", err);
-                } else if (idx == 3) {
-                    doc.SetValue(L"Desktop", L"RememberPosition", remember_pos_ ? L"false" : L"true", err);
-                } else if (idx == 4) {
-                    config_.SaveConfigIniIfModified(true);
-                    const auto file = resolver_.ResolvePmRelativePath(L"Data\\config.ini");
-                    const auto res = reinterpret_cast<INT_PTR>(::ShellExecuteW(
-                        hwnd_, L"open", file.resolved_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
-                    if (res <= 32) Report(static_cast<DWORD>(res));
-                }
-                if (idx >= 0 && idx <= 3) {
-                    config_.SaveConfigIniIfModified(false);
-                    ApplyConfigSettings(true);
-                    ApplyWindowGeometry();
-                    Render();
-                }
+                config_selected_ = idx;
+                focus_node_ = UiNode::ConfigList;
+                ToggleConfigRow(idx);
+            } else if (view_ == View::Files && tab_ == Tab::Notes && ::PtInRect(&rect_note_find_, client)) {
+                ::SetFocus(note_find_edit_);
+                Render();
             } else if (zone == HitZone::WebSearch) SearchWeb(false);
             else if (zone == HitZone::BackButton) Back();
             else if (zone == HitZone::Item && idx >= 0) {
@@ -781,17 +893,34 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
             }
             return 0;
         }
+        case WM_LBUTTONDBLCLK: {
+            if (view_ == View::Pill) return 0;
+            POINT client{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+            int idx = -1;
+            const auto zone = HitTest(client, idx);
+            if (zone == HitZone::Item && idx >= 0 && static_cast<std::size_t>(idx) < items_.size()) {
+                const auto& item = items_[static_cast<std::size_t>(idx)];
+                if (item.kind == Kind::File && Prefix(item.value, L"Apps\\") &&
+                    Equal(fs::path(item.value).extension().native(), L".exe")) {
+                    RegisterManualApp(item.value);
+                    return 0;
+                }
+            }
+            return 0;
+        }
         case WM_RBUTTONUP: {
             POINT client{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
             int idx = -1;
             const auto zone = HitTest(client, idx);
             if (zone == HitZone::Item && idx >= 0) Menu(true, idx);
+            else if (view_ == View::Files && tab_ == Tab::Desktop) DesktopContextMenu();
             else Menu(false);
             return 0;
         }
         case WM_MOUSEWHEEL: {
-            if (view_ == View::Files && !items_.empty()) {
-                const int total_rows = static_cast<int>((items_.size() + static_cast<std::size_t>(cols_) - 1) / static_cast<std::size_t>(cols_));
+            if (view_ == View::Files && tab_ == Tab::Desktop && !items_.empty()) {
+                const int per_row = (desk_view_ == DesktopViewMode::List || desk_view_ == DesktopViewMode::Details) ? 1 : cols_;
+                const int total_rows = static_cast<int>((items_.size() + static_cast<std::size_t>(per_row) - 1) / static_cast<std::size_t>(per_row));
                 const int max_scroll = std::max(0, total_rows - visible_rows_);
                 const int delta = GET_WHEEL_DELTA_WPARAM(wp);
                 scroll_row_ = std::clamp(scroll_row_ + (delta > 0 ? -1 : 1), 0, max_scroll);
@@ -801,17 +930,137 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
         }
         case WM_COMMAND:
             if (LOWORD(wp) == 1 && HIWORD(wp) == EN_CHANGE) {
-                if (view_ == View::Search || (view_ == View::Files && tab_ == Tab::Desktop)) Populate();
-                else if (url_naming_ || note_renaming_ || (view_ == View::Files && tab_ == Tab::Notes)) Render();
+                if (view_ == View::Search) Populate();
+                else if (view_ == View::Files && !note_renaming_ && !app_cfg_editing_) {
+                    if (tab_ != Tab::Desktop && !Text(edit_).empty()) tab_ = Tab::Desktop;
+                    if (tab_ == Tab::Desktop) Populate();
+                } else if (url_naming_ || note_renaming_ || app_cfg_editing_) {
+                    Render();
+                }
+            } else if (LOWORD(wp) == 3 && HIWORD(wp) == EN_CHANGE) {
+                Render();
             }
             return 0;
         case WM_HOTKEY:
             if (config_.LoadConfigIni(false).ok) ApplyConfigSettings(true);
+            ::ShowWindow(hwnd_, SW_SHOW);
             Show(View::Search);
             return 0;
+        case WM_SYSKEYDOWN:
         case WM_KEYDOWN:
-            if (wp == VK_SPACE && view_ == View::Pill) Show(View::Files);
-            else if (wp == VK_ESCAPE) Back();
+            if (view_ == View::Files && tab_ == Tab::Config && hotkey_capturing_) {
+                if (wp == VK_ESCAPE || wp == VK_LEFT) {
+                    hotkey_capturing_ = false;
+                    FocusNode(UiNode::ConfigList);
+                } else {
+                    HandleHotkeyCapture(wp);
+                }
+                return 0;
+            }
+            if (view_ == View::Pill) {
+                if (wp == VK_DOWN) Show(View::Search);
+                else if (wp == VK_ESCAPE || wp == VK_UP) Back();
+                return 0;
+            }
+            if (view_ == View::Files && tab_ == Tab::Desktop && wp == VK_F5) {
+                Populate();
+                return 0;
+            }
+            if (wp == VK_ESCAPE) {
+                if (view_ == View::Files && tab_ == Tab::Config && !config_app_id_.empty()) {
+                    config_app_id_.clear();
+                    app_cfg_editing_ = false;
+                    OpenTab(Tab::Desktop);
+                    return 0;
+                }
+                Back();
+                return 0;
+            }
+            if (view_ == View::Files) {
+                if (focus_node_ == UiNode::ModuleBar) {
+                    if (wp == VK_LEFT) {
+                        const Tab prev = (tab_ == Tab::Desktop) ? Tab::Config
+                            : (tab_ == Tab::Notes ? Tab::Desktop : Tab::Notes);
+                        OpenTab(prev);
+                        FocusNode(UiNode::ModuleBar);
+                        return 0;
+                    }
+                    if (wp == VK_RIGHT) {
+                        const Tab next = (tab_ == Tab::Desktop) ? Tab::Notes
+                            : (tab_ == Tab::Notes ? Tab::Config : Tab::Desktop);
+                        OpenTab(next);
+                        FocusNode(UiNode::ModuleBar);
+                        return 0;
+                    }
+                    if (wp == VK_DOWN) {
+                        if (tab_ == Tab::Desktop) FocusNode(UiNode::DesktopGrid);
+                        else if (tab_ == Tab::Notes) FocusNode(notes_.empty() ? UiNode::NoteEditor : UiNode::NotesTabs);
+                        else FocusNode(UiNode::ConfigList);
+                        return 0;
+                    }
+                    if (wp == VK_UP) {
+                        Show(View::Search);
+                        return 0;
+                    }
+                } else if (focus_node_ == UiNode::DesktopGrid && tab_ == Tab::Desktop) {
+                    if (wp == VK_UP) { MoveSelection(0, -1); return 0; }
+                    if (wp == VK_DOWN) { MoveSelection(0, 1); return 0; }
+                    if (wp == VK_LEFT) { MoveSelection(-1, 0); return 0; }
+                    if (wp == VK_RIGHT) { MoveSelection(1, 0); return 0; }
+                    if (wp == VK_RETURN) { Open(selected_); return 0; }
+                } else if (focus_node_ == UiNode::NotesTabs && tab_ == Tab::Notes) {
+                    const int n = static_cast<int>(notes_.size());
+                    if (wp == VK_LEFT && n > 0) {
+                        SwitchNote((active_note_ - 1 + n) % n);
+                        FocusNode(UiNode::NotesTabs);
+                        return 0;
+                    }
+                    if (wp == VK_RIGHT && n > 0) {
+                        SwitchNote((active_note_ + 1) % n);
+                        FocusNode(UiNode::NotesTabs);
+                        return 0;
+                    }
+                    if (wp == VK_DOWN) {
+                        FocusNode(UiNode::NoteEditor);
+                        return 0;
+                    }
+                    if (wp == VK_UP) {
+                        FocusNode(UiNode::ModuleBar);
+                        return 0;
+                    }
+                } else if (focus_node_ == UiNode::ConfigList && tab_ == Tab::Config) {
+                    const int max_cfg = config_app_id_.empty() ? 6 : 3;
+                    if (wp == VK_UP) {
+                        if (config_selected_ <= 0) {
+                            FocusNode(UiNode::ModuleBar);
+                        } else {
+                            --config_selected_;
+                            Render();
+                        }
+                        return 0;
+                    }
+                    if (wp == VK_DOWN) {
+                        config_selected_ = std::min(max_cfg, config_selected_ + 1);
+                        Render();
+                        return 0;
+                    }
+                    if (wp == VK_LEFT) {
+                        FocusNode(UiNode::ModuleBar);
+                        return 0;
+                    }
+                    if (wp == VK_RIGHT || wp == VK_RETURN || wp == VK_SPACE) {
+                        ToggleConfigRow(config_selected_);
+                        return 0;
+                    }
+                }
+            }
+            return 0;
+        case WM_CHAR:
+            if (view_ == View::Files && tab_ == Tab::Desktop && !hotkey_capturing_ && wp >= 32) {
+                FocusNode(UiNode::Search);
+                ::SendMessageW(edit_, WM_CHAR, wp, lp);
+                return 0;
+            }
             return 0;
         case WM_ACTIVATE:
             if (LOWORD(wp) == WA_INACTIVE) {
@@ -867,7 +1116,7 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
                 Render();
                 if (cur_w_ == target_w_ && cur_h_ == target_h_) ::KillTimer(hwnd_, kAnimTimerId);
             } else if (wp == kCaretTimerId) {
-                if (view_ == View::Search) {
+                if (view_ == View::Search || url_naming_ || note_renaming_ || app_cfg_editing_) {
                     caret_visible_ = !caret_visible_;
                     Render();
                 }
@@ -886,8 +1135,10 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
         case kTrayCallback: {
             const UINT tray_msg = LOWORD(lp);
             if (tray_msg == WM_LBUTTONUP) {
+                ::ShowWindow(hwnd_, SW_SHOW);
                 Show(View::Search);
             } else if (tray_msg == WM_LBUTTONDBLCLK) {
+                ::ShowWindow(hwnd_, SW_SHOW);
                 Show(View::Files);
             } else if (tray_msg == WM_RBUTTONUP) {
                 ::SetForegroundWindow(hwnd_);
@@ -942,25 +1193,45 @@ void Desktop::EnsureConfigDefaults() {
     if (doc.GetValue(L"Desktop", L"AlwaysOnTop").empty())
         doc.SetValue(L"Desktop", L"AlwaysOnTop", L"true", error);
     if (doc.GetValue(L"Desktop", L"Translucent").empty())
-        doc.SetValue(L"Desktop", L"Translucent", L"90%", error);
+        doc.SetValue(L"Desktop", L"Translucent", L"10%", error);
     if (doc.GetValue(L"Desktop", L"RememberPosition").empty())
         doc.SetValue(L"Desktop", L"RememberPosition", L"true", error);
+    if (doc.GetValue(L"Desktop", L"ClipboardOffers").empty())
+        doc.SetValue(L"Desktop", L"ClipboardOffers", L"true", error);
+    if (doc.GetValue(L"Desktop", L"EnableKill").empty())
+        doc.SetValue(L"Desktop", L"EnableKill", L"true", error);
 }
 
 void Desktop::ApplyConfigSettings(bool register_hotkey) {
     const auto& doc = config_.config_doc();
-    const auto top_val = doc.GetValue(L"Desktop", L"AlwaysOnTop", L"true");
-    always_on_top_ = !Equal(top_val, L"false") && top_val != L"0" && !Equal(top_val, L"no");
+    const auto bool_opt = [&](const wchar_t* key, const wchar_t* def) {
+        const auto v = doc.GetValue(L"Desktop", key, def);
+        return !Equal(v, L"false") && v != L"0" && !Equal(v, L"no");
+    };
+    always_on_top_ = bool_opt(L"AlwaysOnTop", L"true");
+    remember_pos_ = bool_opt(L"RememberPosition", L"true");
+    clipboard_offers_ = bool_opt(L"ClipboardOffers", L"true");
+    enable_kill_ = bool_opt(L"EnableKill", L"true");
+    show_all_close_modes_ = bool_opt(L"ShowAllCloseModes", L"false");
 
-    const auto rem_val = doc.GetValue(L"Desktop", L"RememberPosition", L"true");
-    remember_pos_ = !Equal(rem_val, L"false") && rem_val != L"0" && !Equal(rem_val, L"no");
-
-    auto trans_val = doc.GetValue(L"Desktop", L"Translucent", L"90%");
+    auto trans_val = doc.GetValue(L"Desktop", L"Translucent", L"10%");
     if (!trans_val.empty() && trans_val.back() == L'%') trans_val.pop_back();
     wchar_t* end = nullptr;
-    const long parsed_pct = trans_val.empty() ? 90 : std::wcstol(trans_val.c_str(), &end, 10);
+    const long parsed_pct = trans_val.empty() ? 10 : std::wcstol(trans_val.c_str(), &end, 10);
     translucent_pct_ = (end != trans_val.c_str() && *end == L'\0')
-        ? std::clamp(static_cast<int>(parsed_pct), 15, 100) : 90;
+        ? std::clamp(static_cast<int>(parsed_pct), 0, 90) : 10;
+
+    const auto vm = doc.GetValue(L"Desktop", L"ViewMode", L"LargeIcons");
+    if (Equal(vm, L"SmallIcons")) desk_view_ = DesktopViewMode::SmallIcons;
+    else if (Equal(vm, L"List")) desk_view_ = DesktopViewMode::List;
+    else if (Equal(vm, L"Details")) desk_view_ = DesktopViewMode::Details;
+    else desk_view_ = DesktopViewMode::LargeIcons;
+
+    const auto sb = doc.GetValue(L"Desktop", L"SortBy", L"Name");
+    desk_sort_ = Equal(sb, L"Modified") ? DesktopSortBy::Modified : DesktopSortBy::Name;
+
+    const auto gb = doc.GetValue(L"Desktop", L"GroupBy", L"AppsFirst");
+    desk_group_ = Equal(gb, L"FoldersFirst") ? DesktopGroupBy::FoldersFirst : DesktopGroupBy::AppsFirst;
 
     const auto parse_dim = [&](const wchar_t* key, int fallback, int low, int high) {
         const auto v = doc.GetValue(L"Desktop", key);
@@ -984,7 +1255,16 @@ void Desktop::ApplyConfigSettings(bool register_hotkey) {
                 if (Equal(token, L"Win")) modifiers |= MOD_WIN;
             }
             const auto last = tokens.empty() ? std::wstring(L"Space") : tokens.back();
-            const auto vk = last.size() == 1 ? static_cast<UINT>(::VkKeyScanW(last.front()) & 0xff) : VK_SPACE;
+            UINT vk = VK_SPACE;
+            if (last.size() == 1) vk = static_cast<UINT>(::VkKeyScanW(last.front()) & 0xff);
+            else if (Equal(last, L"Tab")) vk = VK_TAB;
+            else if (Equal(last, L"Enter")) vk = VK_RETURN;
+            else if (Equal(last, L"Esc")) vk = VK_ESCAPE;
+            else if (Equal(last, L"Supr")) vk = VK_DELETE;
+            else if ((last[0] == L'F' || last[0] == L'f') && last.size() >= 2) {
+                const int fn = std::wcstol(last.c_str() + 1, nullptr, 10);
+                if (fn >= 1 && fn <= 12) vk = static_cast<UINT>(VK_F1 + fn - 1);
+            }
             ::RegisterHotKey(hwnd_, 1, modifiers, vk);
             registered_hotkey_ = key;
         }
@@ -1044,31 +1324,43 @@ void Desktop::Layout() {
         visible_rows_ = std::min(static_cast<int>(items_.size()), max_rows);
         target_h_ = visible_rows_ > 0 ? (search_h + S(8) + visible_rows_ * row_h + S(8)) : search_h;
     } else if (tab_ == Tab::Notes) {
-        target_w_ = std::clamp(S(notes_w_), S(320), avail_w);
-        target_h_ = std::clamp(S(notes_h_), S(250), avail_h);
+        target_w_ = std::clamp(S(notes_w_), S(340), avail_w);
+        target_h_ = std::clamp(S(notes_h_), S(270), avail_h);
     } else if (tab_ == Tab::Config) {
-        target_w_ = std::min(S(388), avail_w);
-        target_h_ = S(40) + S(246);
+        target_w_ = std::min(S(410), avail_w);
+        target_h_ = S(40) + S(38) + S(276);
     } else {
-        const auto col_str = config_.config_doc().GetValue(L"Desktop", L"Columns");
-        wchar_t* end = nullptr;
-        const long parsed_cols = col_str.empty() ? 0 : std::wcstol(col_str.c_str(), &end, 10);
-        const int max_cols_fit = std::max(1, (avail_w - S(24)) / S(88));
-        const int desired_cols = (!col_str.empty() && end == col_str.c_str() + col_str.size() && parsed_cols > 0)
-            ? static_cast<int>(parsed_cols) : 4;
-        cols_ = std::clamp(desired_cols, 1, max_cols_fit);
+        const int search_h = S(40);
+        const int header_h = S(38);
         const int count = std::max(1, static_cast<int>(items_.size()));
-        if (col_str.empty()) cols_ = std::clamp(count, 3, cols_);
-        const int header_h = S(40);
-        const int search_h = S(36);
-        const int cell_w = S(86);
-        const int cell_h = S(84);
-        const int total_rows = (count + cols_ - 1) / cols_;
-        const int max_rows = std::max(1, (avail_h - header_h - search_h - S(16)) / cell_h);
-        visible_rows_ = std::clamp(total_rows, 1, max_rows);
-        scroll_row_ = std::clamp(scroll_row_, 0, std::max(0, total_rows - visible_rows_));
-        target_w_ = std::clamp(cols_ * cell_w + S(24), S(300), avail_w);
-        target_h_ = header_h + search_h + visible_rows_ * cell_h + S(12);
+        if (desk_view_ == DesktopViewMode::List || desk_view_ == DesktopViewMode::Details) {
+            cols_ = 1;
+            const int row_h = S(30);
+            const int det_extra = (desk_view_ == DesktopViewMode::Details) ? S(24) : 0;
+            const int max_rows = std::max(1, (avail_h - search_h - header_h - det_extra - S(16)) / row_h);
+            visible_rows_ = std::clamp(count, 1, max_rows);
+            scroll_row_ = std::clamp(scroll_row_, 0, std::max(0, count - visible_rows_));
+            target_w_ = std::clamp(S(desk_view_ == DesktopViewMode::Details ? 480 : 380), S(320), avail_w);
+            target_h_ = search_h + header_h + det_extra + visible_rows_ * row_h + S(12);
+        } else {
+            const bool small_ic = (desk_view_ == DesktopViewMode::SmallIcons);
+            const int cell_w = small_ic ? S(72) : S(86);
+            const int cell_h = small_ic ? S(64) : S(84);
+            const auto col_str = config_.config_doc().GetValue(L"Desktop", L"Columns");
+            wchar_t* end = nullptr;
+            const long parsed_cols = col_str.empty() ? 0 : std::wcstol(col_str.c_str(), &end, 10);
+            const int max_cols_fit = std::max(1, (avail_w - S(24)) / (cell_w + S(2)));
+            const int desired_cols = (!col_str.empty() && end == col_str.c_str() + col_str.size() && parsed_cols > 0)
+                ? static_cast<int>(parsed_cols) : (small_ic ? 5 : 4);
+            cols_ = std::clamp(desired_cols, 1, max_cols_fit);
+            if (col_str.empty()) cols_ = std::clamp(count, 3, cols_);
+            const int total_rows = (count + cols_ - 1) / cols_;
+            const int max_rows = std::max(1, (avail_h - search_h - header_h - S(16)) / cell_h);
+            visible_rows_ = std::clamp(total_rows, 1, max_rows);
+            scroll_row_ = std::clamp(scroll_row_, 0, std::max(0, total_rows - visible_rows_));
+            target_w_ = std::clamp(cols_ * cell_w + S(24), S(320), avail_w);
+            target_h_ = search_h + header_h + visible_rows_ * cell_h + S(12);
+        }
     }
 
     if (!has_pill_anchor_) {
@@ -1106,28 +1398,28 @@ void Desktop::Layout() {
 
     // Update child control positions and visibility immediately for tests and input handling
     const int search_h = S(40);
-    const int header_h = S(40);
-    const int desk_search_h = S(36);
+    const int header_h = S(38);
     if (view_ == View::Pill && url_naming_) {
         ::MoveWindow(edit_, pad + S(34), pad + S(5), std::max(S(40), target_w_ - S(64)), S(24), FALSE);
-    } else if (view_ == View::Files && tab_ == Tab::Desktop) {
-        ::MoveWindow(edit_, pad + S(36), pad + header_h + S(6), std::max(S(40), target_w_ - S(72)), S(24), FALSE);
-    } else if (view_ == View::Files && tab_ == Tab::Notes) {
-        ::MoveWindow(edit_, pad + S(36), pad + target_h_ - S(30), std::max(S(40), target_w_ - S(66)), S(22), FALSE);
     } else {
         ::MoveWindow(edit_, pad + S(36), pad + S(8), std::max(S(40), target_w_ - S(72)), S(24), FALSE);
+    }
+    if (view_ == View::Files && tab_ == Tab::Notes) {
+        ::MoveWindow(note_find_edit_, pad + S(36), pad + target_h_ - S(34), std::max(S(40), target_w_ - S(66)), S(22), FALSE);
+    } else {
+        ::MoveWindow(note_find_edit_, 0, 0, 0, 0, FALSE);
     }
     if (view_ == View::Search) {
         ::MoveWindow(list_, pad, pad + search_h, target_w_, std::max(0, target_h_ - search_h), FALSE);
     } else if (view_ == View::Files && tab_ == Tab::Desktop) {
-        ::MoveWindow(list_, pad, pad + header_h + desk_search_h, target_w_, std::max(0, target_h_ - header_h - desk_search_h), FALSE);
+        ::MoveWindow(list_, pad, pad + search_h + header_h, target_w_, std::max(0, target_h_ - search_h - header_h), FALSE);
     } else {
         ::MoveWindow(list_, 0, 0, 0, 0, FALSE);
     }
 
-    const bool show_edit = (view_ == View::Search) || url_naming_ ||
-        (view_ == View::Files && (tab_ == Tab::Desktop || tab_ == Tab::Notes));
+    const bool show_edit = (view_ == View::Search) || url_naming_ || (view_ == View::Files);
     ::ShowWindow(edit_, show_edit ? SW_SHOW : SW_HIDE);
+    ::ShowWindow(note_find_edit_, (view_ == View::Files && tab_ == Tab::Notes) ? SW_SHOW : SW_HIDE);
     ::ShowWindow(list_, (view_ == View::Search || (view_ == View::Files && tab_ == Tab::Desktop)) ? SW_SHOW : SW_HIDE);
     UpdateNoteHostBounds();
 
@@ -1159,8 +1451,8 @@ void Desktop::Render() {
     const float radius = view_ == View::Pill
         ? static_cast<float>(cur_h_) * 0.5f
         : (view_ == View::Search ? Sf(19.0f) : Sf(18.0f));
-    const std::uint8_t base_alpha = static_cast<std::uint8_t>(std::clamp((translucent_pct_ * 255 + 50) / 100, 38, 255));
-    const std::uint8_t fill_alpha = view_ == View::Files ? static_cast<std::uint8_t>(std::max(38, base_alpha - 10)) : base_alpha;
+    const std::uint8_t base_alpha = static_cast<std::uint8_t>(std::clamp(((100 - translucent_pct_) * 255 + 50) / 100, 38, 255));
+    const std::uint8_t fill_alpha = view_ == View::Files ? static_cast<std::uint8_t>(std::max(38, base_alpha - 6)) : base_alpha;
 
     gfx::DrawGlassCapsule(hdc, capsule, radius, fill_alpha, dpi_);
 
@@ -1321,29 +1613,59 @@ void Desktop::Render() {
         rect_tab_config_ = {};
         rect_note_add_ = {};
         rect_resize_grip_ = {};
+        rect_note_find_ = {};
         rect_note_tabs_.clear();
         rect_note_closes_.clear();
         rect_config_rows_.clear();
 
-        const int header_h = S(40);
+        // 1. Top unified search bar (invariable main interface)
+        const int search_h = S(40);
+        const float bar_cy = static_cast<float>(capsule.top) + static_cast<float>(search_h) * 0.5f;
+        gfx::DrawSearchIcon(hdc, static_cast<float>(capsule.left) + Sf(20.0f), bar_cy, Sf(15.0f), {148, 163, 184, 220});
+
+        const auto typed = note_renaming_ ? std::wstring{} : Text(edit_);
+        const bool show_web = !typed.empty();
+        const int right_margin = show_web ? S(42) : S(16);
+        rect_edit_draw_ = {capsule.left + S(36), capsule.top + S(4), capsule.right - right_margin, capsule.top + search_h - S(4)};
+        if (!note_renaming_) {
+            DWORD sel_a = 0, sel_b = 0;
+            ::SendMessageW(edit_, EM_GETSEL, reinterpret_cast<WPARAM>(&sel_a), reinterpret_cast<LPARAM>(&sel_b));
+            const bool focused = ::GetFocus() == edit_;
+            gfx::DrawSearchText(hdc, typed, GhostSuffix(typed), static_cast<int>(sel_a), static_cast<int>(sel_b),
+                                caret_visible_, focused, rect_edit_draw_, Sf(14.0f), dpi_);
+        }
+        if (show_web) {
+            rect_web_ = {capsule.right - S(38), capsule.top + S(4), capsule.right - S(8), capsule.top + search_h - S(4)};
+            const float wcx = static_cast<float>(rect_web_.left + rect_web_.right) * 0.5f;
+            gfx::DrawWebIcon(hdc, wcx, bar_cy, Sf(15.0f), {148, 163, 184, 230}, hover_zone_ == HitZone::WebSearch);
+        }
+
+        gfx::DrawDivider(hdc, static_cast<float>(capsule.left + S(12)), static_cast<float>(capsule.right - S(12)),
+                         static_cast<float>(capsule.top + search_h), 24);
+
+        // 2. Environment bar (PMD)
+        const int env_y = capsule.top + search_h;
+        const int header_h = S(38);
         const bool sub = (tab_ == Tab::Desktop && folder_ != L"Other");
         int tab_x = capsule.left + S(12);
         if (sub) {
-            rect_back_ = {capsule.left + S(8), capsule.top + S(6), capsule.left + S(34), capsule.top + header_h - S(6)};
+            rect_back_ = {capsule.left + S(8), env_y + S(5), capsule.left + S(34), env_y + header_h - S(5)};
             gfx::DrawBackIcon(hdc, static_cast<float>(rect_back_.left + rect_back_.right) * 0.5f,
-                              static_cast<float>(capsule.top) + static_cast<float>(header_h) * 0.5f,
+                              static_cast<float>(env_y) + static_cast<float>(header_h) * 0.5f,
                               Sf(14.0f), {148, 163, 184, 230}, hover_zone_ == HitZone::BackButton);
             tab_x = capsule.left + S(36);
         }
 
         auto draw_top_tab = [&](const wchar_t* label, Tab t, HitZone hz, RECT& out_rect) {
-            const int tw = static_cast<int>(gfx::MeasureTextWidth(hdc, label, Sf(13.0f), true)) + S(22);
-            out_rect = {tab_x, capsule.top + S(6), tab_x + tw, capsule.top + header_h - S(6)};
+            const int tw = static_cast<int>(gfx::MeasureTextWidth(hdc, label, Sf(13.0f), true)) + S(20);
+            out_rect = {tab_x, env_y + S(5), tab_x + tw, env_y + header_h - S(5)};
             const bool active = (tab_ == t);
+            const bool kbd_tab = active && (focus_node_ == UiNode::ModuleBar);
             const bool hov = (hover_zone_ == hz);
             if (active || hov) {
-                const gfx::Color4 fill = active ? gfx::Color4{59, 130, 246, 55} : gfx::Color4{255, 255, 255, 18};
-                const gfx::Color4 border = active ? gfx::Color4{96, 165, 250, 140} : gfx::Color4{0, 0, 0, 0};
+                const gfx::Color4 fill = active ? gfx::Color4{59, 130, 246, static_cast<std::uint8_t>(kbd_tab ? 85 : 55)} : gfx::Color4{255, 255, 255, 18};
+                const gfx::Color4 border = kbd_tab ? gfx::Color4{147, 197, 253, 220}
+                    : (active ? gfx::Color4{96, 165, 250, 140} : gfx::Color4{0, 0, 0, 0});
                 gfx::DrawRoundedHighlight(hdc, static_cast<float>(out_rect.left), static_cast<float>(out_rect.top),
                                           static_cast<float>(tw), static_cast<float>(out_rect.bottom - out_rect.top),
                                           Sf(8.0f), fill, border);
@@ -1356,43 +1678,106 @@ void Desktop::Render() {
         draw_top_tab(L"Notas", Tab::Notes, HitZone::TopTabNotes, rect_tab_notes_);
         draw_top_tab(L"Config", Tab::Config, HitZone::TopTabConfig, rect_tab_config_);
 
-        // Shield exclusively in PMD top-right
         gfx::DrawStatusShield(hdc, static_cast<float>(capsule.right) - Sf(22.0f),
-                              static_cast<float>(capsule.top) + Sf(20.0f), Sf(17.0f), led_color);
+                              static_cast<float>(env_y) + static_cast<float>(header_h) * 0.5f, Sf(18.0f), led_color);
 
         gfx::DrawDivider(hdc, static_cast<float>(capsule.left + S(12)), static_cast<float>(capsule.right - S(12)),
-                         static_cast<float>(capsule.top + header_h), 22);
+                         static_cast<float>(env_y + header_h), 22);
+
+        const int content_y = env_y + header_h;
 
         if (tab_ == Tab::Desktop) {
-            const int desk_search_h = S(36);
-            const RECT sb{capsule.left + S(12), capsule.top + header_h + S(4),
-                          capsule.right - S(12), capsule.top + header_h + desk_search_h - S(2)};
-            gfx::DrawRoundedHighlight(hdc, static_cast<float>(sb.left), static_cast<float>(sb.top),
-                                      static_cast<float>(sb.right - sb.left), static_cast<float>(sb.bottom - sb.top),
-                                      Sf(8.0f), {15, 23, 42, 135}, {148, 163, 184, 55});
-            const float scy = static_cast<float>(sb.top + sb.bottom) * 0.5f;
-            gfx::DrawSearchIcon(hdc, static_cast<float>(sb.left + S(16)), scy, Sf(13.5f), {148, 163, 184, 220});
-
-            const auto typed = Text(edit_);
-            rect_edit_draw_ = {sb.left + S(30), sb.top + S(2), sb.right - S(8), sb.bottom - S(2)};
-            DWORD sel_a = 0, sel_b = 0;
-            ::SendMessageW(edit_, EM_GETSEL, reinterpret_cast<WPARAM>(&sel_a), reinterpret_cast<LPARAM>(&sel_b));
-            const bool focused = ::GetFocus() == edit_;
-            gfx::DrawSearchText(hdc, typed, GhostSuffix(typed), static_cast<int>(sel_a), static_cast<int>(sel_b),
-                                caret_visible_, focused, rect_edit_draw_, Sf(13.0f), dpi_);
-
-            const int cell_w = S(86);
-            const int cell_h = S(84);
-            const int grid_x = capsule.left + S(12);
-            const int grid_y = capsule.top + header_h + desk_search_h + S(4);
-            const int first_idx = scroll_row_ * cols_;
-            const int max_visible = visible_rows_ * cols_;
-
             if (items_.empty()) {
-                const RECT empty_rect{capsule.left + S(16), grid_y, capsule.right - S(16), capsule.bottom - S(12)};
+                const RECT empty_rect{capsule.left + S(16), content_y + S(4), capsule.right - S(16), capsule.bottom - S(12)};
                 gfx::DrawTextLine(hdc, typed.empty() ? L"Carpeta vac\u00eda" : L"Sin resultados",
                                   empty_rect, Sf(12.5f), false, {148, 163, 184, 180}, 0);
+            } else if (desk_view_ == DesktopViewMode::List || desk_view_ == DesktopViewMode::Details) {
+                int list_y = content_y + S(4);
+                if (desk_view_ == DesktopViewMode::Details) {
+                    const RECT hdr_n{capsule.left + S(44), list_y, capsule.right - S(190), list_y + S(22)};
+                    const RECT hdr_t{capsule.right - S(186), list_y, capsule.right - S(104), list_y + S(22)};
+                    const RECT hdr_d{capsule.right - S(100), list_y, capsule.right - S(14), list_y + S(22)};
+                    gfx::DrawTextLine(hdc, L"Nombre", hdr_n, Sf(11.0f), true, {148, 163, 184, 210}, -1);
+                    gfx::DrawTextLine(hdc, L"Tipo", hdr_t, Sf(11.0f), true, {148, 163, 184, 210}, -1);
+                    gfx::DrawTextLine(hdc, L"Modificado", hdr_d, Sf(11.0f), true, {148, 163, 184, 210}, 1);
+                    list_y += S(24);
+                }
+                const int row_h = S(30);
+                for (int offset = 0; offset < visible_rows_ && scroll_row_ + offset < static_cast<int>(items_.size()); ++offset) {
+                    const int idx = scroll_row_ + offset;
+                    const int ry = list_y + offset * row_h;
+                    if (ry + row_h > capsule.bottom) break;
+                    const bool is_sel = (idx == selected_);
+                    const bool is_hov = (hover_zone_ == HitZone::Item && hover_index_ == idx);
+                    if (is_sel || is_hov) {
+                        const gfx::Color4 fill = is_sel ? gfx::Color4{30, 41, 59, 210} : gfx::Color4{30, 41, 59, 115};
+                        const gfx::Color4 border = is_sel ? gfx::Color4{59, 130, 246, 130} : gfx::Color4{0, 0, 0, 0};
+                        gfx::DrawRoundedHighlight(hdc, static_cast<float>(capsule.left + S(8)), static_cast<float>(ry + S(1)),
+                                                  static_cast<float>(cur_w_ - S(16)), static_cast<float>(row_h - S(2)),
+                                                  Sf(7.0f), fill, border);
+                    }
+                    const auto& item = items_[static_cast<std::size_t>(idx)];
+                    const int icon_sz = S(18);
+                    const int ix = capsule.left + S(16);
+                    const int iy = ry + (row_h - icon_sz) / 2;
+                    if (item.kind == Kind::Url) {
+                        gfx::DrawWebIcon(hdc, static_cast<float>(ix + icon_sz / 2), static_cast<float>(iy + icon_sz / 2),
+                                         Sf(14.0f), {52, 211, 153, 235}, is_sel || is_hov);
+                    } else if (item.kind == Kind::Kill) {
+                        gfx::DrawGlowingLed(hdc, static_cast<float>(ix + icon_sz / 2), static_cast<float>(iy + icon_sz / 2),
+                                            Sf(5.0f), {248, 113, 113, 255}, is_sel || is_hov);
+                    } else {
+                        std::wstring rel = item.value;
+                        bool has_dot = false;
+                        gfx::Color4 dot_color{148, 163, 184, 255};
+                        bool running = false;
+                        if (item.kind == Kind::App) {
+                            has_dot = true;
+                            running = IsAppRunning(item.value);
+                            if (const auto* app = FindLoadedApp(item.value)) {
+                                rel = app->executable;
+                                dot_color = PrivacyColor(app->color);
+                            } else rel.clear();
+                        }
+                        const auto resolved = resolver_.ResolvePmRelativePath(rel);
+                        gfx::DrawItemIcon(hdc, resolved.ok ? resolved.resolved_path : L"",
+                                          item.kind == Kind::App, item.kind == Kind::Folder,
+                                          ix, iy, icon_sz, has_dot, dot_color, running, dpi_);
+                    }
+                    if (desk_view_ == DesktopViewMode::Details) {
+                        const RECT nr{capsule.left + S(44), ry, capsule.right - S(190), ry + row_h};
+                        const RECT tr{capsule.right - S(186), ry, capsule.right - S(104), ry + row_h};
+                        const RECT dr{capsule.right - S(100), ry, capsule.right - S(14), ry + row_h};
+                        gfx::DrawTextLine(hdc, item.label, nr, Sf(12.5f), is_sel, {241, 245, 249, 255}, -1);
+                        const wchar_t* tipo = item.kind == Kind::App ? L"App" : item.kind == Kind::Folder ? L"Carpeta" : item.kind == Kind::Url ? L"Link" : item.kind == Kind::Kill ? L"Acci\u00f3n" : L"Archivo";
+                        gfx::DrawTextLine(hdc, tipo, tr, Sf(11.5f), false, {148, 163, 184, 220}, -1);
+                        std::wstring date_str = L"-";
+                        if (item.modified_time != 0) {
+                            FILETIME ft{static_cast<DWORD>(item.modified_time & 0xFFFFFFFFULL), static_cast<DWORD>(item.modified_time >> 32)};
+                            FILETIME lft{};
+                            SYSTEMTIME st{};
+                            if (::FileTimeToLocalFileTime(&ft, &lft) && ::FileTimeToSystemTime(&lft, &st)) {
+                                wchar_t buf[32]{};
+                                std::swprintf(buf, std::size(buf), L"%02u/%02u/%04u", st.wDay, st.wMonth, st.wYear);
+                                date_str = buf;
+                            }
+                        }
+                        gfx::DrawTextLine(hdc, date_str, dr, Sf(11.5f), false, {148, 163, 184, 210}, 1);
+                    } else {
+                        const RECT nr{capsule.left + S(44), ry, capsule.right - S(16), ry + row_h};
+                        gfx::DrawTextLine(hdc, item.label, nr, Sf(12.5f), is_sel, {241, 245, 249, 255}, -1);
+                    }
+                }
             } else {
+                const bool small_ic = (desk_view_ == DesktopViewMode::SmallIcons);
+                const int cell_w = small_ic ? S(72) : S(86);
+                const int cell_h = small_ic ? S(64) : S(84);
+                const int icon_sz = small_ic ? S(24) : S(36);
+                const int grid_x = capsule.left + S(12);
+                const int grid_y = content_y + S(4);
+                const int first_idx = scroll_row_ * cols_;
+                const int max_visible = visible_rows_ * cols_;
+
                 for (int offset = 0; offset < max_visible && first_idx + offset < static_cast<int>(items_.size()); ++offset) {
                     const int idx = first_idx + offset;
                     const int row = offset / cols_;
@@ -1412,19 +1797,18 @@ void Desktop::Render() {
                     }
 
                     const auto& item = items_[static_cast<std::size_t>(idx)];
-                    const int icon_sz = S(36);
                     const int ix = cx + (cell_w - icon_sz) / 2;
-                    const int iy = cy + S(12);
+                    const int iy = cy + (small_ic ? S(8) : S(12));
                     if (item.kind == Kind::Url) {
                         gfx::DrawWebIcon(hdc, static_cast<float>(ix) + static_cast<float>(icon_sz) * 0.5f,
                                          static_cast<float>(iy) + static_cast<float>(icon_sz) * 0.5f,
-                                         Sf(24.0f), {52, 211, 153, 235}, is_sel || is_hov);
+                                         small_ic ? Sf(18.0f) : Sf(24.0f), {52, 211, 153, 235}, is_sel || is_hov);
                     } else if (item.kind == Kind::Kill) {
-                        gfx::DrawRoundedHighlight(hdc, static_cast<float>(ix + S(4)), static_cast<float>(iy + S(4)),
-                                                  static_cast<float>(icon_sz - S(8)), static_cast<float>(icon_sz - S(8)),
-                                                  Sf(14.0f), {220, 38, 38, 190}, {248, 113, 113, 255});
+                        gfx::DrawRoundedHighlight(hdc, static_cast<float>(ix + S(2)), static_cast<float>(iy + S(2)),
+                                                  static_cast<float>(icon_sz - S(4)), static_cast<float>(icon_sz - S(4)),
+                                                  Sf(12.0f), {220, 38, 38, 190}, {248, 113, 113, 255});
                         const RECT xr{ix, iy, ix + icon_sz, iy + icon_sz};
-                        gfx::DrawTextLine(hdc, L"\u00d7", xr, Sf(18.0f), true, {255, 255, 255, 255}, 0);
+                        gfx::DrawTextLine(hdc, L"\u00d7", xr, small_ic ? Sf(14.0f) : Sf(18.0f), true, {255, 255, 255, 255}, 0);
                     } else {
                         std::wstring rel = item.value;
                         bool has_dot = false;
@@ -1436,9 +1820,7 @@ void Desktop::Render() {
                             if (const auto* app = FindLoadedApp(item.value)) {
                                 rel = app->executable;
                                 dot_color = PrivacyColor(app->color);
-                            } else {
-                                rel.clear();
-                            }
+                            } else rel.clear();
                         }
                         const auto resolved = resolver_.ResolvePmRelativePath(rel);
                         gfx::DrawItemIcon(hdc, resolved.ok ? resolved.resolved_path : L"",
@@ -1446,20 +1828,18 @@ void Desktop::Render() {
                                           ix, iy, icon_sz, has_dot, dot_color, running, dpi_);
                     }
 
-                    const RECT lbl_rect{cx + S(4), iy + icon_sz + S(5), cx + cell_w - S(4), cy + cell_h - S(2)};
-                    gfx::DrawGridLabel(hdc, item.label, lbl_rect, Sf(11.5f),
+                    const RECT lbl_rect{cx + S(4), iy + icon_sz + S(4), cx + cell_w - S(4), cy + cell_h - S(2)};
+                    gfx::DrawGridLabel(hdc, item.label, lbl_rect, small_ic ? Sf(10.5f) : Sf(11.5f),
                                        is_sel ? gfx::Color4{255, 255, 255, 255} : gfx::Color4{226, 232, 240, 245});
                 }
             }
         } else if (tab_ == Tab::Notes) {
+            // Top of Notes environment: note tabs
             const int note_tab_h = S(32);
             const int find_h = S(34);
             const int bottom_pad = S(10);
-            const int tabs_y = capsule.bottom - bottom_pad - find_h - note_tab_h;
+            const int tabs_y = content_y + S(4);
             const int find_y = capsule.bottom - bottom_pad - find_h;
-
-            gfx::DrawDivider(hdc, static_cast<float>(capsule.left + S(12)), static_cast<float>(capsule.right - S(12)),
-                             static_cast<float>(tabs_y - S(2)), 20);
 
             int nx = capsule.left + S(12);
             const int max_tab_x = capsule.right - S(44);
@@ -1470,14 +1850,16 @@ void Desktop::Render() {
                     hdc, notes_[static_cast<std::size_t>(i)].name, Sf(12.0f), active));
                 const int tw = std::clamp(text_w + S(38), S(74), S(140));
                 if (nx + tw > max_tab_x) break;
-                const RECT tr{nx, tabs_y + S(3), nx + tw, tabs_y + note_tab_h - S(3)};
+                const RECT tr{nx, tabs_y + S(2), nx + tw, tabs_y + note_tab_h - S(2)};
                 rect_note_tabs_.push_back(tr);
                 const RECT cr{tr.right - S(22), tr.top + S(2), tr.right - S(4), tr.bottom - S(2)};
                 rect_note_closes_.push_back(cr);
 
                 if (active || hov) {
-                    const gfx::Color4 fill = active ? gfx::Color4{30, 41, 59, 220} : gfx::Color4{255, 255, 255, 18};
-                    const gfx::Color4 border = active ? gfx::Color4{59, 130, 246, 150} : gfx::Color4{0, 0, 0, 0};
+                    const bool kbd_note = active && (focus_node_ == UiNode::NotesTabs);
+                    const gfx::Color4 fill = active ? gfx::Color4{30, 41, 59, static_cast<std::uint8_t>(kbd_note ? 245 : 220)} : gfx::Color4{255, 255, 255, 18};
+                    const gfx::Color4 border = kbd_note ? gfx::Color4{147, 197, 253, 220}
+                        : (active ? gfx::Color4{59, 130, 246, 150} : gfx::Color4{0, 0, 0, 0});
                     gfx::DrawRoundedHighlight(hdc, static_cast<float>(tr.left), static_cast<float>(tr.top),
                                               static_cast<float>(tw), static_cast<float>(tr.bottom - tr.top),
                                               Sf(7.0f), fill, border);
@@ -1502,7 +1884,7 @@ void Desktop::Render() {
             }
 
             if (nx + S(28) <= capsule.right - S(12)) {
-                rect_note_add_ = {nx, tabs_y + S(3), nx + S(26), tabs_y + note_tab_h - S(3)};
+                rect_note_add_ = {nx, tabs_y + S(2), nx + S(26), tabs_y + note_tab_h - S(2)};
                 const bool add_hov = (hover_zone_ == HitZone::NoteAdd);
                 if (add_hov) {
                     gfx::DrawRoundedHighlight(hdc, static_cast<float>(rect_note_add_.left), static_cast<float>(rect_note_add_.top),
@@ -1512,20 +1894,21 @@ void Desktop::Render() {
                 gfx::DrawTextLine(hdc, L"+", rect_note_add_, Sf(15.0f), true, {203, 213, 225, 255}, 0);
             }
 
-            const RECT fb{capsule.left + S(12), find_y + S(3), capsule.right - S(28), find_y + find_h - S(2)};
-            gfx::DrawRoundedHighlight(hdc, static_cast<float>(fb.left), static_cast<float>(fb.top),
-                                      static_cast<float>(fb.right - fb.left), static_cast<float>(fb.bottom - fb.top),
+            // Bottom of Notes environment: local find bar + resize grip
+            rect_note_find_ = {capsule.left + S(12), find_y + S(3), capsule.right - S(28), find_y + find_h - S(2)};
+            gfx::DrawRoundedHighlight(hdc, static_cast<float>(rect_note_find_.left), static_cast<float>(rect_note_find_.top),
+                                      static_cast<float>(rect_note_find_.right - rect_note_find_.left),
+                                      static_cast<float>(rect_note_find_.bottom - rect_note_find_.top),
                                       Sf(8.0f), {15, 23, 42, 135}, {148, 163, 184, 55});
-            const float fcy = static_cast<float>(fb.top + fb.bottom) * 0.5f;
-            gfx::DrawSearchIcon(hdc, static_cast<float>(fb.left + S(16)), fcy, Sf(13.0f), {148, 163, 184, 220});
+            const float fcy = static_cast<float>(rect_note_find_.top + rect_note_find_.bottom) * 0.5f;
+            gfx::DrawSearchIcon(hdc, static_cast<float>(rect_note_find_.left + S(16)), fcy, Sf(13.0f), {148, 163, 184, 220});
 
-            if (!note_renaming_) {
-                rect_edit_draw_ = {fb.left + S(30), fb.top + S(2), fb.right - S(8), fb.bottom - S(2)};
-                DWORD sel_a = 0, sel_b = 0;
-                ::SendMessageW(edit_, EM_GETSEL, reinterpret_cast<WPARAM>(&sel_a), reinterpret_cast<LPARAM>(&sel_b));
-                gfx::DrawSearchText(hdc, Text(edit_), L"", static_cast<int>(sel_a), static_cast<int>(sel_b),
-                                    caret_visible_, ::GetFocus() == edit_, rect_edit_draw_, Sf(12.5f), dpi_);
-            }
+            const RECT find_draw{rect_note_find_.left + S(30), rect_note_find_.top + S(2),
+                                 rect_note_find_.right - S(8), rect_note_find_.bottom - S(2)};
+            DWORD fa = 0, fb = 0;
+            ::SendMessageW(note_find_edit_, EM_GETSEL, reinterpret_cast<WPARAM>(&fa), reinterpret_cast<LPARAM>(&fb));
+            gfx::DrawSearchText(hdc, Text(note_find_edit_), L"", static_cast<int>(fa), static_cast<int>(fb),
+                                caret_visible_, ::GetFocus() == note_find_edit_, find_draw, Sf(12.5f), dpi_);
 
             rect_resize_grip_ = {capsule.right - S(24), capsule.bottom - S(24), capsule.right - S(2), capsule.bottom - S(2)};
             const bool grip_hov = (hover_zone_ == HitZone::ResizeGrip || resizing_notes_);
@@ -1533,35 +1916,65 @@ void Desktop::Render() {
                               grip_hov ? gfx::Color4{148, 163, 184, 255} : gfx::Color4{148, 163, 184, 140}, 0);
         } else {
             // Tab::Config
-            const auto& cfg = config_.config_doc();
-            const std::wstring hotkey_val = cfg.GetValue(L"PMD", L"Hotkey", L"Ctrl+Space");
-            const auto bool_str = [&](const wchar_t* key, const wchar_t* def) -> std::wstring {
-                const auto v = cfg.GetValue(L"PMD", key, def);
-                return (Equal(v, L"true") || v == L"1") ? L"Activado" : L"Desactivado";
-            };
-            struct CfgRow { const wchar_t* label; std::wstring value; };
-            const CfgRow rows[] = {
-                {L"Atajo de teclado (Hotkey)", hotkey_val + L"  (clic para cambiar)"},
-                {L"Siempre visible (AlwaysOnTop)", bool_str(L"AlwaysOnTop", L"true")},
-                {L"Translucidez (Translucent)", bool_str(L"Translucent", L"true")},
-                {L"Recordar posici\u00f3n (RememberPosition)", bool_str(L"RememberPosition", L"false")},
-                {L"Editar archivo Data\\config.ini", L"Abrir\u2026"},
-            };
-            const int row_h = S(42);
-            int ry = capsule.top + header_h + S(12);
-            for (int i = 0; i < 5; ++i) {
+            struct CfgRow { const wchar_t* label; std::wstring value; gfx::Color4 color; };
+            std::vector<CfgRow> rows;
+            App cfg_app;
+            const bool is_app_cfg = !config_app_id_.empty() &&
+                applications::Find(resolver_, config_app_id_, cfg_app) == ERROR_SUCCESS;
+            if (is_app_cfg) {
+                const std::wstring name_disp = cfg_app.aliases.empty() ? cfg_app.name : (cfg_app.name + L", " + cfg_app.aliases);
+                const std::wstring edit_tag = L"[Editando arriba\u2026]";
+                rows = {
+                    {L"Nombre y alias (Name)", (app_cfg_editing_ && app_cfg_field_ == 1) ? edit_tag : name_disp, {96, 165, 250, 255}},
+                    {L"Extensiones (Extensions)", (app_cfg_editing_ && app_cfg_field_ == 2) ? edit_tag : (cfg_app.extensions.empty() ? L"(ninguna)" : cfg_app.extensions), {96, 165, 250, 255}},
+                    {L"Argumentos (Arguments)", (app_cfg_editing_ && app_cfg_field_ == 3) ? edit_tag : (cfg_app.arguments.empty() ? L"(ninguno)" : cfg_app.arguments), {96, 165, 250, 255}},
+                    {L"Navegador predeterminado", cfg_app.browser ? L"Activado" : L"Desactivado", {96, 165, 250, 255}},
+                };
+            } else {
+                const auto& cfg = config_.config_doc();
+                const std::wstring hotkey_val = cfg.GetValue(L"Desktop", L"Hotkey", L"Ctrl+Space");
+                gfx::Color4 hk_color{96, 165, 250, 255};
+                std::wstring hk_text = hotkey_val;
+                if (hotkey_capturing_) {
+                    hk_text = L"Presiona teclas\u2026";
+                    hk_color = {147, 197, 253, 255};
+                } else if (hotkey_status_err_) {
+                    hk_color = {248, 113, 113, 255};
+                } else if (hotkey_status_ok_) {
+                    hk_color = {52, 211, 153, 255};
+                }
+                rows = {
+                    {L"Atajo de teclado (Hotkey)", hk_text, hk_color},
+                    {L"Siempre visible (AlwaysOnTop)", always_on_top_ ? L"Activado" : L"Desactivado", {96, 165, 250, 255}},
+                    {L"Translucidez (Translucent)", std::to_wstring(translucent_pct_) + L"%", {96, 165, 250, 255}},
+                    {L"Recordar posici\u00f3n (RememberPosition)", remember_pos_ ? L"Activado" : L"Desactivado", {96, 165, 250, 255}},
+                    {L"Detectar portapapeles (ClipboardOffers)", clipboard_offers_ ? L"Activado" : L"Desactivado", {96, 165, 250, 255}},
+                    {L"Comando kill (EnableKill)", enable_kill_ ? L"Activado" : L"Desactivado", {96, 165, 250, 255}},
+                    {L"Mostrar todos los tipos de cierre", show_all_close_modes_ ? L"Activado" : L"Desactivado", {96, 165, 250, 255}},
+                };
+            }
+            const int row_h = S(36);
+            int ry = content_y + S(8);
+            for (int i = 0; i < static_cast<int>(rows.size()); ++i) {
                 const RECT rr{capsule.left + S(16), ry, capsule.right - S(16), ry + row_h - S(4)};
                 rect_config_rows_.push_back(rr);
-                const bool hov = (hover_zone_ == HitZone::ConfigAction && hover_index_ == i);
+                const bool kbd_sel = (focus_node_ == UiNode::ConfigList && config_selected_ == i);
+                const bool hov = (hover_zone_ == HitZone::ConfigAction && hover_index_ == i) || kbd_sel;
+                gfx::Color4 border = hov ? gfx::Color4{59, 130, 246, 150} : gfx::Color4{148, 163, 184, 35};
+                if (!is_app_cfg && i == 0 && hotkey_status_err_) border = {248, 113, 113, 180};
+                else if (!is_app_cfg && i == 0 && hotkey_status_ok_) border = {52, 211, 153, 180};
                 gfx::DrawRoundedHighlight(hdc, static_cast<float>(rr.left), static_cast<float>(rr.top),
                                           static_cast<float>(rr.right - rr.left), static_cast<float>(rr.bottom - rr.top),
-                                          Sf(9.0f), hov ? gfx::Color4{30, 41, 59, 190} : gfx::Color4{15, 23, 42, 110},
-                                          hov ? gfx::Color4{59, 130, 246, 130} : gfx::Color4{148, 163, 184, 35});
-                const RECT lr{rr.left + S(12), rr.top, rr.right - S(150), rr.bottom};
-                const RECT vr{rr.right - S(150), rr.top, rr.right - S(12), rr.bottom};
-                gfx::DrawTextLine(hdc, rows[i].label, lr, Sf(12.5f), false, {226, 232, 240, 250}, -1);
-                gfx::DrawTextLine(hdc, rows[i].value, vr, Sf(12.0f), true, {96, 165, 250, 255}, 1);
+                                          Sf(9.0f), hov ? gfx::Color4{30, 41, 59, 190} : gfx::Color4{15, 23, 42, 110}, border);
+                const RECT lr{rr.left + S(12), rr.top, rr.right - S(160), rr.bottom};
+                const RECT vr{rr.right - S(160), rr.top, rr.right - S(12), rr.bottom};
+                gfx::DrawTextLine(hdc, rows[static_cast<std::size_t>(i)].label, lr, Sf(12.0f), kbd_sel, {226, 232, 240, 250}, -1);
+                gfx::DrawTextLine(hdc, rows[static_cast<std::size_t>(i)].value, vr, Sf(12.0f), true, rows[static_cast<std::size_t>(i)].color, 1);
                 ry += row_h;
+            }
+            if (!is_app_cfg && hotkey_status_err_ && !hotkey_error_text_.empty()) {
+                const RECT err_r{capsule.left + S(20), ry + S(2), capsule.right - S(20), ry + S(22)};
+                gfx::DrawTextLine(hdc, hotkey_error_text_, err_r, Sf(11.5f), true, {248, 113, 113, 255}, 1);
             }
         }
     }
@@ -1604,6 +2017,7 @@ HitZone Desktop::HitTest(POINT client, int& item_index) const {
         return HitZone::None;
     }
 
+    if (!Text(edit_).empty() && in(rect_web_)) return HitZone::WebSearch;
     if (in(rect_tab_desktop_)) return HitZone::TopTabDesktop;
     if (in(rect_tab_notes_)) return HitZone::TopTabNotes;
     if (in(rect_tab_config_)) return HitZone::TopTabConfig;
@@ -1637,12 +2051,28 @@ HitZone Desktop::HitTest(POINT client, int& item_index) const {
     }
 
     if (folder_ != L"Other" && in(rect_back_)) return HitZone::BackButton;
-    const int header_h = S(40);
-    const int desk_search_h = S(36);
-    const int cell_w = S(86);
-    const int cell_h = S(84);
+    const int search_h = S(40);
+    const int header_h = S(38);
+    const int content_y = pad + search_h + header_h;
+    if (desk_view_ == DesktopViewMode::List || desk_view_ == DesktopViewMode::Details) {
+        const int list_y = content_y + S(4) + (desk_view_ == DesktopViewMode::Details ? S(24) : 0);
+        const int row_h = S(30);
+        if (client.x >= pad && client.x <= pad + cur_w_ && client.y >= list_y) {
+            const int row = (client.y - list_y) / row_h;
+            const int idx = scroll_row_ + row;
+            if (row >= 0 && row < visible_rows_ && idx >= 0 && idx < static_cast<int>(items_.size())) {
+                item_index = idx;
+                return HitZone::Item;
+            }
+        }
+        return HitZone::None;
+    }
+
+    const bool small_ic = (desk_view_ == DesktopViewMode::SmallIcons);
+    const int cell_w = small_ic ? S(72) : S(86);
+    const int cell_h = small_ic ? S(64) : S(84);
     const int grid_x = pad + S(12);
-    const int grid_y = pad + header_h + desk_search_h + S(4);
+    const int grid_y = content_y + S(4);
     if (client.x >= grid_x && client.x < grid_x + cols_ * cell_w &&
         client.y >= grid_y && client.y < grid_y + visible_rows_ * cell_h) {
         const int col = (client.x - grid_x) / cell_w;
@@ -1668,10 +2098,44 @@ void Desktop::UpdateHover(POINT client) {
 }
 
 void Desktop::EnsureVisibleSelection() {
-    if (view_ != View::Files || items_.empty() || cols_ <= 0) return;
-    const int row = selected_ / cols_;
+    if (view_ != View::Files || items_.empty()) return;
+    const int per_row = (desk_view_ == DesktopViewMode::List || desk_view_ == DesktopViewMode::Details) ? 1 : std::max(1, cols_);
+    const int row = selected_ / per_row;
     if (row < scroll_row_) scroll_row_ = row;
     else if (row >= scroll_row_ + visible_rows_) scroll_row_ = row - visible_rows_ + 1;
+}
+
+void Desktop::FocusNode(UiNode node) {
+    focus_node_ = node;
+    switch (node) {
+        case UiNode::Pill:
+        case UiNode::ModuleBar:
+            ::SetFocus(hwnd_);
+            break;
+        case UiNode::Search:
+        case UiNode::ConfigFieldEdit:
+            if (node == UiNode::ConfigFieldEdit && hotkey_capturing_) ::SetFocus(hwnd_);
+            else ::SetFocus(edit_);
+            break;
+        case UiNode::DesktopGrid:
+            if (!items_.empty()) selected_ = std::clamp(selected_, 0, static_cast<int>(items_.size()) - 1);
+            ::SetFocus(hwnd_);
+            break;
+        case UiNode::NotesTabs:
+            ::SetFocus(hwnd_);
+            break;
+        case UiNode::NoteEditor:
+            if (note_edit_) ::SetFocus(note_edit_);
+            else ::SetFocus(hwnd_);
+            break;
+        case UiNode::ConfigList: {
+            const int max_cfg = config_app_id_.empty() ? 6 : 3;
+            config_selected_ = std::clamp(config_selected_, 0, max_cfg);
+            ::SetFocus(hwnd_);
+            break;
+        }
+    }
+    Render();
 }
 
 void Desktop::MoveSelection(int dx, int dy) {
@@ -1680,12 +2144,53 @@ void Desktop::MoveSelection(int dx, int dy) {
     if (view_ == View::Search) {
         selected_ = std::clamp(selected_ + dy, 0, count - 1);
     } else {
-        int next = selected_ + dx + dy * cols_;
+        const int per_row = (desk_view_ == DesktopViewMode::List || desk_view_ == DesktopViewMode::Details) ? 1 : cols_;
+        if (dy < 0 && selected_ < per_row) {
+            FocusNode(UiNode::ModuleBar);
+            return;
+        }
+        int next = selected_ + dx + dy * per_row;
         next = std::clamp(next, 0, count - 1);
         selected_ = next;
         EnsureVisibleSelection();
     }
     Render();
+}
+
+void Desktop::OpenTab(Tab tab) {
+    if (closing_) return;
+    if (view_ == View::Files && tab_ == Tab::Notes && tab != Tab::Notes) {
+        SaveActiveNote();
+    }
+    note_renaming_ = false;
+    hotkey_capturing_ = false;
+    hotkey_status_ok_ = false;
+    hotkey_status_err_ = false;
+    hotkey_error_text_.clear();
+    view_ = View::Files;
+    tab_ = tab;
+    url_naming_ = false;
+    ::SetWindowTextW(edit_, L"");
+    if (tab == Tab::Desktop) {
+        focus_node_ = UiNode::Search;
+        folder_ = L"Other";
+        scroll_row_ = 0;
+        selected_ = 0;
+        ::SetForegroundWindow(hwnd_);
+        Populate();
+        caret_visible_ = true;
+        ::SetFocus(edit_);
+    } else if (tab == Tab::Notes) {
+        focus_node_ = UiNode::NoteEditor;
+        ::SetForegroundWindow(hwnd_);
+        LoadNotes();
+        Layout();
+        if (note_edit_) ::SetFocus(note_edit_);
+    } else {
+        focus_node_ = UiNode::ConfigList;
+        ::SetForegroundWindow(hwnd_);
+        Layout();
+    }
 }
 
 void Desktop::Show(View view) {
@@ -1694,14 +2199,21 @@ void Desktop::Show(View view) {
         SaveActiveNote();
         note_renaming_ = false;
     }
+    hotkey_capturing_ = false;
+    hotkey_status_ok_ = false;
+    hotkey_status_err_ = false;
+    hotkey_error_text_.clear();
     view_ = view;
     url_naming_ = false;
     if (view == View::Pill) ::SetWindowTextW(edit_, L"");
     if (view == View::Files) {
+        focus_node_ = UiNode::Search;
         tab_ = Tab::Desktop;
         note_renaming_ = false;
         folder_ = L"Other";
     }
+    if (view == View::Pill) focus_node_ = UiNode::Pill;
+    else if (view == View::Search) focus_node_ = UiNode::Search;
     scroll_row_ = 0;
     selected_ = 0;
     hover_zone_ = HitZone::None;
@@ -1725,32 +2237,32 @@ void Desktop::Populate() {
         Layout();
         return;
     }
-    if (!typed.empty() && Prefix(L"kill", typed)) {
-        items_.push_back({Kind::Kill, L"kill \u2014 Matar ventana con un clic", L"kill", {}});
+    if (enable_kill_ && !typed.empty() && Prefix(L"kill", typed)) {
+        items_.push_back({Kind::Kill, L"kill \u2014 Matar ventana con un clic", L"kill", {}, 0});
     }
     applications::List(resolver_, apps_);
+    std::vector<Item> app_items;
     if (view_ == View::Search || folder_ == L"Other") {
         std::vector<Item> partial;
-        const auto& settings = config_.config_doc();
         for (const auto& app : apps_) {
             if (app.archived && view_ == View::Files) continue;
             auto aliases = Split(app.aliases, L',');
             aliases.push_back(app.id);
             aliases.push_back(app.name);
-            for (const auto& line : settings.lines()) {
-                if (line.kind != core::IniDocument::LineKind::Section ||
-                    !Prefix(line.section_name, L"MagicWord.") ||
-                    Equal(line.section_name, L"MagicWord._DEFAULT") ||
-                    !Equal(settings.GetValue(line.section_name, L"App"), app.id)) continue;
-                const auto magic = Split(settings.GetValue(line.section_name, L"Names"), L',');
-                aliases.insert(aliases.end(), magic.begin(), magic.end());
+            std::uint64_t mtime = 0;
+            if (const auto exe = resolver_.ResolvePmRelativePath(app.executable); exe.ok) {
+                WIN32_FILE_ATTRIBUTE_DATA fad{};
+                if (::GetFileAttributesExW(exe.resolved_path.c_str(), GetFileExInfoStandard, &fad)) {
+                    mtime = (static_cast<std::uint64_t>(fad.ftLastWriteTime.dwHighDateTime) << 32) |
+                             static_cast<std::uint64_t>(fad.ftLastWriteTime.dwLowDateTime);
+                }
             }
-            Item item{Kind::App, app.name + (app.archived ? L" (archivado)" : L""), app.id, {}};
+            Item item{Kind::App, app.name + (app.archived ? L" (archivado)" : L""), app.id, {}, mtime};
             bool match = false, prefix = false;
             for (const auto& name : aliases) {
                 if (Equal(typed, name) || (Prefix(typed, name) && typed.size() > name.size() && typed[name.size()] == L' ')) {
                     if (typed.size() > name.size()) item.args = typed.substr(name.size() + 1);
-                    items_.push_back(item);
+                    app_items.push_back(item);
                     match = true;
                     break;
                 }
@@ -1758,18 +2270,24 @@ void Desktop::Populate() {
             }
             if (!match && prefix) partial.push_back(std::move(item));
         }
-        items_.insert(items_.end(), partial.begin(), partial.end());
+        app_items.insert(app_items.end(), partial.begin(), partial.end());
     }
+    std::vector<Item> url_items;
     if (view_ == View::Search || (view_ == View::Files && folder_ == L"Other" && !typed.empty())) {
         config_.LoadAppsIni(false);
         const auto& apps_doc = config_.apps_doc();
         std::vector<Item> url_exact, url_partial;
         for (const auto& line : apps_doc.lines()) {
-            if (line.kind != core::IniDocument::LineKind::Section || !Prefix(line.section_name, L"Url.")) continue;
-            const auto name = line.section_name.substr(4);
-            const auto url = apps_doc.GetValue(line.section_name, L"URL");
+            if (line.kind != core::IniDocument::LineKind::Section) continue;
+            const bool is_url = Prefix(line.section_name, L"Url.");
+            const bool is_link = Prefix(line.section_name, L"Link.");
+            if (!is_url && !is_link) continue;
+            const auto name = line.section_name.substr(is_url ? 4 : 5);
+            auto url = apps_doc.GetValue(line.section_name, L"URL");
+            if (url.empty()) url = apps_doc.GetValue(line.section_name, L"Path");
+            if (url.empty()) url = apps_doc.GetValue(line.section_name, L"Target");
             if (name.empty() || url.empty()) continue;
-            Item item{Kind::Url, name, url, {}};
+            Item item{Kind::Url, name, url, {}, 0};
             if (Equal(typed, name) || (Prefix(typed, name) && typed.size() > name.size() && typed[name.size()] == L' ')) {
                 if (typed.size() > name.size()) item.args = typed.substr(name.size() + 1);
                 url_exact.push_back(std::move(item));
@@ -1777,26 +2295,78 @@ void Desktop::Populate() {
                 url_partial.push_back(std::move(item));
             }
         }
-        items_.insert(items_.end(), url_exact.begin(), url_exact.end());
-        items_.insert(items_.end(), url_partial.begin(), url_partial.end());
+        url_items.insert(url_items.end(), url_exact.begin(), url_exact.end());
+        url_items.insert(url_items.end(), url_partial.begin(), url_partial.end());
     }
+    std::vector<Item> file_items;
     const auto folder = view_ == View::Files ? folder_ : L"Other";
     const auto full = resolver_.ResolvePmRelativePath(folder);
     applications::Pins pins;
     if (full.ok && !applications::PinDirectory(full.resolved_path, pins)) {
         std::error_code ec;
-        std::vector<Item> files;
         for (fs::directory_iterator it(full.resolved_path, ec), end; !ec && it != end; it.increment(ec)) {
             const auto name = it->path().filename().native();
             const auto normalized = PathResolver::NormalizePmRelativePath(name);
             if (!normalized.ok || normalized.resolved_path != name || !Prefix(name, typed)) continue;
-            const auto attrs = ::GetFileAttributesW(it->path().c_str());
-            if (attrs == INVALID_FILE_ATTRIBUTES || attrs & FILE_ATTRIBUTE_REPARSE_POINT) continue;
-            files.push_back({attrs & FILE_ATTRIBUTE_DIRECTORY ? Kind::Folder : Kind::File, name, folder + L"\\" + name, {}});
-            if (files.size() == 1000) break;
+            WIN32_FILE_ATTRIBUTE_DATA fad{};
+            if (!::GetFileAttributesExW(it->path().c_str(), GetFileExInfoStandard, &fad)) continue;
+            if (fad.dwFileAttributes == INVALID_FILE_ATTRIBUTES || (fad.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) continue;
+            const std::uint64_t mtime = (static_cast<std::uint64_t>(fad.ftLastWriteTime.dwHighDateTime) << 32) |
+                                        static_cast<std::uint64_t>(fad.ftLastWriteTime.dwLowDateTime);
+            file_items.push_back({fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ? Kind::Folder : Kind::File,
+                                  name, folder + L"\\" + name, {}, mtime});
+            if (file_items.size() == 1000) break;
         }
-        std::sort(files.begin(), files.end(), [](const Item& a, const Item& b) { return a.label < b.label; });
-        items_.insert(items_.end(), files.begin(), files.end());
+    }
+    if (view_ == View::Files && folder_ == L"Other" && typed.empty()) {
+        const auto apps_root = resolver_.ResolvePmRelativePath(L"Apps");
+        applications::Pins apps_pins;
+        if (apps_root.ok && !applications::PinDirectory(apps_root.resolved_path, apps_pins)) {
+            std::error_code ec;
+            for (fs::directory_iterator it(apps_root.resolved_path, ec), end; !ec && it != end; it.increment(ec)) {
+                const auto name = it->path().filename().native();
+                if (Equal(name, L".temp")) continue;
+                const auto rel_dir = L"Apps\\" + name;
+                const bool registered = std::any_of(apps_.begin(), apps_.end(), [&](const App& a) {
+                    return Equal(a.directory, rel_dir);
+                });
+                if (registered) continue;
+                WIN32_FILE_ATTRIBUTE_DATA fad{};
+                if (!::GetFileAttributesExW(it->path().c_str(), GetFileExInfoStandard, &fad)) continue;
+                if (fad.dwFileAttributes == INVALID_FILE_ATTRIBUTES ||
+                    (fad.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ||
+                    !(fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
+                const std::uint64_t mtime = (static_cast<std::uint64_t>(fad.ftLastWriteTime.dwHighDateTime) << 32) |
+                                            static_cast<std::uint64_t>(fad.ftLastWriteTime.dwLowDateTime);
+                file_items.push_back({Kind::Folder, name, rel_dir, {}, mtime});
+                if (file_items.size() >= 1000) break;
+            }
+        }
+    }
+
+    if (view_ == View::Files && typed.empty()) {
+        auto sort_vec = [&](std::vector<Item>& v) {
+            std::sort(v.begin(), v.end(), [&](const Item& a, const Item& b) {
+                if (desk_sort_ == DesktopSortBy::Modified && a.modified_time != b.modified_time) {
+                    return a.modified_time > b.modified_time;
+                }
+                return _wcsicmp(a.label.c_str(), b.label.c_str()) < 0;
+            });
+        };
+        sort_vec(app_items);
+        sort_vec(file_items);
+        if (desk_group_ == DesktopGroupBy::FoldersFirst) {
+            items_.insert(items_.end(), file_items.begin(), file_items.end());
+            items_.insert(items_.end(), app_items.begin(), app_items.end());
+        } else {
+            items_.insert(items_.end(), app_items.begin(), app_items.end());
+            items_.insert(items_.end(), file_items.begin(), file_items.end());
+        }
+    } else {
+        std::sort(file_items.begin(), file_items.end(), [](const Item& a, const Item& b) { return a.label < b.label; });
+        items_.insert(items_.end(), app_items.begin(), app_items.end());
+        items_.insert(items_.end(), url_items.begin(), url_items.end());
+        items_.insert(items_.end(), file_items.begin(), file_items.end());
     }
     selected_ = items_.empty() ? -1 : 0;
     Layout();
@@ -1804,19 +2374,26 @@ void Desktop::Populate() {
 
 void Desktop::Back() {
     if (view_ == View::Pill) {
+        bool dismissed = false;
         if (url_naming_) {
             url_naming_ = false;
             ::SetWindowTextW(edit_, L"");
+            dismissed = true;
         }
         if (!clipboard_url_.empty()) {
             dismissed_url_ = clipboard_url_;
             clipboard_url_.clear();
             Layout();
+            dismissed = true;
         }
         if (!package_.empty()) {
             dismissed_package_ = package_;
             package_.clear();
             Layout();
+            dismissed = true;
+        }
+        if (!dismissed && !always_on_top_ && tray_added_) {
+            ::ShowWindow(hwnd_, SW_HIDE);
         }
         return;
     }
@@ -1837,8 +2414,8 @@ void Desktop::Back() {
             Render();
             return;
         }
-        if (!Text(edit_).empty()) {
-            ::SetWindowTextW(edit_, L"");
+        if (note_find_edit_ && !Text(note_find_edit_).empty()) {
+            ::SetWindowTextW(note_find_edit_, L"");
             Render();
             return;
         }
@@ -1847,6 +2424,11 @@ void Desktop::Back() {
         return;
     }
     if (tab_ == Tab::Config) {
+        if (hotkey_capturing_) {
+            hotkey_capturing_ = false;
+            Render();
+            return;
+        }
         Show(View::Pill);
         return;
     }
@@ -1873,15 +2455,32 @@ void Desktop::Open(int index) {
         Populate();
         ::SetFocus(edit_);
     } else if (item.kind == Kind::File) {
-        BrowseDocument(item);
+        if (Prefix(item.value, L"Apps\\")) {
+            if (Equal(fs::path(item.value).extension().native(), L".exe")) {
+                RegisterManualApp(item.value);
+                return;
+            }
+            const auto path = resolver_.ResolvePmRelativePath(item.value);
+            if (!path.ok) { Report(ERROR_INVALID_NAME); return; }
+            const auto code = reinterpret_cast<INT_PTR>(::ShellExecuteW(
+                hwnd_, L"open", path.resolved_path.c_str(), nullptr,
+                fs::path(path.resolved_path).parent_path().c_str(), SW_SHOWNORMAL));
+            if (code <= 32) Report(static_cast<DWORD>(code));
+            else Show(View::Pill);
+        } else {
+            BrowseDocument(item);
+        }
     } else if (item.kind == Kind::Url) {
-        const auto final_url = item.value.find(L"$W$") != std::wstring::npos
+        auto expanded = (item.value.find(L"$W$") != std::wstring::npos || item.value.find(L"$I$") != std::wstring::npos)
             ? ExpandWeb(item.value, item.args) : item.value;
-        if (!IsHttpUrl(final_url)) { Report(ERROR_INVALID_NAME); return; }
-        applications::List(resolver_, apps_);
-        const auto browser = std::find_if(apps_.begin(), apps_.end(), [](const App& a) { return a.browser && !a.archived; });
-        if (browser != apps_.end()) {
-            Launch(*browser, jobs::QuoteArgument(final_url));
+        wchar_t env_buf[2048]{};
+        const DWORD env_n = ::ExpandEnvironmentStringsW(expanded.c_str(), env_buf, static_cast<DWORD>(std::size(env_buf)));
+        const std::wstring final_url = (env_n > 0 && env_n <= std::size(env_buf)) ? std::wstring(env_buf) : expanded;
+        std::error_code ec;
+        const bool is_local = fs::exists(final_url, ec) || final_url.starts_with(L"file://");
+        if (!IsHttpUrl(final_url) && !is_local) { Report(ERROR_INVALID_NAME); return; }
+        if (IsHttpUrl(final_url)) {
+            OpenTargetUrl(final_url);
         } else {
             const auto result = reinterpret_cast<INT_PTR>(::ShellExecuteW(
                 hwnd_, L"open", final_url.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
@@ -1909,11 +2508,42 @@ void Desktop::BrowseDocument(const Item& item) {
     if (!ext.empty()) ext.erase(0, 1);
     std::wstring id;
     App app;
-    if (!ext.empty() && !applications::Association(resolver_, ext, id) && !id.empty() &&
-        !applications::Find(resolver_, id, app) && !app.archived && !applications::ValidateApp(resolver_, app, true)) {
-        Launch(app, jobs::QuoteArgument(path.resolved_path));
+    if (!ext.empty() && !applications::Association(resolver_, ext, id) && !id.empty()) {
+        if (Equal(id, L"HOST")) {
+            const auto code = reinterpret_cast<INT_PTR>(::ShellExecuteW(
+                hwnd_, L"open", path.resolved_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+            if (code <= 32) Report(static_cast<DWORD>(code));
+            else Show(View::Pill);
+            return;
+        }
+        if (!applications::Find(resolver_, id, app) && !app.archived && !applications::ValidateApp(resolver_, app, true)) {
+            Launch(app, jobs::QuoteArgument(path.resolved_path));
+            return;
+        }
+    }
+
+    const bool old_modal = modal_;
+    modal_ = true;
+    const std::wstring prompt = ext.empty()
+        ? L"\u00bfC\u00f3mo deseas abrir este archivo?"
+        : (L"No hay asociaci\u00f3n configurada para ." + ext + L".\n\u00bfC\u00f3mo deseas abrirlo?");
+    const int mode_choice = gfx::ShowGlassDialog(
+        hwnd_, L"Abrir archivo", prompt,
+        {L"App de PML", L"Anfitri\u00f3n (Windows)", L"Cancelar"}, dpi_, 0);
+    if (mode_choice == 1) {
+        if (!ext.empty()) Report(applications::SetAssociation(resolver_, ext, L"HOST"));
+        const auto code = reinterpret_cast<INT_PTR>(::ShellExecuteW(
+            hwnd_, L"open", path.resolved_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+        if (code <= 32) Report(static_cast<DWORD>(code));
+        else Show(View::Pill);
+        modal_ = old_modal;
         return;
     }
+    if (mode_choice != 0) {
+        modal_ = old_modal;
+        return;
+    }
+
     std::vector<gfx::MenuEntry> menu_items;
     std::vector<App> available;
     for (auto a : apps_) {
@@ -1921,28 +2551,98 @@ void Desktop::BrowseDocument(const Item& item) {
         available.push_back(a);
         menu_items.push_back({static_cast<int>(available.size()), a.name, true, false});
     }
-    constexpr int kHost = 32000;
-    menu_items.push_back({kHost, L"Abrir con Windows\u2026", true, false});
+    if (menu_items.empty()) {
+        gfx::ShowGlassDialog(hwnd_, L"Abrir archivo", L"No hay aplicaciones de PML disponibles.", {L"Aceptar"}, dpi_, 0);
+        modal_ = old_modal;
+        return;
+    }
     POINT cursor{};
     ::GetCursorPos(&cursor);
-    modal_ = true;
     const auto choice = gfx::ShowGlassMenu(hwnd_, cursor, menu_items, dpi_);
-    if (choice == kHost) {
-        if (::MessageBoxW(hwnd_, L"\u00bfAbrir con la aplicaci\u00f3n de Windows? PML no controla sus residuos.",
-                          L"PortableManager Desktop", MB_YESNO | MB_ICONQUESTION) == IDYES) {
-            const auto code = reinterpret_cast<INT_PTR>(::ShellExecuteW(hwnd_, L"open", path.resolved_path.c_str(),
-                nullptr, nullptr, SW_SHOWNORMAL));
-            if (code <= 32) Report(static_cast<DWORD>(code));
-            else Show(View::Pill);
-        }
-    } else if (choice > 0 && static_cast<std::size_t>(choice) <= available.size()) {
+    modal_ = old_modal;
+    if (choice > 0 && static_cast<std::size_t>(choice) <= available.size()) {
         const auto selected = available[static_cast<std::size_t>(choice - 1)];
-        if (!ext.empty() && ::MessageBoxW(hwnd_, L"\u00bfRecordar para esta extensi\u00f3n?",
-                L"PortableManager Desktop", MB_YESNO | MB_ICONQUESTION) == IDYES)
-            Report(applications::SetAssociation(resolver_, ext, selected.id));
+        if (!ext.empty()) Report(applications::SetAssociation(resolver_, ext, selected.id));
         Launch(selected, jobs::QuoteArgument(path.resolved_path));
     }
-    modal_ = false;
+}
+
+void Desktop::OpenTargetUrl(const std::wstring& target) {
+    if (closing_) return;
+    if (!IsHttpUrl(target)) {
+        const auto result = reinterpret_cast<INT_PTR>(::ShellExecuteW(hwnd_, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+        if (result <= 32) Report(static_cast<DWORD>(result));
+        else Show(View::Pill);
+        return;
+    }
+    applications::List(resolver_, apps_);
+    const auto& settings = config_.config_doc();
+    const auto pref = settings.GetValue(L"Web", L"App");
+    if (Equal(pref, L"HOST")) {
+        const auto result = reinterpret_cast<INT_PTR>(::ShellExecuteW(hwnd_, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+        if (result <= 32) Report(static_cast<DWORD>(result));
+        else Show(View::Pill);
+        return;
+    }
+    if (!pref.empty()) {
+        App app;
+        if (!applications::Find(resolver_, pref, app) && !app.archived) {
+            Launch(app, jobs::QuoteArgument(target));
+            return;
+        }
+    }
+    const auto browser = std::find_if(apps_.begin(), apps_.end(), [](const App& a) { return a.browser && !a.archived; });
+    if (browser != apps_.end()) {
+        Launch(*browser, jobs::QuoteArgument(target));
+        return;
+    }
+
+    const bool old_modal = modal_;
+    modal_ = true;
+    const int mode_choice = gfx::ShowGlassDialog(
+        hwnd_, L"Abrir enlace",
+        L"No hay un navegador predeterminado configurado.\n\u00bfC\u00f3mo deseas abrir este enlace?",
+        {L"App de PML", L"Anfitri\u00f3n (Windows)", L"Cancelar"}, dpi_, 0);
+    if (mode_choice == 1) {
+        std::wstring err;
+        config_.config_doc().SetValue(L"Web", L"App", L"HOST", err);
+        config_.SaveConfigIniIfModified(false);
+        const auto result = reinterpret_cast<INT_PTR>(::ShellExecuteW(hwnd_, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+        if (result <= 32) Report(static_cast<DWORD>(result));
+        else Show(View::Pill);
+        modal_ = old_modal;
+        return;
+    }
+    if (mode_choice != 0) {
+        modal_ = old_modal;
+        return;
+    }
+
+    std::vector<gfx::MenuEntry> menu_items;
+    std::vector<App> available;
+    for (auto a : apps_) {
+        if (a.archived || applications::ValidateApp(resolver_, a, true)) continue;
+        available.push_back(a);
+        menu_items.push_back({static_cast<int>(available.size()), a.name, true, false});
+    }
+    if (menu_items.empty()) {
+        gfx::ShowGlassDialog(hwnd_, L"Abrir enlace", L"No hay aplicaciones de PML disponibles.", {L"Aceptar"}, dpi_, 0);
+        modal_ = old_modal;
+        return;
+    }
+    POINT cursor{};
+    ::GetCursorPos(&cursor);
+    const auto choice = gfx::ShowGlassMenu(hwnd_, cursor, menu_items, dpi_);
+    modal_ = old_modal;
+    if (choice > 0 && static_cast<std::size_t>(choice) <= available.size()) {
+        auto selected = available[static_cast<std::size_t>(choice - 1)];
+        std::wstring err;
+        config_.config_doc().SetValue(L"Web", L"App", selected.id, err);
+        config_.SaveConfigIniIfModified(false);
+        selected.browser = true;
+        applications::SaveApp(resolver_, selected, false);
+        Launch(selected, jobs::QuoteArgument(target));
+    }
 }
 
 std::wstring ExpandWeb(std::wstring_view pattern, const std::wstring& input) {
@@ -1974,44 +2674,16 @@ std::wstring ExpandWeb(std::wstring_view pattern, const std::wstring& input) {
     return result;
 }
 
-void Desktop::SearchWeb(bool fallback) {
+void Desktop::SearchWeb(bool /*fallback*/) {
     const auto query = Text(edit_);
     if (query.empty() || closing_) return;
     const auto& settings = config_.config_doc();
-    const auto section = fallback ? L"MagicWord._DEFAULT" : L"Web";
-    const auto id = settings.GetValue(section, L"App");
-    const auto url = ExpandWeb(settings.GetValue(section, L"URL", L"https://www.google.com/search?q=$W$"), query);
-    const auto argument = fallback ? settings.GetValue(section, L"Argument") : L"";
-    App app;
-    if (!id.empty()) {
-        const auto error = applications::Find(resolver_, id, app);
-        if (error || app.archived) { Report(error ? error : ERROR_FILE_NOT_FOUND); return; }
-        Launch(app, jobs::QuoteArgument(argument.empty() ? url : ExpandWeb(argument, query)));
-        return;
-    }
-    const auto browser = std::find_if(apps_.begin(), apps_.end(), [](const App& a) { return a.browser && !a.archived; });
-    if (browser != apps_.end()) { Launch(*browser, jobs::QuoteArgument(url)); return; }
-    if (!url.starts_with(L"https://") && !url.starts_with(L"http://")) { Report(ERROR_INVALID_NAME); return; }
-    modal_ = true;
-    if (::MessageBoxW(hwnd_, L"\u00bfUsar el navegador del anfitri\u00f3n para esta b\u00fasqueda?",
-                      L"PortableManager Desktop", MB_YESNO | MB_ICONQUESTION) == IDYES) {
-        const auto result = reinterpret_cast<INT_PTR>(::ShellExecuteW(hwnd_, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
-        if (result <= 32) Report(static_cast<DWORD>(result));
-        else Show(View::Pill);
-    }
-    modal_ = false;
+    const auto url = ExpandWeb(settings.GetValue(L"Web", L"URL", L"https://www.google.com/search?q=$W$"), query);
+    OpenTargetUrl(url);
 }
 
 void Desktop::Launch(const App& app, std::wstring arguments, bool force_evaluate) {
     if (closing_) return;
-    if (Equal(app.color, L"Red")) {
-        const bool old_modal = modal_;
-        modal_ = true;
-        const auto confirmed = ::MessageBoxW(hwnd_, L"Esta aplicaci\u00f3n puede dejar residuos. \u00bfAbrir de todas formas?",
-                                              app.name.c_str(), MB_YESNO | MB_ICONWARNING);
-        modal_ = old_modal;
-        if (confirmed != IDYES) return;
-    }
     if (IsAppRunning(app.id)) {
         Report(ERROR_BUSY);
         return;
@@ -2171,7 +2843,7 @@ void Desktop::Report(DWORD error) {
         const bool was_modal = modal_;
         modal_ = true;
         const auto message = L"No se complet\u00f3 la operaci\u00f3n (Win32 " + std::to_wstring(error) + L").";
-        ::MessageBoxW(hwnd_, message.c_str(), L"PortableManager Desktop", MB_OK | MB_ICONWARNING);
+        gfx::ShowGlassDialog(hwnd_, L"PortableManager Lite", message, {L"Aceptar"}, dpi_, 0);
         modal_ = was_modal;
     }
     Render();
@@ -2216,6 +2888,13 @@ void Desktop::UpdateClipboard() {
         }
     }
     ::CloseClipboard();
+    if (!clipboard_offers_) {
+        package_.clear();
+        clipboard_url_.clear();
+        url_naming_ = false;
+        Layout();
+        return;
+    }
     const auto attrs = candidate.empty() ? INVALID_FILE_ATTRIBUTES : ::GetFileAttributesW(candidate.c_str());
     const bool valid_pkg = attrs != INVALID_FILE_ATTRIBUTES &&
         !(attrs & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) &&
@@ -2373,37 +3052,52 @@ void Desktop::Menu(bool application, int index) {
     App app;
     Worker* worker = nullptr;
     if (application) {
-        if (index < 0 || static_cast<std::size_t>(index) >= items_.size() ||
-            items_[static_cast<std::size_t>(index)].kind != Kind::App ||
-            applications::Find(resolver_, items_[static_cast<std::size_t>(index)].value, app)) {
+        if (index < 0 || static_cast<std::size_t>(index) >= items_.size()) return;
+        const auto& clicked = items_[static_cast<std::size_t>(index)];
+        if (clicked.kind == Kind::File && Prefix(clicked.value, L"Apps\\") &&
+            Equal(fs::path(clicked.value).extension().native(), L".exe")) {
+            menu_items.push_back({1, L"Abrir", true, false});
+            menu_items.push_back({2, L"Registrar en PML\u2026", !busy_, false});
+            POINT cursor{};
+            ::GetCursorPos(&cursor);
+            ::SetForegroundWindow(hwnd_);
+            modal_ = true;
+            const auto choice = gfx::ShowGlassMenu(hwnd_, cursor, menu_items, dpi_);
+            modal_ = false;
+            if (choice == 1) Open(index);
+            else if (choice == 2) RegisterManualApp(clicked.value);
+            return;
+        }
+        if (clicked.kind != Kind::App || applications::Find(resolver_, clicked.value, app)) {
             return;
         }
         for (auto& entry : workers_) if (entry->app.id == app.id) worker = entry.get();
         menu_items.push_back({1, app.archived ? L"Reinstalar\u2026" : L"Abrir", true, false});
         menu_items.push_back({2, L"Cerrar", worker != nullptr, false});
         const bool can_maintain = !worker && !busy_;
-        menu_items.push_back({8, L"Evaluar", can_maintain && !app.archived && session_.protected_by_guard(), false});
+        menu_items.push_back({8, L"Evaluar", can_maintain && !app.archived && session_.protected_by_guard() && workers_.empty(), false});
         menu_items.push_back({3, L"Configurar\u2026", true, false});
-        menu_items.push_back({4, L"Actualizar\u2026", can_maintain, false});
         menu_items.push_back({5, L"Restablecer\u2026", can_maintain, false});
         menu_items.push_back({6, L"Archivar\u2026", can_maintain, false});
         menu_items.push_back({7, L"Desinstalar\u2026", !busy_, false});
     } else {
         menu_items.push_back({1, L"Escritorio", true, false});
+        menu_items.push_back({11, L"Notas", true, false});
+        menu_items.push_back({8, L"Configuraci\u00f3n", true, false});
         menu_items.push_back({2, L"Buscar", true, false});
-        menu_items.push_back({3, L"Instalar paquete\u2026", true, false});
         if (!package_.empty())
             menu_items.push_back({4, L"Elegir destino del portapapeles\u2026", true, false});
-        menu_items.push_back({0, L"", false, true});
-        menu_items.push_back({8, L"Configuraci\u00f3n\u2026", !origin_lost_, false});
         if (!orphan_sessions_.empty()) {
+            menu_items.push_back({0, L"", false, true});
             menu_items.push_back({9, L"Recuperar sesiones hu\u00e9rfanas\u2026", !busy_, false});
             menu_items.push_back({10, L"Desechar sesiones hu\u00e9rfanas\u2026", !busy_, false});
         }
         menu_items.push_back({0, L"", false, true});
-        menu_items.push_back({5, L"Cierre normal", true, false});
-        menu_items.push_back({6, L"Cierre r\u00e1pido", true, false});
-        menu_items.push_back({7, L"Cierre cr\u00edtico", true, false});
+        menu_items.push_back({5, L"Cerrar", true, false});
+        if (show_all_close_modes_) {
+            menu_items.push_back({6, L"Cierre r\u00e1pido", true, false});
+            menu_items.push_back({7, L"Cierre cr\u00edtico", true, false});
+        }
         menu_items.push_back({0, L"", false, true});
         menu_items.push_back({0, std::wstring(L"v") + core::kVersionString, false, false});
     }
@@ -2413,19 +3107,15 @@ void Desktop::Menu(bool application, int index) {
     modal_ = true;
     const auto choice = gfx::ShowGlassMenu(hwnd_, cursor, menu_items, dpi_);
     if (!application) {
-        if (choice == 1) Show(View::Files);
-        if (choice == 2) Show(View::Search);
-        if (choice == 3) PickPackage();
-        if (choice == 4) InstallPackage(true);
-        if (choice == 8 && !origin_lost_) {
-            config_.LoadConfigIni(true);
-            EnsureConfigDefaults();
-            config_.SaveConfigIniIfModified(true);
-            const auto file = resolver_.ResolvePmRelativePath(L"Data\\config.ini");
-            const auto result = reinterpret_cast<INT_PTR>(::ShellExecuteW(
-                hwnd_, L"open", file.resolved_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
-            if (result <= 32) Report(static_cast<DWORD>(result));
+        if (choice == 1) OpenTab(Tab::Desktop);
+        if (choice == 11) OpenTab(Tab::Notes);
+        if (choice == 8) {
+            config_app_id_.clear();
+            app_cfg_editing_ = false;
+            OpenTab(Tab::Config);
         }
+        if (choice == 2) Show(View::Search);
+        if (choice == 4) InstallPackage(true);
         if (choice == 9) {
             modal_ = false;
             RestoreOrphansInteractive();
@@ -2449,19 +3139,17 @@ void Desktop::Menu(bool application, int index) {
             Launch(app, {}, true);
             return;
         }
-        if (choice == 3 && ::MessageBoxW(hwnd_, L"\u00bfAbrir apps.ini en el editor de Windows?",
-                L"PortableManager Desktop", MB_YESNO | MB_ICONQUESTION) == IDYES) {
-            const auto file = resolver_.ResolvePmRelativePath(L"Data\\apps.ini");
-            const auto result = reinterpret_cast<INT_PTR>(::ShellExecuteW(hwnd_, L"open", file.resolved_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
-            if (result <= 32) Report(static_cast<DWORD>(result));
+        if (choice == 3) {
+            modal_ = false;
+            ConfigureAppModal(app);
+            return;
         }
-        if (choice == 4) PickPackage(app.id);
         if (choice >= 5 && choice <= 7) {
             const auto action = choice == 5 ? applications::Maintenance::Reset :
                 choice == 6 ? applications::Maintenance::Archive : applications::Maintenance::Uninstall;
             const auto text = choice == 6 ? L"\u00bfArchivar esta aplicaci\u00f3n y conservar sus datos?"
                 : L"\u00bfConfirmar la eliminaci\u00f3n de los datos portables de esta aplicaci\u00f3n?";
-            if (::MessageBoxW(hwnd_, text, app.name.c_str(), MB_YESNO | MB_ICONWARNING) == IDYES) {
+            if (gfx::ShowGlassDialog(hwnd_, app.name, text, {L"S\u00ed", L"No"}, dpi_, 1) == 0) {
                 const auto running = std::find_if(workers_.begin(), workers_.end(),
                     [&](const auto& active) { return active->app.id == app.id; });
                 if (action == applications::Maintenance::Uninstall && running != workers_.end()) {
@@ -2544,9 +3232,9 @@ void Desktop::RestoreOrphansInteractive() {
     modal_ = true;
     const auto msg = L"Se detectaron " + std::to_wstring(orphan_sessions_.size()) +
         L" sesi\u00f3n(es) hu\u00e9rfana(s) sin restaurar en el sistema.\n\n\u00bfDeseas restaurar el anfitri\u00f3n ahora?";
-    const int answer = ::MessageBoxW(hwnd_, msg.c_str(), L"PortableManager Lite", MB_YESNO | MB_ICONWARNING);
+    const int answer = gfx::ShowGlassDialog(hwnd_, L"Sesiones hu\u00e9rfanas", msg, {L"Restaurar", L"Cancelar"}, dpi_, 0);
     modal_ = was_modal;
-    if (answer != IDYES) return;
+    if (answer != 0) return;
 
     const auto ids = orphan_sessions_;
     StartOperation([ids]() -> DWORD {
@@ -2570,9 +3258,9 @@ void Desktop::DiscardOrphansInteractive() {
     modal_ = true;
     const auto msg = L"Se detectaron " + std::to_wstring(orphan_sessions_.size()) +
         L" sesi\u00f3n(es) hu\u00e9rfana(s) en %TEMP%.\n\nEsta acci\u00f3n eliminar\u00e1 \u00fanicamente los registros temporales sin modificar archivos ni el Registro del equipo.\n\n\u00bfDeseas desecharlas ahora?";
-    const int answer = ::MessageBoxW(hwnd_, msg.c_str(), L"PortableManager Lite", MB_YESNO | MB_ICONWARNING);
+    const int answer = gfx::ShowGlassDialog(hwnd_, L"Sesiones hu\u00e9rfanas", msg, {L"Desechar", L"Cancelar"}, dpi_, 1);
     modal_ = was_modal;
-    if (answer != IDYES) return;
+    if (answer != 0) return;
 
     const auto ids = orphan_sessions_;
     const auto sessions_root = fs::path(runtime::SessionManager::QuerySystemTempDir()) /
@@ -2703,8 +3391,10 @@ void Desktop::EnsureNoteHost() {
             0, L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
             0, 0, 100, 100, note_host_, nullptr, ::GetModuleHandleW(nullptr), nullptr);
-        if (note_edit_ && note_font_) {
-            ::SendMessageW(note_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(note_font_), TRUE);
+        if (note_edit_) {
+            if (note_font_) ::SendMessageW(note_edit_, WM_SETFONT, reinterpret_cast<WPARAM>(note_font_), TRUE);
+            note_edit_proc_ = reinterpret_cast<WNDPROC>(
+                ::SetWindowLongPtrW(note_edit_, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(NoteEditProc)));
         }
     }
 }
@@ -2714,14 +3404,16 @@ void Desktop::UpdateNoteHostBounds() {
         EnsureNoteHost();
         if (!note_host_ || !note_edit_) return;
         const int pad = ShadowPad();
-        const int header_h = S(40);
+        const int search_h = S(40);
+        const int header_h = S(38);
         const int note_tab_h = S(32);
         const int find_h = S(34);
         const int bottom_pad = S(10);
+        const int top_off = search_h + header_h + note_tab_h + S(8);
         const int nx = win_x_ + pad + S(14);
-        const int ny = win_y_ + pad + header_h + S(8);
+        const int ny = win_y_ + pad + top_off;
         const int nw = std::max(S(120), cur_w_ - S(28));
-        const int nh = std::max(S(60), cur_h_ - header_h - note_tab_h - find_h - bottom_pad - S(16));
+        const int nh = std::max(S(60), cur_h_ - top_off - find_h - bottom_pad - S(8));
         ::SetWindowPos(note_host_, always_on_top_ ? HWND_TOPMOST : HWND_TOP,
                        nx, ny, nw, nh, SWP_NOACTIVATE | SWP_SHOWWINDOW);
         ::MoveWindow(note_edit_, 0, 0, nw, nh, TRUE);
@@ -2820,9 +3512,9 @@ void Desktop::DeleteNote(int index) {
         const bool old_modal = modal_;
         modal_ = true;
         const auto msg = L"\u00bfEliminar la nota \"" + notes_[static_cast<std::size_t>(index)].name + L"\"?";
-        const int ans = ::MessageBoxW(hwnd_, msg.c_str(), L"Notas", MB_YESNO | MB_ICONQUESTION);
+        const int ans = gfx::ShowGlassDialog(hwnd_, L"Notas", msg, {L"Eliminar", L"Cancelar"}, dpi_, 1);
         modal_ = old_modal;
-        if (ans != IDYES) return;
+        if (ans != 0) return;
     }
     std::error_code ec;
     fs::remove(notes_[static_cast<std::size_t>(index)].path, ec);
@@ -2878,8 +3570,8 @@ void Desktop::CommitNoteRename() {
 }
 
 void Desktop::FindNextInNote() {
-    if (!note_edit_) return;
-    const auto needle = Text(edit_);
+    if (!note_edit_ || !note_find_edit_) return;
+    const auto needle = Text(note_find_edit_);
     if (needle.empty()) return;
     const auto hay = Text(note_edit_);
     if (hay.empty()) return;
@@ -2897,6 +3589,244 @@ void Desktop::FindNextInNote() {
         ::SendMessageW(note_edit_, EM_SETSEL, static_cast<WPARAM>(pos), static_cast<LPARAM>(pos + n_low.size()));
         ::SendMessageW(note_edit_, EM_SCROLLCARET, 0, 0);
     }
+}
+
+void Desktop::ToggleConfigRow(int idx) {
+    if (!config_app_id_.empty()) {
+        App cfg_app;
+        if (applications::Find(resolver_, config_app_id_, cfg_app) != ERROR_SUCCESS) {
+            config_app_id_.clear();
+            Render();
+            return;
+        }
+        if (idx >= 0 && idx <= 2) {
+            const std::wstring name_disp = cfg_app.aliases.empty() ? cfg_app.name : (cfg_app.name + L", " + cfg_app.aliases);
+            app_cfg_target_ = cfg_app;
+            app_cfg_field_ = idx + 1;
+            app_cfg_editing_ = true;
+            const std::wstring initial = (idx == 0) ? name_disp
+                : (idx == 1 ? cfg_app.extensions : cfg_app.arguments);
+            ::SetWindowTextW(edit_, initial.c_str());
+            ::SendMessageW(edit_, EM_SETSEL, 0, -1);
+            FocusNode(UiNode::ConfigFieldEdit);
+            return;
+        }
+        if (idx == 3) {
+            cfg_app.browser = !cfg_app.browser;
+            Report(applications::SaveApp(resolver_, cfg_app, false));
+            std::wstring err;
+            if (cfg_app.browser) {
+                config_.config_doc().SetValue(L"Web", L"App", cfg_app.id, err);
+                config_.SaveConfigIniIfModified(false);
+            }
+            Render();
+            return;
+        }
+        return;
+    }
+
+    auto& doc = config_.config_doc();
+    std::wstring err;
+    if (idx == 0) {
+        hotkey_capturing_ = !hotkey_capturing_;
+        hotkey_status_ok_ = false;
+        hotkey_status_err_ = false;
+        hotkey_error_text_.clear();
+        FocusNode(hotkey_capturing_ ? UiNode::ConfigFieldEdit : UiNode::ConfigList);
+        return;
+    }
+    hotkey_capturing_ = false;
+    if (idx == 1) doc.SetValue(L"Desktop", L"AlwaysOnTop", always_on_top_ ? L"false" : L"true", err);
+    else if (idx == 2) {
+        const int next_pct = (translucent_pct_ >= 90) ? 0 : ((translucent_pct_ / 10) * 10 + 10);
+        doc.SetValue(L"Desktop", L"Translucent", std::to_wstring(next_pct) + L"%", err);
+    } else if (idx == 3) doc.SetValue(L"Desktop", L"RememberPosition", remember_pos_ ? L"false" : L"true", err);
+    else if (idx == 4) doc.SetValue(L"Desktop", L"ClipboardOffers", clipboard_offers_ ? L"false" : L"true", err);
+    else if (idx == 5) doc.SetValue(L"Desktop", L"EnableKill", enable_kill_ ? L"false" : L"true", err);
+    else if (idx == 6) doc.SetValue(L"Desktop", L"ShowAllCloseModes", show_all_close_modes_ ? L"false" : L"true", err);
+    config_.SaveConfigIniIfModified(false);
+    ApplyConfigSettings(true);
+    ApplyWindowGeometry();
+    Render();
+}
+
+void Desktop::ConfigureAppModal(const App& app) {
+    if (closing_) return;
+    config_app_id_ = app.id;
+    app_cfg_editing_ = false;
+    OpenTab(Tab::Config);
+    config_selected_ = 0;
+    FocusNode(UiNode::ConfigList);
+}
+
+void Desktop::CommitAppFieldEdit() {
+    if (!app_cfg_editing_) return;
+    const auto text = Text(edit_);
+    App updated = app_cfg_target_;
+    if (app_cfg_field_ == 1) {
+        const auto parts = Split(text, L',');
+        if (!parts.empty()) {
+            updated.name = parts.front();
+            updated.aliases.clear();
+            for (std::size_t i = 1; i < parts.size(); ++i) {
+                if (!updated.aliases.empty()) updated.aliases += L", ";
+                updated.aliases += parts[i];
+            }
+        }
+    } else if (app_cfg_field_ == 2) {
+        updated.extensions = text;
+    } else if (app_cfg_field_ == 3) {
+        updated.arguments = text;
+    }
+    app_cfg_editing_ = false;
+    ::SetWindowTextW(edit_, L"");
+    Report(applications::SaveApp(resolver_, updated, false));
+    applications::List(resolver_, apps_);
+    FocusNode(UiNode::ConfigList);
+}
+
+void Desktop::RegisterManualApp(const std::wstring& rel_exe) {
+    if (closing_ || !Prefix(rel_exe, L"Apps\\")) return;
+    const fs::path p(rel_exe);
+    auto it = p.begin();
+    if (it == p.end()) return;
+    ++it; // skip "Apps"
+    if (it == p.end()) return;
+    const std::wstring dir_name = it->native();
+    App app;
+    app.id = SanitizeUrlName(dir_name);
+    if (app.id.empty()) app.id = L"app";
+    app.name = p.stem().native();
+    app.directory = L"Apps\\" + dir_name;
+    app.executable = rel_exe;
+    app.paf = false;
+    const DWORD err = applications::Register(resolver_, app);
+    if (err) {
+        Report(err);
+        return;
+    }
+    Populate();
+    Launch(app, {});
+}
+
+void Desktop::DesktopContextMenu() {
+    if (closing_) return;
+    auto mark = [](bool on, const wchar_t* label) -> std::wstring {
+        return (on ? L"\u2713 " : L"   ") + std::wstring(label);
+    };
+    std::vector<gfx::MenuEntry> menu_items;
+    menu_items.push_back({1, mark(desk_view_ == DesktopViewMode::LargeIcons, L"Ver: Iconos grandes"), true, false});
+    menu_items.push_back({2, mark(desk_view_ == DesktopViewMode::SmallIcons, L"Ver: Iconos peque\u00f1os"), true, false});
+    menu_items.push_back({3, mark(desk_view_ == DesktopViewMode::List, L"Ver: Lista"), true, false});
+    menu_items.push_back({4, mark(desk_view_ == DesktopViewMode::Details, L"Ver: Detalles"), true, false});
+    menu_items.push_back({0, L"", false, true});
+    menu_items.push_back({5, mark(desk_sort_ == DesktopSortBy::Name, L"Ordenar por: Nombre"), true, false});
+    menu_items.push_back({6, mark(desk_sort_ == DesktopSortBy::Modified, L"Ordenar por: Fecha de modificaci\u00f3n"), true, false});
+    menu_items.push_back({0, L"", false, true});
+    menu_items.push_back({7, mark(desk_group_ == DesktopGroupBy::AppsFirst, L"Agrupar: Apps primero"), true, false});
+    menu_items.push_back({8, mark(desk_group_ == DesktopGroupBy::FoldersFirst, L"Agrupar: Carpetas primero"), true, false});
+    menu_items.push_back({0, L"", false, true});
+    menu_items.push_back({10, L"   Actualizar (F5)", true, false});
+
+    POINT cursor{};
+    ::GetCursorPos(&cursor);
+    ::SetForegroundWindow(hwnd_);
+    modal_ = true;
+    const auto choice = gfx::ShowGlassMenu(hwnd_, cursor, menu_items, dpi_);
+    modal_ = false;
+    if (!choice) return;
+    if (choice == 10) {
+        Populate();
+        return;
+    }
+    std::wstring err;
+    auto& doc = config_.config_doc();
+    if (choice == 1) doc.SetValue(L"Desktop", L"ViewMode", L"LargeIcons", err);
+    else if (choice == 2) doc.SetValue(L"Desktop", L"ViewMode", L"SmallIcons", err);
+    else if (choice == 3) doc.SetValue(L"Desktop", L"ViewMode", L"List", err);
+    else if (choice == 4) doc.SetValue(L"Desktop", L"ViewMode", L"Details", err);
+    else if (choice == 5) doc.SetValue(L"Desktop", L"SortBy", L"Name", err);
+    else if (choice == 6) doc.SetValue(L"Desktop", L"SortBy", L"Modified", err);
+    else if (choice == 7) doc.SetValue(L"Desktop", L"GroupBy", L"AppsFirst", err);
+    else if (choice == 8) doc.SetValue(L"Desktop", L"GroupBy", L"FoldersFirst", err);
+    config_.SaveConfigIniIfModified(false);
+    ApplyConfigSettings(false);
+    Populate();
+}
+
+void Desktop::HandleHotkeyCapture(WPARAM vk) {
+    if (!hotkey_capturing_) return;
+    if (vk == VK_CONTROL || vk == VK_LCONTROL || vk == VK_RCONTROL ||
+        vk == VK_MENU || vk == VK_LMENU || vk == VK_RMENU ||
+        vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT ||
+        vk == VK_LWIN || vk == VK_RWIN) {
+        return;
+    }
+    if (vk == VK_ESCAPE && (::GetKeyState(VK_CONTROL) & 0x8000) == 0 &&
+        (::GetKeyState(VK_MENU) & 0x8000) == 0 && (::GetKeyState(VK_SHIFT) & 0x8000) == 0) {
+        hotkey_capturing_ = false;
+        FocusNode(UiNode::ConfigList);
+        return;
+    }
+    const bool ctrl = (::GetKeyState(VK_CONTROL) & 0x8000) != 0;
+    const bool alt = (::GetKeyState(VK_MENU) & 0x8000) != 0;
+    const bool shift = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+    const bool win = ((::GetKeyState(VK_LWIN) & 0x8000) != 0) || ((::GetKeyState(VK_RWIN) & 0x8000) != 0);
+
+    std::wstring key_name;
+    if (vk == VK_SPACE) key_name = L"Space";
+    else if (vk == VK_ESCAPE) key_name = L"Esc";
+    else if (vk == VK_TAB) key_name = L"Tab";
+    else if (vk == VK_RETURN) key_name = L"Enter";
+    else if (vk == VK_DELETE) key_name = L"Supr";
+    else if (vk >= VK_F1 && vk <= VK_F12) key_name = L"F" + std::to_wstring(vk - VK_F1 + 1);
+    else if ((vk >= 'A' && vk <= 'Z') || (vk >= '0' && vk <= '9')) key_name.push_back(static_cast<wchar_t>(vk));
+    else return;
+
+    std::wstring combo;
+    UINT mods = MOD_NOREPEAT;
+    if (ctrl) { combo += L"Ctrl+"; mods |= MOD_CONTROL; }
+    if (alt) { combo += L"Alt+"; mods |= MOD_ALT; }
+    if (shift) { combo += L"Shift+"; mods |= MOD_SHIFT; }
+    if (win) { combo += L"Win+"; mods |= MOD_WIN; }
+    combo += key_name;
+
+    hotkey_capturing_ = false;
+    hotkey_status_ok_ = false;
+    hotkey_status_err_ = false;
+    hotkey_error_text_.clear();
+
+    const wchar_t* known_owner = nullptr;
+    if (ctrl && !alt && !shift && !win && vk == VK_ESCAPE) known_owner = L"Men\u00fa Inicio";
+    else if (ctrl && shift && !alt && !win && vk == VK_ESCAPE) known_owner = L"Administrador de tareas";
+    else if (win && !ctrl && !alt && !shift && (vk == 'D' || vk == 'E' || vk == 'R' || vk == 'L')) {
+        known_owner = vk == 'D' ? L"Mostrar escritorio" : vk == 'E' ? L"Explorador de archivos" : vk == 'R' ? L"Ejecutar" : L"Bloquear equipo";
+    } else if (alt && !ctrl && !shift && !win && (vk == VK_TAB || vk == VK_F4 || vk == VK_SPACE)) {
+        known_owner = vk == VK_TAB ? L"Cambiar de ventana" : vk == VK_F4 ? L"Cerrar ventana" : L"Men\u00fa de ventana";
+    }
+    if (known_owner) {
+        hotkey_status_err_ = true;
+        hotkey_error_text_ = known_owner;
+        FocusNode(UiNode::ConfigList);
+        return;
+    }
+
+    const bool same_as_active = Equal(combo, registered_hotkey_);
+    if (!same_as_active) {
+        if (!::RegisterHotKey(hwnd_, 2, mods, static_cast<UINT>(vk))) {
+            hotkey_status_err_ = true;
+            FocusNode(UiNode::ConfigList);
+            return;
+        }
+        ::UnregisterHotKey(hwnd_, 2);
+    }
+
+    std::wstring err;
+    config_.config_doc().SetValue(L"Desktop", L"Hotkey", combo, err);
+    config_.SaveConfigIniIfModified(false);
+    ApplyConfigSettings(true);
+    hotkey_status_ok_ = true;
+    FocusNode(UiNode::ConfigList);
 }
 
 } // namespace

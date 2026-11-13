@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 #include <vector>
 
 namespace std {
@@ -356,44 +357,53 @@ void DrawStatusShield(HDC hdc, float cx, float cy, float size, Color4 color) {
     Gdiplus::Graphics g(hdc);
     ConfigureGraphics(g);
 
-    const float half = size * 0.5f;
-    // Soft glow behind the shield
-    const float glow_r = size * 0.95f;
+    const float w = size * 0.88f;
+    const float h = size;
+    const float top = cy - h * 0.50f;
+    const float sh_y = cy - h * 0.30f;
+    const float mid_y = cy + h * 0.08f;
+    const float bot = cy + h * 0.50f;
+    const float hw = w * 0.50f;
+
+    auto build_shield = [&](Gdiplus::GraphicsPath& p, float inset) {
+        const float sx = std::max(0.2f, 1.0f - inset / hw);
+        const float sy = std::max(0.2f, 1.0f - inset / (h * 0.5f));
+        auto X = [&](float dx) { return cx + dx * sx; };
+        auto Y = [&](float py) { return cy + (py - cy) * sy; };
+
+        p.StartFigure();
+        // Top crest right
+        p.AddBezier(X(0.0f), Y(top), X(hw * 0.35f), Y(top + h * 0.03f),
+                    X(hw * 0.68f), Y(sh_y - h * 0.05f), X(hw), Y(sh_y));
+        // Right side down to tip
+        p.AddBezier(X(hw), Y(sh_y), X(hw * 0.99f), Y(mid_y + h * 0.10f),
+                    X(hw * 0.64f), Y(bot - h * 0.14f), X(0.0f), Y(bot));
+        // Left side up from tip
+        p.AddBezier(X(0.0f), Y(bot), X(-hw * 0.64f), Y(bot - h * 0.14f),
+                    X(-hw * 0.99f), Y(mid_y + h * 0.10f), X(-hw), Y(sh_y));
+        // Top crest left
+        p.AddBezier(X(-hw), Y(sh_y), X(-hw * 0.68f), Y(sh_y - h * 0.05f),
+                    X(-hw * 0.35f), Y(top + h * 0.03f), X(0.0f), Y(top));
+        p.CloseFigure();
+    };
+
+    // Subtle outer ambient glow matching shield state
+    const float glow_r = size * 0.78f;
     Gdiplus::GraphicsPath glow_path;
     glow_path.AddEllipse(cx - glow_r, cy - glow_r, glow_r * 2.0f, glow_r * 2.0f);
     Gdiplus::PathGradientBrush pgb(&glow_path);
-    pgb.SetCenterColor(Gdiplus::Color(85, color.r, color.g, color.b));
+    pgb.SetCenterColor(Gdiplus::Color(42, color.r, color.g, color.b));
     Gdiplus::Color surround(0, color.r, color.g, color.b);
     int count = 1;
     pgb.SetSurroundColors(&surround, &count);
     g.FillPath(&pgb, &glow_path);
 
-    // Smooth shield path
-    Gdiplus::GraphicsPath shield;
-    const Gdiplus::PointF pts[] = {
-        {cx, cy - half},
-        {cx + half * 0.88f, cy - half * 0.68f},
-        {cx + half * 0.80f, cy + half * 0.16f},
-        {cx + half * 0.42f, cy + half * 0.68f},
-        {cx, cy + half},
-        {cx - half * 0.42f, cy + half * 0.68f},
-        {cx - half * 0.80f, cy + half * 0.16f},
-        {cx - half * 0.88f, cy - half * 0.68f},
-    };
-    shield.AddPolygon(pts, static_cast<int>(std::size(pts)));
-
-    Gdiplus::LinearGradientBrush fill(
-        Gdiplus::PointF(cx, cy - half), Gdiplus::PointF(cx, cy + half),
-        Gdiplus::Color(255, static_cast<BYTE>(std::min(255, color.r + 25)),
-                       static_cast<BYTE>(std::min(255, color.g + 25)),
-                       static_cast<BYTE>(std::min(255, color.b + 25))),
-        Gdiplus::Color(255, static_cast<BYTE>(color.r * 0.78f),
-                       static_cast<BYTE>(color.g * 0.78f),
-                       static_cast<BYTE>(color.b * 0.78f)));
-    g.FillPath(&fill, &shield);
-
-    Gdiplus::Pen rim(Gdiplus::Color(150, 255, 255, 255), 1.0f);
-    g.DrawPath(&rim, &shield);
+    // Outline-only shield matching the exact pml.ico silhouette
+    Gdiplus::GraphicsPath outer_path;
+    build_shield(outer_path, 0.0f);
+    Gdiplus::Pen outline_pen(ToGp(Color4{color.r, color.g, color.b, 245}), std::max(1.6f, size * 0.11f));
+    outline_pen.SetLineJoin(Gdiplus::LineJoinRound);
+    g.DrawPath(&outline_pen, &outer_path);
 }
 
 void DrawInstallIcon(HDC hdc, float cx, float cy, float size, Color4 color, bool hovered) {
@@ -621,9 +631,18 @@ void DrawItemIcon(HDC hdc, const std::wstring& resolved_path, bool is_app, bool 
     Gdiplus::Graphics g(hdc);
     ConfigureGraphics(g);
 
-    if (HICON icon = ExtractHighResIcon(resolved_path, is_app, is_folder, size)) {
+    static std::unordered_map<std::wstring, HICON> icon_cache;
+    const std::wstring cache_key = resolved_path + L"|" + std::to_wstring(size) +
+        (is_app ? L"|A" : L"|") + (is_folder ? L"F" : L"");
+    HICON icon = nullptr;
+    if (const auto it = icon_cache.find(cache_key); it != icon_cache.end()) {
+        icon = it->second;
+    } else {
+        icon = ExtractHighResIcon(resolved_path, is_app, is_folder, size);
+        if (icon_cache.size() < 512) icon_cache.emplace(cache_key, icon);
+    }
+    if (icon) {
         DrawIconAlphaAware(g, icon, x, y, size);
-        ::DestroyIcon(icon);
     } else {
         // Fallback crisp vector icon when binary/path icon is unavailable
         const float pad = static_cast<float>(size) * 0.14f;
@@ -927,6 +946,295 @@ int ShowGlassMenu(HWND owner, POINT screen_pt, const std::vector<MenuEntry>& ite
     ::DestroyWindow(hwnd);
     if (owner && ::IsWindow(owner)) ::SetForegroundWindow(owner);
     return state.result_id;
+}
+
+namespace {
+
+struct GlassDialogState {
+    std::wstring title;
+    std::wstring message;
+    std::vector<std::wstring> buttons;
+    std::vector<RECT> btn_rects;
+    RECT title_rect{};
+    RECT msg_rect{};
+    UINT dpi = 96;
+    int shadow = 0;
+    int width = 0;
+    int height = 0;
+    int hover_btn = -1;
+    int focus_btn = 0;
+    int result_btn = -1;
+    bool done = false;
+    bool tracking_mouse = false;
+    Surface surface;
+
+    void Render(HWND hwnd) {
+        if (!surface.Resize(width, height)) return;
+        surface.Clear();
+        const HDC hdc = surface.hdc();
+        const float radius = ScaleF(14.0f, dpi);
+        const RECT bounds{shadow, shadow, width - shadow, height - shadow};
+
+        DrawGlassCapsule(hdc, bounds, radius, 248, dpi);
+
+        const float pad_x = ScaleF(18.0f, dpi);
+        const float cx = static_cast<float>(bounds.left);
+        const float cw = static_cast<float>(bounds.right - bounds.left);
+
+        DrawTextLine(hdc, title, title_rect, ScaleF(14.5f, dpi), true, Color4{248, 250, 252, 255}, -1);
+        DrawDivider(hdc, cx + pad_x, cx + cw - pad_x, static_cast<float>(title_rect.bottom + Scale(6, dpi)), 30);
+
+        {
+            Gdiplus::Graphics g(hdc);
+            ConfigureGraphics(g);
+            Gdiplus::FontFamily ff(L"Segoe UI");
+            Gdiplus::Font font(&ff, ScaleF(12.5f, dpi), Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+            Gdiplus::SolidBrush brush(ToGp(Color4{203, 213, 225, 255}));
+            Gdiplus::StringFormat fmt;
+            fmt.SetAlignment(Gdiplus::StringAlignmentNear);
+            fmt.SetLineAlignment(Gdiplus::StringAlignmentNear);
+            const Gdiplus::RectF layout(
+                static_cast<float>(msg_rect.left),
+                static_cast<float>(msg_rect.top),
+                static_cast<float>(msg_rect.right - msg_rect.left),
+                static_cast<float>(msg_rect.bottom - msg_rect.top));
+            g.DrawString(message.c_str(), static_cast<INT>(message.size()), &font, layout, &fmt, &brush);
+        }
+
+        const float btn_font = ScaleF(12.5f, dpi);
+        for (std::size_t i = 0; i < buttons.size(); ++i) {
+            const RECT& rc = btn_rects[i];
+            const bool focused = (static_cast<int>(i) == focus_btn);
+            const bool hovered = (static_cast<int>(i) == hover_btn);
+            const Color4 fill = hovered
+                ? Color4{59, 130, 246, 95}
+                : (focused ? Color4{59, 130, 246, 58} : Color4{30, 41, 59, 185});
+            const Color4 border = (focused || hovered)
+                ? Color4{96, 165, 250, 175}
+                : Color4{148, 163, 184, 55};
+            DrawRoundedHighlight(hdc,
+                                 static_cast<float>(rc.left), static_cast<float>(rc.top),
+                                 static_cast<float>(rc.right - rc.left),
+                                 static_cast<float>(rc.bottom - rc.top),
+                                 ScaleF(8.0f, dpi), fill, border);
+            DrawTextLine(hdc, buttons[i], rc, btn_font, focused, Color4{241, 245, 249, 255}, 0);
+        }
+
+        RECT wnd_rc{};
+        ::GetWindowRect(hwnd, &wnd_rc);
+        POINT dst{wnd_rc.left, wnd_rc.top};
+        SIZE sz{width, height};
+        POINT src{0, 0};
+        BLENDFUNCTION bf{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+        ::UpdateLayeredWindow(hwnd, nullptr, &dst, &sz, hdc, &src, 0, &bf, ULW_ALPHA);
+    }
+
+    int HitTest(int x, int y) const {
+        const POINT pt{x, y};
+        for (std::size_t i = 0; i < btn_rects.size(); ++i) {
+            if (::PtInRect(&btn_rects[i], pt)) return static_cast<int>(i);
+        }
+        return -1;
+    }
+};
+
+LRESULT CALLBACK GlassDialogProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    if (msg == WM_NCCREATE) {
+        const auto* cs = reinterpret_cast<CREATESTRUCTW*>(lp);
+        ::SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(cs->lpCreateParams));
+        return TRUE;
+    }
+    auto* state = reinterpret_cast<GlassDialogState*>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (!state) return ::DefWindowProcW(hwnd, msg, wp, lp);
+
+    switch (msg) {
+        case WM_MOUSEMOVE: {
+            if (!state->tracking_mouse) {
+                TRACKMOUSEEVENT tme{sizeof(tme), TME_LEAVE, hwnd, 0};
+                ::TrackMouseEvent(&tme);
+                state->tracking_mouse = true;
+            }
+            const int hit = state->HitTest(static_cast<short>(LOWORD(lp)), static_cast<short>(HIWORD(lp)));
+            if (hit != state->hover_btn) {
+                state->hover_btn = hit;
+                state->Render(hwnd);
+            }
+            return 0;
+        }
+        case WM_MOUSELEAVE:
+            state->tracking_mouse = false;
+            if (state->hover_btn != -1) {
+                state->hover_btn = -1;
+                state->Render(hwnd);
+            }
+            return 0;
+        case WM_LBUTTONUP: {
+            const int hit = state->HitTest(static_cast<short>(LOWORD(lp)), static_cast<short>(HIWORD(lp)));
+            if (hit >= 0) {
+                state->result_btn = hit;
+                state->done = true;
+            }
+            return 0;
+        }
+        case WM_KEYDOWN: {
+            const int n = static_cast<int>(state->buttons.size());
+            if (wp == VK_ESCAPE) {
+                state->result_btn = -1;
+                state->done = true;
+                return 0;
+            }
+            if ((wp == VK_RETURN || wp == VK_SPACE) && n > 0) {
+                state->result_btn = std::clamp(state->focus_btn, 0, n - 1);
+                state->done = true;
+                return 0;
+            }
+            if ((wp == VK_LEFT || wp == VK_UP) && n > 0) {
+                state->focus_btn = (state->focus_btn - 1 + n) % n;
+                state->Render(hwnd);
+                return 0;
+            }
+            if ((wp == VK_RIGHT || wp == VK_DOWN || wp == VK_TAB) && n > 0) {
+                state->focus_btn = (state->focus_btn + 1) % n;
+                state->Render(hwnd);
+                return 0;
+            }
+            return 0;
+        }
+        case WM_CLOSE:
+            state->result_btn = -1;
+            state->done = true;
+            return 0;
+        default:
+            return ::DefWindowProcW(hwnd, msg, wp, lp);
+    }
+}
+
+} // namespace
+
+int ShowGlassDialog(HWND owner, std::wstring_view title, std::wstring_view message,
+                    const std::vector<std::wstring>& buttons, UINT dpi, int default_button) {
+    static const wchar_t* kClassName = L"PMDGlassDialogWindow";
+    static bool registered = false;
+    const HINSTANCE instance = ::GetModuleHandleW(nullptr);
+    if (!registered) {
+        WNDCLASSEXW wc{};
+        wc.cbSize = sizeof(wc);
+        wc.lpfnWndProc = GlassDialogProc;
+        wc.hInstance = instance;
+        wc.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
+        wc.lpszClassName = kClassName;
+        if (::RegisterClassExW(&wc) || ::GetLastError() == ERROR_CLASS_ALREADY_EXISTS) {
+            registered = true;
+        } else {
+            return -1;
+        }
+    }
+
+    GlassDialogState state;
+    state.title = std::wstring(title);
+    state.message = std::wstring(message);
+    state.buttons = buttons.empty() ? std::vector<std::wstring>{L"Aceptar"} : buttons;
+    state.dpi = dpi;
+    state.shadow = Scale(12, dpi);
+    state.focus_btn = std::clamp(default_button, 0, static_cast<int>(state.buttons.size()) - 1);
+
+    const int pad_x = Scale(18, dpi);
+    const int pad_y = Scale(16, dpi);
+    const int title_h = Scale(26, dpi);
+    const int btn_h = Scale(32, dpi);
+    const int btn_gap = Scale(10, dpi);
+    const float btn_font = ScaleF(12.5f, dpi);
+
+    HDC screen_dc = ::GetDC(nullptr);
+    int total_btn_w = 0;
+    std::vector<int> btn_widths;
+    btn_widths.reserve(state.buttons.size());
+    for (std::size_t i = 0; i < state.buttons.size(); ++i) {
+        const float tw = MeasureTextWidth(screen_dc, state.buttons[i], btn_font, true);
+        const int bw = std::max(Scale(84, dpi), static_cast<int>(std::ceil(tw)) + Scale(26, dpi));
+        btn_widths.push_back(bw);
+        total_btn_w += bw + (i > 0 ? btn_gap : 0);
+    }
+
+    const int content_w = std::clamp(
+        std::max(Scale(380, dpi), total_btn_w + pad_x * 2),
+        Scale(380, dpi), Scale(520, dpi));
+    const int inner_w = content_w - pad_x * 2;
+
+    int msg_h = Scale(44, dpi);
+    if (screen_dc) {
+        Gdiplus::Graphics g(screen_dc);
+        Gdiplus::FontFamily ff(L"Segoe UI");
+        Gdiplus::Font font(&ff, ScaleF(12.5f, dpi), Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+        Gdiplus::RectF measured{};
+        Gdiplus::StringFormat fmt;
+        g.MeasureString(state.message.c_str(), static_cast<INT>(state.message.size()),
+                        &font, Gdiplus::RectF(0.0f, 0.0f, static_cast<float>(inner_w), 600.0f),
+                        &fmt, &measured);
+        msg_h = std::max(Scale(34, dpi), static_cast<int>(std::ceil(measured.Height)) + Scale(6, dpi));
+        ::ReleaseDC(nullptr, screen_dc);
+    }
+
+    const int content_h = pad_y + title_h + Scale(14, dpi) + msg_h + Scale(18, dpi) + btn_h + pad_y;
+    state.width = content_w + state.shadow * 2;
+    state.height = content_h + state.shadow * 2;
+
+    state.title_rect = RECT{
+        state.shadow + pad_x,
+        state.shadow + pad_y,
+        state.shadow + content_w - pad_x,
+        state.shadow + pad_y + title_h
+    };
+    state.msg_rect = RECT{
+        state.shadow + pad_x,
+        state.title_rect.bottom + Scale(14, dpi),
+        state.shadow + content_w - pad_x,
+        state.title_rect.bottom + Scale(14, dpi) + msg_h
+    };
+
+    const int btn_y = state.msg_rect.bottom + Scale(16, dpi);
+    int bx = state.shadow + content_w - pad_x - total_btn_w;
+    for (std::size_t i = 0; i < state.buttons.size(); ++i) {
+        state.btn_rects.push_back(RECT{bx, btn_y, bx + btn_widths[i], btn_y + btn_h});
+        bx += btn_widths[i] + btn_gap;
+    }
+
+    MONITORINFO mi{};
+    mi.cbSize = sizeof(mi);
+    RECT anchor{};
+    if (owner && ::IsWindow(owner) && ::GetWindowRect(owner, &anchor)) {
+        ::GetMonitorInfoW(::MonitorFromWindow(owner, MONITOR_DEFAULTTONEAREST), &mi);
+    } else {
+        ::GetMonitorInfoW(::MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY), &mi);
+        anchor = mi.rcWork;
+    }
+    const RECT& work = mi.rcWork;
+    int x = (anchor.left + anchor.right - state.width) / 2;
+    int y = (anchor.top + anchor.bottom - state.height) / 2;
+    x = std::clamp(x, static_cast<int>(work.left - state.shadow), static_cast<int>(work.right - state.width + state.shadow));
+    y = std::clamp(y, static_cast<int>(work.top - state.shadow), static_cast<int>(work.bottom - state.height + state.shadow));
+
+    HWND hwnd = ::CreateWindowExW(
+        WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+        kClassName, L"", WS_POPUP,
+        x, y, state.width, state.height,
+        owner, nullptr, instance, &state);
+    if (!hwnd) return -1;
+
+    state.Render(hwnd);
+    ::ShowWindow(hwnd, SW_SHOW);
+    ::SetForegroundWindow(hwnd);
+    ::SetFocus(hwnd);
+
+    MSG msg{};
+    while (!state.done && ::GetMessageW(&msg, nullptr, 0, 0) > 0) {
+        ::TranslateMessage(&msg);
+        ::DispatchMessageW(&msg);
+    }
+
+    ::DestroyWindow(hwnd);
+    if (owner && ::IsWindow(owner)) ::SetForegroundWindow(owner);
+    return state.result_btn;
 }
 
 } // namespace pm::pmd::gfx

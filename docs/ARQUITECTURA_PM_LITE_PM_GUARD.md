@@ -38,7 +38,7 @@ directamente desde allí.
 USB:\
 ├── pm.exe
 ├── pm.ini
-├── App\
+├── Apps\
 │   ├── FirefoxPortable\
 │   ├── PuTTY\
 │   └── ...
