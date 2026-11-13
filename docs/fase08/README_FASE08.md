@@ -11,7 +11,7 @@ mantenimiento y la interfaz PortableManager Desktop (PMD) en `pml.exe`.
 ```powershell
 .\pml.exe --desktop
 .\pml.exe --list
-.\pml.exe --register demo App/demo App/demo/demo.exe "Mi aplicación"
+.\pml.exe --register demo Apps/demo Apps/demo/demo.exe "Mi aplicación"
 .\pml.exe --install demo "C:\paquetes\demo.zip"
 .\pml.exe --run demo --argumento
 ```
@@ -50,13 +50,11 @@ recargan automáticamente al activar PMD.
 ## Catálogo y ejecución
 
 Las secciones `[App.<id>]` de `Data/apps.ini` usan `InstallDir`, `Executable`,
-`Name`, `Aliases`, `Arguments`, `Type` y `Color`. Se reconocen entradas
-anteriores con `Executable` o `Launcher` dentro de `App/<carpeta>/`. El
+`Name`, `Aliases`, `Arguments`, `Type`, `Color` y `LearnRuns`. Se reconocen entradas
+con `InstallDir`/`Executable` (o `Launcher`) dentro de `Apps/<carpeta>/`. El
 usuario puede guardar extensiones en `[Associations]` y elegir el navegador
-portable con `IsDefaultBrowser=true`. Las secciones `[MagicWord.<id>]` aceptan
-`App` y `Names`. Para la acción de respaldo, `[MagicWord._DEFAULT]` acepta
-`App`, `URL` y `Argument`, con sustituciones `$I$` y `$W$`. El uso de
-aplicaciones del anfitrión desde PMD requiere confirmación.
+portable con `IsDefaultBrowser=true`. Las secciones `[Url.<id>]` aceptan
+`URL`. El uso de aplicaciones del anfitrión desde PMD requiere confirmación.
 
 - PAF se ejecuta mediante su lanzador. Para el resto, `Arguments` configura el
   mecanismo nativo de la app. `Environment=APPDATA,LOCALAPPDATA,USERPROFILE`
@@ -99,7 +97,7 @@ aplicaciones del anfitrión desde PMD requiere confirmación.
 ## Paquetes y mantenimiento
 
 Los comprimidos se inspeccionan con el `tar.exe` del sistema y se extraen en
-`App/.temp/<operación>/`. Se validan las rutas, los tipos de entrada, el número
+`Apps/.temp/<operación>/`. Se validan las rutas, los tipos de entrada, el número
 de archivos, el tamaño y el árbol resultante. Si hay varios ejecutables
 principales, PMD permite elegir uno. En consola se indica su ruta relativa
 dentro del paquete como último argumento de `--install`.
@@ -114,7 +112,7 @@ elegida. [PortableApps.com](https://portableapps.com/node/62791)
 La actualización registra sus movimientos relativos en `session.journal`.
 Si falla una publicación se intenta revertir y se conserva la preparación
 cuando falla la reversión. Una interrupción del proceso en medio de la
-publicación puede requerir revisar el diario y los archivos de `App/.temp`.
+publicación puede requerir revisar el diario y los archivos de `Apps/.temp`.
 No hay una reparación automática de ese escenario.
 
 `--reset`, `--archive` y `--uninstall` requieren `--confirm`. Restablecer

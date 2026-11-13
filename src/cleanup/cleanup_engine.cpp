@@ -148,7 +148,8 @@ Result Execute(SessionManager& session, Mode mode, Artifacts artifacts,
             if (!app_id.empty() && op.app_id != app_id) continue;
             if (!OwnedJob(op, session) &&
                 !junctions::JunctionManager::IsJunctionOperation(op) &&
-                !registry::RegistryManager::IsRegistryOperation(op, session.session_dir()))
+                !registry::RegistryManager::IsRegistryOperation(op, session.session_dir()) &&
+                !(op.type == OperationType::DeleteDir && !op.app_id.empty() && !op.target_host_path.empty()))
                 pending.push_back({ManifestManager::OperationTypeToString(op.type),
                                    path, ERROR_NOT_SUPPORTED});
         }
@@ -172,6 +173,23 @@ Result Execute(SessionManager& session, Mode mode, Artifacts artifacts,
         handlers.on_release_reg_backup = [&](const auto& op, DWORD& error) {
             if (registry::RegistryManager::ReleaseBackup(op, error)) return true;
             pending.push_back({L"RELEASE_REG_BACKUP", op.backup_host_path, error});
+            return false;
+        };
+        handlers.on_delete_dir = [](const auto& op, DWORD& error) {
+            if (op.target_host_path.empty()) {
+                error = ERROR_INVALID_PARAMETER;
+                return false;
+            }
+            if (::RemoveDirectoryW(op.target_host_path.c_str())) {
+                error = ERROR_SUCCESS;
+                return true;
+            }
+            const DWORD err = ::GetLastError();
+            if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND || err == ERROR_DIR_NOT_EMPTY) {
+                error = ERROR_SUCCESS;
+                return true;
+            }
+            error = err;
             return false;
         };
         const auto summary = manifest.ExecutePendingRollbacks(handlers, app_id);

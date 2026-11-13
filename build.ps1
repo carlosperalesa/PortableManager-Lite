@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
     Script reproducible de compilación C++20 nativa con LLVM-MinGW portable para PortableManager Lite.
@@ -104,6 +104,8 @@ $pmlSources = @(
     (Join-Path $ProjectRoot "src\applications\app_command.cpp"),
     (Join-Path $ProjectRoot "src\pmd\pmd_module.cpp"),
     (Join-Path $ProjectRoot "src\pmd\pmd_graphics.cpp"),
+    (Join-Path $ProjectRoot "src\pmd\pmd_notes.cpp"),
+    (Join-Path $ProjectRoot "src\pmd\pmd_search.cpp"),
     (Join-Path $ProjectRoot "src\core\main.cpp"),
     (Join-Path $ProjectRoot "src\guard\guard_entry.cpp")
 ) + $coreSources + $runtimeSources + $guardSources
@@ -215,6 +217,7 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Phase6Resource)) {
 $test6Sources = @(
     $LearningSource,
     $GuardSupervisorSource,
+    (Join-Path $ProjectRoot "src\applications\session_host.cpp"),
     (Join-Path $ProjectRoot "src\guard\guard_entry.cpp"),
     (Join-Path $ProjectRoot "tests\test_phase6_learning.cpp")
 ) + $coreSources + $runtimeSources + $guardSources

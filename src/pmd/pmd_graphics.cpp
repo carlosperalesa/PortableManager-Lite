@@ -336,21 +336,18 @@ void DrawOrphanBadge(HDC hdc, float cx, float cy, float size, bool hovered) {
     tri.AddPolygon(pts, 3);
 
     const std::uint8_t alpha = hovered ? 255 : 225;
-    Gdiplus::SolidBrush fill(Gdiplus::Color(alpha, 251, 191, 36));
-    g.FillPath(&fill, &tri);
-
-    Gdiplus::Pen rim(Gdiplus::Color(alpha, 254, 243, 199), 1.0f);
+    Gdiplus::Pen rim(Gdiplus::Color(alpha, 250, 204, 21), std::max(1.5f, size * 0.11f));
     rim.SetLineJoin(Gdiplus::LineJoinRound);
     g.DrawPath(&rim, &tri);
 
-    // Exclamation mark inside triangle
-    Gdiplus::Pen excl(Gdiplus::Color(255, 17, 24, 39), std::max(1.3f, size * 0.12f));
+    // Exclamation mark inside outline triangle
+    Gdiplus::Pen excl(Gdiplus::Color(alpha, 250, 204, 21), std::max(1.3f, size * 0.11f));
     excl.SetStartCap(Gdiplus::LineCapRound);
     excl.SetEndCap(Gdiplus::LineCapRound);
-    g.DrawLine(&excl, cx, cy - h * 0.30f, cx, cy + h * 0.25f);
-    Gdiplus::SolidBrush dot(Gdiplus::Color(255, 17, 24, 39));
+    g.DrawLine(&excl, cx, cy - h * 0.28f, cx, cy + h * 0.24f);
+    Gdiplus::SolidBrush dot(Gdiplus::Color(alpha, 250, 204, 21));
     const float dr = std::max(0.9f, size * 0.08f);
-    g.FillEllipse(&dot, cx - dr, cy + h * 0.46f - dr, dr * 2.0f, dr * 2.0f);
+    g.FillEllipse(&dot, cx - dr, cy + h * 0.48f - dr, dr * 2.0f, dr * 2.0f);
 }
 
 void DrawStatusShield(HDC hdc, float cx, float cy, float size, Color4 color) {

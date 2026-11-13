@@ -121,11 +121,29 @@ SessionInitResult SessionManager::InitializeSessionWithId(std::wstring_view sess
         return res;
     }
 
+    AcquireLivePresence();
     res.ok = true;
     res.session_id = session_id_;
     res.session_dir = session_dir_;
     res.manifest_path = manifest_path_;
     return res;
+}
+
+bool SessionManager::AcquireLivePresence() {
+    if (session_id_.empty()) return false;
+    if (live_event_) return true;
+    HANDLE ev = ::CreateEventW(nullptr, TRUE, FALSE, LiveEventName(session_id_).c_str());
+    if (!ev) return false;
+    live_event_ = std::shared_ptr<void>(ev, [](HANDLE h) { if (h) ::CloseHandle(h); });
+    return true;
+}
+
+bool SessionManager::IsSessionLive(std::wstring_view session_id) {
+    if (session_id.empty()) return false;
+    HANDLE ev = ::OpenEventW(SYNCHRONIZE, FALSE, LiveEventName(session_id).c_str());
+    if (!ev) return false;
+    ::CloseHandle(ev);
+    return true;
 }
 
 ManifestStatusResult SessionManager::OpenExistingSession(std::wstring_view session_id) {
@@ -167,6 +185,9 @@ std::vector<std::wstring> SessionManager::DiscoverOrphanSessions() const {
             continue;
         }
         if (!session_id_.empty() && dir_name == session_id_) {
+            continue;
+        }
+        if (IsSessionLive(dir_name)) {
             continue;
         }
 

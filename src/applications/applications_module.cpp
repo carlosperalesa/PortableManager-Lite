@@ -69,6 +69,8 @@ App ReadApp(const IniDocument& doc, const std::wstring& section) {
     app.paf = Equal(get(L"Type"), L"PAF");
     app.archived = Equal(get(L"State"), L"Archived");
     app.browser = Equal(get(L"IsDefaultBrowser"), L"true");
+    const auto lr = get(L"LearnRuns");
+    app.learn_runs = lr.empty() ? 0 : std::max(0, static_cast<int>(std::wcstol(lr.c_str(), nullptr, 10)));
     return app;
 }
 
@@ -254,13 +256,15 @@ DWORD SaveApp(const PathResolver& resolver, App app, bool removed) {
     } else {
         std::wstring combined_name = app.name;
         if (!app.aliases.empty()) combined_name += L", " + app.aliases;
+        const std::wstring learn_runs_str = std::to_wstring(app.learn_runs);
         const std::pair<const wchar_t*, std::wstring_view> fields[] = {
             {L"Name", combined_name}, {L"Extensions", app.extensions},
             {L"Arguments", app.arguments}, {L"Color", app.color}, {L"Environment", app.environment},
             {L"ExclusiveRoaming", app.exclusive_roaming}, {L"ExclusiveLocal", app.exclusive_local},
             {L"ExclusiveRegistry", app.exclusive_registry}, {L"Type", app.paf ? L"PAF" : L"Archive"},
             {L"State", app.archived ? L"Archived" : L"Installed"},
-            {L"IsDefaultBrowser", app.browser ? L"true" : L"false"}
+            {L"IsDefaultBrowser", app.browser ? L"true" : L"false"},
+            {L"LearnRuns", learn_runs_str}
         };
         for (const auto& [key, value] : fields)
             if (!doc.SetValue(section, key, value, message)) return ERROR_INVALID_DATA;
@@ -384,6 +388,25 @@ RunResult Run(const PathResolver& resolver, const App& selected, std::wstring_vi
             error = host.Add(app.id, job, reservations, policy.lease != nullptr);
             if (error) return error == ERROR_CANCELLED ? ERROR_SUCCESS : error;
             added = true;
+            if (policy.persist_reg_key && !policy.registry.empty()) {
+                const std::wstring reg_key = policy.registry;
+                const std::wstring app_id = app.id;
+                host.SetPreRollback(app.id, [&resolver, app_id, reg_key, origin]() -> DWORD {
+                    if (!guard::IsOriginAccessible(origin)) return ERROR_DEVICE_NOT_CONNECTED;
+                    Pins reg_pins;
+                    const auto reg_dir = L"Data\\apps\\" + app_id + L"\\registry";
+                    DWORD export_err = EnsureDirectory(resolver, reg_dir, reg_pins);
+                    if (!export_err) {
+                        const auto reg_file = resolver.ResolvePmRelativePath(reg_dir + L"\\persisted.reg");
+                        if (reg_file.ok) {
+                            registry::RegistryManager::ExportPortableData(reg_key, reg_file.resolved_path, export_err);
+                        } else {
+                            export_err = ERROR_INVALID_NAME;
+                        }
+                    }
+                    return export_err;
+                });
+            }
             error = PreparePolicy(session, resolver, app, policy);
             if (error) return error;
             if (!job->Create(session, app.id, error)) return error;
@@ -425,18 +448,20 @@ RunResult Run(const PathResolver& resolver, const App& selected, std::wstring_vi
     }
     if (host.closing()) return result; // The owner closes all Jobs together.
     const auto mode = result.error ? cleanup::Mode::Critical : stop.mode.load();
+    DWORD export_err = ERROR_SUCCESS;
     if (policy.persist_reg_key && !policy.registry.empty() && result.error == ERROR_SUCCESS &&
         mode != cleanup::Mode::Critical && guard::IsOriginAccessible(origin)) {
         Pins reg_pins;
         const auto reg_dir = L"Data\\apps\\" + app.id + L"\\registry";
-        DWORD export_err = EnsureDirectory(resolver, reg_dir, reg_pins);
+        export_err = EnsureDirectory(resolver, reg_dir, reg_pins);
         if (!export_err) {
             const auto reg_file = resolver.ResolvePmRelativePath(reg_dir + L"\\persisted.reg");
             if (reg_file.ok) registry::RegistryManager::ExportPortableData(policy.registry, reg_file.resolved_path, export_err);
+            else export_err = ERROR_INVALID_NAME;
         }
     }
     const auto cleaned = cleanup::CleanupEngine::RunApplication(session, app.id, mode);
-    result.rollback_error = cleaned.error;
+    result.rollback_error = cleaned.error ? cleaned.error : export_err;
     if (cleaned.ok) {
         job.reset();
         host.Release(app.id);

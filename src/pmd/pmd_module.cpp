@@ -1,5 +1,7 @@
 #include "pmd/pmd_module.h"
 #include "pmd/pmd_graphics.h"
+#include "pmd/pmd_notes.h"
+#include "pmd/pmd_search.h"
 #include "applications/app_paths.h"
 #include "applications/session_host.h"
 #include "cleanup/cleanup_module.h"
@@ -8,6 +10,7 @@
 #include "guard/guard_process.h"
 #include "jobs/job_manager.h"
 #include "learning/learning_engine.h"
+#include "runtime/session_lock.h"
 
 #include <commdlg.h>
 #include <shellapi.h>
@@ -54,13 +57,6 @@ enum class HitZone {
     TopTabDesktop, TopTabNotes, TopTabConfig, NoteTab, NoteClose, NoteAdd, ResizeGrip, ConfigAction
 };
 
-struct NoteEntry {
-    std::wstring name;
-    std::wstring path;
-    std::wstring content;
-    bool dirty = false;
-};
-
 struct Item {
     Kind kind;
     std::wstring label;
@@ -86,23 +82,8 @@ std::wstring Text(HWND control) {
     return text;
 }
 
-bool Prefix(std::wstring_view name, std::wstring_view query) {
-    return name.size() >= query.size() && Equal(name.substr(0, query.size()), query);
-}
-
-std::vector<std::wstring> Split(std::wstring_view text, wchar_t delimiter) {
-    std::vector<std::wstring> result;
-    while (!text.empty()) {
-        const auto end = text.find(delimiter);
-        auto word = text.substr(0, end);
-        const auto start = word.find_first_not_of(L" \t");
-        if (start != std::wstring_view::npos)
-            result.emplace_back(word.substr(start, word.find_last_not_of(L" \t") - start + 1));
-        if (end == std::wstring_view::npos) break;
-        text.remove_prefix(end + 1);
-    }
-    return result;
-}
+constexpr auto& Prefix = PrefixNoCase;
+constexpr auto& Split = SplitTrimmed;
 
 bool IsPackage(const fs::path& path) {
     const auto name = path.filename().native();
@@ -131,108 +112,6 @@ gfx::Color4 PrivacyColor(std::wstring_view color_name) {
 }
 
 std::wstring ExpandWeb(std::wstring_view pattern, const std::wstring& input);
-
-bool IsHttpUrl(std::wstring_view text) {
-    if (text.size() <= 8) return false;
-    if (!text.starts_with(L"https://") && !text.starts_with(L"http://")) return false;
-    for (const wchar_t ch : text) {
-        if (ch <= L' ' || ch == L'"' || ch == L'\r' || ch == L'\n') return false;
-    }
-    const auto sep = text.find(L"://");
-    return sep != std::wstring_view::npos && sep + 3 < text.size();
-}
-
-std::wstring SanitizeUrlName(std::wstring_view raw) {
-    std::wstring out;
-    for (const wchar_t ch : raw) {
-        if (ch == L'[' || ch == L']' || ch == L'=' || ch == L'\r' || ch == L'\n') continue;
-        if (ch == L' ' || ch == L'\t') {
-            if (!out.empty() && out.back() != L'-') out.push_back(L'-');
-        } else {
-            out.push_back(static_cast<wchar_t>(std::towlower(ch)));
-        }
-    }
-    while (!out.empty() && out.back() == L'-') out.pop_back();
-    return out;
-}
-
-std::wstring SuggestedUrlName(std::wstring_view url) {
-    const auto sep = url.find(L"://");
-    if (sep == std::wstring_view::npos) return L"web";
-    auto host = url.substr(sep + 3);
-    const auto slash = host.find_first_of(L"/?#:");
-    if (slash != std::wstring_view::npos) host = host.substr(0, slash);
-    if (host.starts_with(L"www.")) host.remove_prefix(4);
-    const auto dot = host.find(L'.');
-    if (dot != std::wstring_view::npos && dot > 0) host = host.substr(0, dot);
-    auto cleaned = SanitizeUrlName(host);
-    return cleaned.empty() ? L"web" : cleaned;
-}
-
-class Calculator {
-public:
-    explicit Calculator(std::wstring_view input) : input_(input) {}
-
-    bool Evaluate(double& result) {
-        if (input_.size() > 128) return false;
-        result = Expression();
-        Trim();
-        return valid_ && input_.empty() && std::isfinite(result);
-    }
-
-private:
-    void Trim() {
-        while (!input_.empty() && input_.front() == L' ') input_.remove_prefix(1);
-    }
-
-    bool Take(wchar_t token) {
-        Trim();
-        if (input_.empty() || input_.front() != token) return false;
-        input_.remove_prefix(1);
-        return true;
-    }
-
-    double Expression() {
-        double value = Term();
-        for (;;) {
-            if (Take(L'+')) value += Term();
-            else if (Take(L'-')) value -= Term();
-            else return value;
-        }
-    }
-
-    double Term() {
-        double value = Atom();
-        for (;;) {
-            if (Take(L'*')) value *= Atom();
-            else if (Take(L'/')) {
-                const double divisor = Atom();
-                if (divisor == 0) valid_ = false;
-                else value /= divisor;
-            } else return value;
-        }
-    }
-
-    double Atom() {
-        if (Take(L'-')) return -Atom();
-        if (Take(L'+')) return Atom();
-        if (Take(L'(')) {
-            const auto value = Expression();
-            if (!Take(L')')) valid_ = false;
-            return value;
-        }
-        Trim();
-        const std::wstring literal(input_.substr(0, input_.find_first_not_of(L"0123456789.")));
-        wchar_t* end = nullptr;
-        const double result = std::wcstod(literal.c_str(), &end);
-        if (literal.empty() || end != literal.c_str() + literal.size()) valid_ = false;
-        input_.remove_prefix(literal.size());
-        return result;
-    }
-
-    std::wstring_view input_;
-    bool valid_ = true;
-};
 
 class Desktop {
 public:
@@ -435,8 +314,7 @@ private:
     HWND note_edit_ = nullptr;
     HBRUSH note_bg_brush_ = nullptr;
     HFONT note_font_ = nullptr;
-    std::vector<NoteEntry> notes_;
-    int active_note_ = 0;
+    NotesController notes_ctrl_;
     bool note_renaming_ = false;
     int notes_w_ = 440;
     int notes_h_ = 360;
@@ -549,7 +427,7 @@ LRESULT CALLBACK Desktop::NoteEditProc(HWND control, UINT msg, WPARAM wp, LPARAM
         const LRESULT line = ::SendMessageW(control, EM_LINEFROMCHAR, static_cast<WPARAM>(start), 0);
         if (line == 0) {
             self->SaveActiveNote();
-            self->FocusNode(self->notes_.empty() ? UiNode::ModuleBar : UiNode::NotesTabs);
+            self->FocusNode(self->notes_ctrl_.notes().empty() ? UiNode::ModuleBar : UiNode::NotesTabs);
             return 0;
         }
     }
@@ -872,7 +750,7 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
                 app_cfg_editing_ = false;
                 OpenTab(Tab::Config);
             } else if (zone == HitZone::NoteTab && idx >= 0) {
-                if (idx == active_note_) StartNoteRename();
+                if (idx == notes_ctrl_.active()) StartNoteRename();
                 else SwitchNote(idx);
             } else if (zone == HitZone::NoteClose && idx >= 0) {
                 DeleteNote(idx);
@@ -994,7 +872,7 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
                     }
                     if (wp == VK_DOWN) {
                         if (tab_ == Tab::Desktop) FocusNode(UiNode::DesktopGrid);
-                        else if (tab_ == Tab::Notes) FocusNode(notes_.empty() ? UiNode::NoteEditor : UiNode::NotesTabs);
+                        else if (tab_ == Tab::Notes) FocusNode(notes_ctrl_.notes().empty() ? UiNode::NoteEditor : UiNode::NotesTabs);
                         else FocusNode(UiNode::ConfigList);
                         return 0;
                     }
@@ -1009,14 +887,14 @@ LRESULT Desktop::Message(UINT msg, WPARAM wp, LPARAM lp) {
                     if (wp == VK_RIGHT) { MoveSelection(1, 0); return 0; }
                     if (wp == VK_RETURN) { Open(selected_); return 0; }
                 } else if (focus_node_ == UiNode::NotesTabs && tab_ == Tab::Notes) {
-                    const int n = static_cast<int>(notes_.size());
+                    const int n = static_cast<int>(notes_ctrl_.notes().size());
                     if (wp == VK_LEFT && n > 0) {
-                        SwitchNote((active_note_ - 1 + n) % n);
+                        SwitchNote((notes_ctrl_.active() - 1 + n) % n);
                         FocusNode(UiNode::NotesTabs);
                         return 0;
                     }
                     if (wp == VK_RIGHT && n > 0) {
-                        SwitchNote((active_note_ + 1) % n);
+                        SwitchNote((notes_ctrl_.active() + 1) % n);
                         FocusNode(UiNode::NotesTabs);
                         return 0;
                     }
@@ -1843,11 +1721,12 @@ void Desktop::Render() {
 
             int nx = capsule.left + S(12);
             const int max_tab_x = capsule.right - S(44);
-            for (int i = 0; i < static_cast<int>(notes_.size()); ++i) {
-                const bool active = (i == active_note_);
+            const auto& notes_list = notes_ctrl_.notes();
+            for (int i = 0; i < static_cast<int>(notes_list.size()); ++i) {
+                const bool active = (i == notes_ctrl_.active());
                 const bool hov = (hover_zone_ == HitZone::NoteTab && hover_index_ == i);
                 const int text_w = static_cast<int>(gfx::MeasureTextWidth(
-                    hdc, notes_[static_cast<std::size_t>(i)].name, Sf(12.0f), active));
+                    hdc, notes_list[static_cast<std::size_t>(i)].name, Sf(12.0f), active));
                 const int tw = std::clamp(text_w + S(38), S(74), S(140));
                 if (nx + tw > max_tab_x) break;
                 const RECT tr{nx, tabs_y + S(2), nx + tw, tabs_y + note_tab_h - S(2)};
@@ -1873,7 +1752,7 @@ void Desktop::Render() {
                                         caret_visible_, ::GetFocus() == edit_, er, Sf(12.0f), dpi_);
                 } else {
                     const RECT lr{tr.left + S(8), tr.top, cr.left, tr.bottom};
-                    gfx::DrawTextLine(hdc, notes_[static_cast<std::size_t>(i)].name, lr, Sf(12.0f), active,
+                    gfx::DrawTextLine(hdc, notes_list[static_cast<std::size_t>(i)].name, lr, Sf(12.0f), active,
                                       active ? gfx::Color4{248, 250, 252, 255} : gfx::Color4{148, 163, 184, 235}, -1);
                 }
 
@@ -2695,10 +2574,19 @@ void Desktop::Launch(const App& app, std::wstring arguments, bool force_evaluate
     std::error_code ec;
     const bool no_wrapper = resolved_dir.ok &&
         !fs::exists(fs::path(resolved_dir.resolved_path) / L"wrapper.ini", ec);
-    const auto candidates = ((no_wrapper || force_evaluate) && workers_.empty() && session_.protected_by_guard())
+    const bool auto_learn = no_wrapper && (app.learn_runs < 3);
+    const auto candidates = ((auto_learn || force_evaluate) && !app.archived && workers_.empty() && session_.protected_by_guard())
         ? std::make_optional(learning::LearningEngine::InspectWithFallback(executable, app.id))
         : std::nullopt;
     entry->learning_run = candidates.has_value();
+    if (entry->learning_run) {
+        if (config_.LoadAppsIni(false).ok) {
+            std::wstring err;
+            config_.apps_doc().SetValue(L"App." + app.id, L"LearnRuns", std::to_wstring(app.learn_runs + 1), err);
+            config_.SaveAppsIniIfModified(false);
+        }
+        entry->app.learn_runs = app.learn_runs + 1;
+    }
     entry->event.reset(::CreateEventW(nullptr, TRUE, FALSE, nullptr));
     if (!entry->event) { Report(::GetLastError()); return; }
     entry->stop.event = entry->event.get();
@@ -2719,7 +2607,11 @@ void Desktop::Launch(const App& app, std::wstring arguments, bool force_evaluate
                         full_args,
                         worker->app.id,
                         {candidates->roaming, candidates->local, candidates->registry},
-                        true
+                        INFINITE,
+                        nullptr,
+                        true,
+                        &session_,
+                        worker->stop.event
                     };
                     worker->learning_result = learning::LearningEngine::Run(resolver_, req);
                 } else {
@@ -3213,17 +3105,50 @@ void Desktop::RefreshOrphans() {
 
 void Desktop::ChooseOrphanAction() {
     if (orphan_sessions_.empty() || busy_ || closing_) return;
-    std::vector<gfx::MenuEntry> menu_items;
-    menu_items.push_back({1, L"Recuperar sesiones hu\u00e9rfanas\u2026", true, false});
-    menu_items.push_back({2, L"Desechar sesiones hu\u00e9rfanas\u2026", true, false});
-    POINT cursor{};
-    ::GetCursorPos(&cursor);
-    ::SetForegroundWindow(hwnd_);
+    const bool was_modal = modal_;
     modal_ = true;
-    const auto choice = gfx::ShowGlassMenu(hwnd_, cursor, menu_items, dpi_);
-    modal_ = false;
-    if (choice == 1) RestoreOrphansInteractive();
-    else if (choice == 2) DiscardOrphansInteractive();
+    const auto msg = L"Se detectaron " + std::to_wstring(orphan_sessions_.size()) +
+        L" sesi\u00f3n(es) hu\u00e9rfana(s) sin cerrar en %TEMP%.\n\n"
+        L"\u2022 Restaurar: revierte junctions y claves del Registro pendientes en el anfitri\u00f3n.\n"
+        L"\u2022 Desechar: elimina los registros y respaldos temporales de %TEMP% sin tocar el anfitri\u00f3n (los cambios no restaurados quedar\u00e1n permanentes).";
+    const int answer = gfx::ShowGlassDialog(
+        hwnd_, L"Sesiones hu\u00e9rfanas", msg, {L"Restaurar", L"Desechar", L"Cancelar"}, dpi_, 0);
+    modal_ = was_modal;
+    if (answer == 0) {
+        const auto ids = orphan_sessions_;
+        StartOperation([ids]() -> DWORD {
+            DWORD err = 0;
+            for (const auto& id : ids) {
+                runtime::SessionManager s;
+                if (!s.OpenExistingSession(id).ok) {
+                    if (!err) err = ERROR_INVALID_DATA;
+                    continue;
+                }
+                runtime::SessionLock lock(s.session_mutex_name());
+                if (!lock.ok() || runtime::SessionManager::IsSessionLive(id)) continue;
+                const auto r = cleanup::CleanupEngine::Recover(s, true);
+                if (!r.ok && !err) err = r.error ? r.error : ERROR_CAN_NOT_COMPLETE;
+            }
+            return err;
+        });
+    } else if (answer == 1) {
+        const auto ids = orphan_sessions_;
+        const auto sessions_root = fs::path(runtime::SessionManager::QuerySystemTempDir()) /
+            L"PortableManager" / L"Session";
+        StartOperation([ids, sessions_root]() -> DWORD {
+            DWORD err = 0;
+            for (const auto& id : ids) {
+                runtime::SessionManager s;
+                s.OpenExistingSession(id);
+                runtime::SessionLock lock(s.session_mutex_name());
+                if (!lock.ok() || runtime::SessionManager::IsSessionLive(id)) continue;
+                std::error_code ec;
+                fs::remove_all(sessions_root / id, ec);
+                if (ec && !err) err = static_cast<DWORD>(ec.value() ? ec.value() : ERROR_ACCESS_DENIED);
+            }
+            return err;
+        });
+    }
 }
 
 void Desktop::RestoreOrphansInteractive() {
@@ -3268,6 +3193,10 @@ void Desktop::DiscardOrphansInteractive() {
     StartOperation([ids, sessions_root]() -> DWORD {
         DWORD err = 0;
         for (const auto& id : ids) {
+            runtime::SessionManager s;
+            s.OpenExistingSession(id);
+            runtime::SessionLock lock(s.session_mutex_name());
+            if (!lock.ok() || runtime::SessionManager::IsSessionLive(id)) continue;
             std::error_code ec;
             fs::remove_all(sessions_root / id, ec);
             if (ec && !err) err = static_cast<DWORD>(ec.value() ? ec.value() : ERROR_ACCESS_DENIED);
@@ -3423,58 +3352,22 @@ void Desktop::UpdateNoteHostBounds() {
 }
 
 void Desktop::LoadNotes() {
-    notes_.clear();
-    const auto dir_res = resolver_.ResolvePmRelativePath(L"Data\\notes");
-    if (!dir_res.ok) return;
-    std::error_code ec;
-    fs::create_directories(dir_res.resolved_path, ec);
-    for (fs::directory_iterator it(dir_res.resolved_path, ec), end; !ec && it != end; it.increment(ec)) {
-        if (!it->is_regular_file(ec)) continue;
-        if (Equal(it->path().extension().native(), L".txt")) {
-            notes_.push_back({it->path().stem().native(), it->path().native(), {}, false});
-        }
-    }
-    std::sort(notes_.begin(), notes_.end(), [](const NoteEntry& a, const NoteEntry& b) {
-        return _wcsicmp(a.name.c_str(), b.name.c_str()) < 0;
-    });
-    if (notes_.empty()) {
-        const auto p = (fs::path(dir_res.resolved_path) / L"Nota 1.txt").native();
-        core::AtomicFile::WriteUtf8Text(p, "");
-        notes_.push_back({L"Nota 1", p, {}, false});
-    }
-    active_note_ = std::clamp(active_note_, 0, static_cast<int>(notes_.size()) - 1);
-    SwitchNote(active_note_);
+    notes_ctrl_.Load(resolver_);
+    SwitchNote(notes_ctrl_.active());
 }
 
 void Desktop::SaveActiveNote() {
-    if (!note_edit_ || active_note_ < 0 || static_cast<std::size_t>(active_note_) >= notes_.size()) return;
-    const auto raw = Text(note_edit_);
-    std::wstring norm;
-    norm.reserve(raw.size());
-    for (std::size_t i = 0; i < raw.size(); ++i) {
-        if (raw[i] == L'\r' && i + 1 < raw.size() && raw[i + 1] == L'\n') continue;
-        norm.push_back(raw[i]);
-    }
-    core::AtomicFile::WriteUtf8Text(notes_[static_cast<std::size_t>(active_note_)].path,
-                                    core::IniDocument::WideToUtf8(norm));
+    if (!note_edit_) return;
+    notes_ctrl_.Save(notes_ctrl_.active(), Text(note_edit_));
 }
 
 void Desktop::SwitchNote(int index) {
-    if (index < 0 || static_cast<std::size_t>(index) >= notes_.size()) return;
-    if (note_edit_ && active_note_ >= 0 && static_cast<std::size_t>(active_note_) < notes_.size() && index != active_note_) {
-        SaveActiveNote();
-    }
-    active_note_ = index;
+    if (index < 0 || static_cast<std::size_t>(index) >= notes_ctrl_.notes().size()) return;
+    if (note_edit_ && index != notes_ctrl_.active()) SaveActiveNote();
+    notes_ctrl_.set_active(index);
     EnsureNoteHost();
     if (!note_edit_) return;
-    const auto read_res = core::AtomicFile::ReadUtf8Text(notes_[static_cast<std::size_t>(index)].path);
-    const auto wide = read_res.ok ? core::IniDocument::Utf8ToWide(read_res.content) : L"";
-    std::wstring crlf;
-    crlf.reserve(wide.size() + 16);
-    for (std::size_t i = 0; i < wide.size(); ++i) {
-        if (wide[i] == L'\n' && (i == 0 || wide[i - 1] != L'\r')) crlf.push_back(L'\r');
-        crlf.push_back(wide[i]);
-    }
+    const auto crlf = notes_ctrl_.ReadCrlf(index);
     ::SetWindowTextW(note_edit_, crlf.c_str());
     ::SendMessageW(note_edit_, EM_SETSEL, 0, 0);
     Render();
@@ -3482,59 +3375,32 @@ void Desktop::SwitchNote(int index) {
 
 void Desktop::CreateNote() {
     SaveActiveNote();
-    const auto dir_res = resolver_.ResolvePmRelativePath(L"Data\\notes");
-    if (!dir_res.ok) return;
-    std::error_code ec;
-    fs::create_directories(dir_res.resolved_path, ec);
-    int n = static_cast<int>(notes_.size()) + 1;
-    fs::path p;
-    std::wstring title;
-    do {
-        title = L"Nota " + std::to_wstring(n++);
-        p = fs::path(dir_res.resolved_path) / (title + L".txt");
-    } while (fs::exists(p, ec));
-    core::AtomicFile::WriteUtf8Text(p.native(), "");
-    notes_.push_back({title, p.native(), {}, false});
-    SwitchNote(static_cast<int>(notes_.size()) - 1);
+    const int idx = notes_ctrl_.Create(resolver_);
+    SwitchNote(idx);
     if (note_edit_) ::SetFocus(note_edit_);
 }
 
 void Desktop::DeleteNote(int index) {
-    if (index < 0 || static_cast<std::size_t>(index) >= notes_.size()) return;
-    bool has_text = false;
-    if (index == active_note_ && note_edit_) {
-        has_text = !Text(note_edit_).empty();
-    } else {
-        const auto r = core::AtomicFile::ReadUtf8Text(notes_[static_cast<std::size_t>(index)].path);
-        has_text = r.ok && !r.content.empty();
-    }
+    if (index < 0 || static_cast<std::size_t>(index) >= notes_ctrl_.notes().size()) return;
+    const bool has_text = (index == notes_ctrl_.active() && note_edit_)
+        ? !Text(note_edit_).empty()
+        : notes_ctrl_.HasContent(index);
     if (has_text) {
         const bool old_modal = modal_;
         modal_ = true;
-        const auto msg = L"\u00bfEliminar la nota \"" + notes_[static_cast<std::size_t>(index)].name + L"\"?";
+        const auto msg = L"\u00bfEliminar la nota \"" + notes_ctrl_.notes()[static_cast<std::size_t>(index)].name + L"\"?";
         const int ans = gfx::ShowGlassDialog(hwnd_, L"Notas", msg, {L"Eliminar", L"Cancelar"}, dpi_, 1);
         modal_ = old_modal;
         if (ans != 0) return;
     }
-    std::error_code ec;
-    fs::remove(notes_[static_cast<std::size_t>(index)].path, ec);
-    notes_.erase(notes_.begin() + index);
-    if (notes_.empty()) {
-        const auto dir_res = resolver_.ResolvePmRelativePath(L"Data\\notes");
-        const auto p = (fs::path(dir_res.resolved_path) / L"Nota 1.txt").native();
-        core::AtomicFile::WriteUtf8Text(p, "");
-        notes_.push_back({L"Nota 1", p, {}, false});
-        active_note_ = 0;
-    } else if (active_note_ >= static_cast<int>(notes_.size())) {
-        active_note_ = static_cast<int>(notes_.size()) - 1;
-    }
-    SwitchNote(active_note_);
+    if (notes_ctrl_.Delete(resolver_, index)) SwitchNote(notes_ctrl_.active());
 }
 
 void Desktop::StartNoteRename() {
-    if (active_note_ < 0 || static_cast<std::size_t>(active_note_) >= notes_.size()) return;
+    const int idx = notes_ctrl_.active();
+    if (idx < 0 || static_cast<std::size_t>(idx) >= notes_ctrl_.notes().size()) return;
     note_renaming_ = true;
-    ::SetWindowTextW(edit_, notes_[static_cast<std::size_t>(active_note_)].name.c_str());
+    ::SetWindowTextW(edit_, notes_ctrl_.notes()[static_cast<std::size_t>(idx)].name.c_str());
     ::SendMessageW(edit_, EM_SETSEL, 0, -1);
     ::SetFocus(edit_);
     Render();
@@ -3545,25 +3411,13 @@ void Desktop::CommitNoteRename() {
     note_renaming_ = false;
     std::wstring next = Text(edit_);
     ::SetWindowTextW(edit_, L"");
-    if (!next.empty() && active_note_ >= 0 && static_cast<std::size_t>(active_note_) < notes_.size()) {
+    if (!next.empty()) {
         for (wchar_t& ch : next) {
             if (ch == L'\\' || ch == L'/' || ch == L':' || ch == L'*' ||
                 ch == L'?' || ch == L'"' || ch == L'<' || ch == L'>' || ch == L'|') ch = L'_';
         }
-        auto& note = notes_[static_cast<std::size_t>(active_note_)];
-        if (next != note.name) {
-            SaveActiveNote();
-            const fs::path old_p(note.path);
-            const fs::path new_p = old_p.parent_path() / (next + L".txt");
-            std::error_code ec;
-            if (!fs::exists(new_p, ec)) {
-                fs::rename(old_p, new_p, ec);
-                if (!ec) {
-                    note.name = next;
-                    note.path = new_p.native();
-                }
-            }
-        }
+        SaveActiveNote();
+        notes_ctrl_.Rename(notes_ctrl_.active(), next);
     }
     if (note_edit_) ::SetFocus(note_edit_);
     Render();
@@ -3699,6 +3553,8 @@ void Desktop::RegisterManualApp(const std::wstring& rel_exe) {
     app.name = p.stem().native();
     app.directory = L"Apps\\" + dir_name;
     app.executable = rel_exe;
+    app.color = L"Gray";
+    app.learn_runs = 0;
     app.paf = false;
     const DWORD err = applications::Register(resolver_, app);
     if (err) {
@@ -3832,7 +3688,19 @@ void Desktop::HandleHotkeyCapture(WPARAM vk) {
 } // namespace
 
 int Run(const PathResolver& resolver) {
-    return Desktop(resolver).Run();
+    ::SetLastError(ERROR_SUCCESS);
+    HANDLE single_instance = ::CreateMutexW(nullptr, FALSE, L"Local\\PML_Desktop_SingleInstance");
+    if (single_instance && ::GetLastError() == ERROR_ALREADY_EXISTS) {
+        if (HWND existing = ::FindWindowW(kWindowClass, nullptr)) {
+            ::ShowWindow(existing, SW_SHOW);
+            ::SetForegroundWindow(existing);
+        }
+        ::CloseHandle(single_instance);
+        return 0;
+    }
+    const int rc = Desktop(resolver).Run();
+    if (single_instance) ::CloseHandle(single_instance);
+    return rc;
 }
 
 } // namespace pm::pmd

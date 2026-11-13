@@ -6,6 +6,10 @@
 #include <array>
 #include <optional>
 
+namespace pm::applications {
+class SessionHost;
+}
+
 namespace pm::learning {
 
 struct Candidates {
@@ -30,6 +34,8 @@ struct LearningRequest {
     DWORD timeout_ms = INFINITE;
     HANDLE app_reservation = nullptr;
     bool allow_fallback = false;
+    applications::SessionHost* shared_host = nullptr;
+    HANDLE stop_event = nullptr;
 };
 
 struct LearningResult {

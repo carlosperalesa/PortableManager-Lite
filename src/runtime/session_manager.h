@@ -3,6 +3,7 @@
 #include "runtime/manifest_manager.h"
 
 #include <windows.h>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -76,6 +77,11 @@ public:
     const std::wstring& session_dir() const noexcept { return session_dir_; }
     const std::wstring& manifest_path() const noexcept { return manifest_path_; }
     std::wstring session_mutex_name() const { return L"Local\\PM_Session_Mutex_" + session_id_; }
+    static std::wstring LiveEventName(std::wstring_view session_id) {
+        return L"Local\\PML_Session_" + std::wstring(session_id);
+    }
+    bool AcquireLivePresence();
+    static bool IsSessionLive(std::wstring_view session_id);
 
     ManifestManager& manifest() noexcept { return manifest_; }
     const ManifestManager& manifest() const noexcept { return manifest_; }
@@ -86,6 +92,7 @@ private:
     std::wstring session_dir_;
     std::wstring manifest_path_;
     ManifestManager manifest_;
+    std::shared_ptr<void> live_event_;
 
     static std::wstring BuildDefaultSessionsRoot(std::wstring_view temp_root);
 };

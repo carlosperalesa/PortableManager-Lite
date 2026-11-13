@@ -25,6 +25,7 @@ struct App {
     bool paf = false;
     bool archived = false;
     bool browser = false;
+    int learn_runs = 0;
 };
 
 class SessionHost;

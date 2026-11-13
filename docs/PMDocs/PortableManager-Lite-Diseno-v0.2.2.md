@@ -150,3 +150,22 @@ El [protocolo nativo de Fase 7](../fase07/README_FASE07.md) describe el drenaje 
 4. **LearningEngine y Junctions**:
    - Creación temporal de directorios padre faltantes en `%APPDATA%`/`%LOCALAPPDATA%` antes de `JunctionPrepare`, con limpieza automática si quedan vacíos al finalizar.
    - Registro granular de sub-pasos y códigos Win32 en `Data\logs\learning_<app>.log`.
+
+---
+
+## 25. Endurecimiento de Auditoría y Modularización POO (`v0.2.2-beta.3`)
+
+1. **Instancia única de PMD y presencia viva de sesión (`Local\PML_Session_<id>`)**:
+   - `pm::pmd::Run` adquiere el mutex `Local\PML_Desktop_SingleInstance` para evitar dos instancias simultáneas de PMD (enfocando la ventana existente si ya está abierta).
+   - `SessionManager` (tanto en `pml.exe` como en `pmg.exe`) mantiene abierto el evento de kernel `Local\PML_Session_<id>`. `DiscoverOrphanSessions`, la recuperación y el descarte verifican `SessionLock` y `IsSessionLive()` antes de tocar ninguna carpeta de sesión.
+2. **PMG estrictamente sombra de PML**:
+   - `guard_entry.cpp` espera únicamente `{parent, stop}` (`WaitForMultipleObjects`), dejando que PML atienda `OriginLost` mientras esté vivo y reservando el relevo de PMG para caídas de `pml.exe`.
+3. **Aprendizaje unificado, write-ahead de padres y regla de 3 ejecuciones**:
+   - `LearningEngine::Run` opera sobre el `SessionHost` compartido de PMD (`shared_host` + `stop_event`), eliminando la creación de un segundo PMG.
+   - Los directorios padre creados en `%APPDATA%`/`%LOCALAPPDATA%` se registran write-ahead (`OperationType::DeleteDir`) en `session.ini` antes de `CreateDirectoryW`, y `CleanupEngine` los elimina si quedan vacíos tras una caída.
+   - Las aplicaciones recién registradas inician en `Color=Gray` y `LearnRuns=0`; las primeras 3 ejecuciones desencadenan evaluación automática (pasando a `Green` si no hubo cambios o `Yellow`/`Red` según el resultado) y a partir de la 4.ª solo se evalúa manualmente.
+4. **`PersistRegKey` en cierre individual y global**:
+   - `SessionHost::SetPreRollback` ejecuta la exportación de `persisted.reg` tras detener los Jobs y antes de restaurar el Registro del anfitrión tanto en cierre individual como en cierre global, reportando errores de exportación sin impedir el rollback.
+5. **Icono de advertencia y modularización de `src/pmd/`**:
+   - `DrawOrphanBadge` usa contorno amarillo (`#FACC15`) coherente con el escudo de PMG; al hacer clic abre un único diálogo con `Restaurar`, `Desechar` y `Cancelar`.
+   - Extraídos `pmd_search.h/.cpp` (`Calculator`, helpers de búsqueda/URL) y `pmd_notes.h/.cpp` (`NotesController`) desde `pmd_module.cpp`.

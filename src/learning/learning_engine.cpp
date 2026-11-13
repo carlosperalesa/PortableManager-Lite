@@ -1,5 +1,6 @@
 #include "learning/learning_engine.h"
 
+#include "applications/session_host.h"
 #include "core/config_manager.h"
 #include "guard/guard_supervisor.h"
 #include "jobs/job_manager.h"
@@ -419,30 +420,38 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
         return result;
     }
 
-    SessionManager session;
-    const auto init = session.InitializeNewSession();
-    if (!init.ok) {
-        result.error = init.win32_error;
-        return result;
+    std::unique_ptr<SessionManager> owned_session;
+    std::unique_ptr<guard::GuardSupervisor> owned_guard;
+    if (!request.shared_host) {
+        owned_session = std::make_unique<SessionManager>();
+        const auto init = owned_session->InitializeNewSession();
+        if (!init.ok) {
+            result.error = init.win32_error;
+            return result;
+        }
     }
-    result.session_id = init.session_id;
+    SessionManager& session = request.shared_host ? request.shared_host->session() : *owned_session;
+    result.session_id = session.session_id();
     result.data_path = L"Data\\apps\\" + request.app_id + L"\\" + result.session_id;
-    const auto origin = PathResolver::QueryExecutablePath();
-    guard::GuardSupervisor guard;
-    guard.Start(origin, session);
+    const auto origin = request.shared_host ? request.shared_host->origin() : PathResolver::QueryExecutablePath();
     const HANDLE reservations[] = {reservation.get(), request.app_reservation};
-    result.error = guard.Protect(request.app_id, reservations);
-    if (result.error != ERROR_SUCCESS) {
-        LogLearningError(resolver, request.app_id, L"GuardProtect", result.error);
-        guard.StopMonitoring();
-        const auto restored = cleanup::CleanupEngine::Run(
-            session, cleanup::Mode::Critical, cleanup::Artifacts::Remove, &guard.process());
-        result.host_restored = restored.ok;
-        result.rollback_error = restored.error;
-        return result;
+    if (!request.shared_host) {
+        owned_guard = std::make_unique<guard::GuardSupervisor>();
+        owned_guard->Start(origin, session);
+        result.error = owned_guard->Protect(request.app_id, reservations);
+        if (result.error != ERROR_SUCCESS) {
+            LogLearningError(resolver, request.app_id, L"GuardProtect", result.error);
+            owned_guard->StopMonitoring();
+            const auto restored = cleanup::CleanupEngine::Run(
+                session, cleanup::Mode::Critical, cleanup::Artifacts::Remove, &owned_guard->process());
+            result.host_restored = restored.ok;
+            result.rollback_error = restored.error;
+            return result;
+        }
     }
 
-    jobs::JobManager job;
+    auto job = std::make_shared<jobs::JobManager>();
+    bool added_to_host = false;
     bool registry_changed = false;
     std::wstring fail_step = L"Run";
     std::vector<std::wstring> created_host_parents;
@@ -452,6 +461,14 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
             const DWORD error = ReserveDataDirectory(resolver, request, result);
             if (error != ERROR_SUCCESS) { fail_step = L"ReserveDataDirectory"; return error; }
         }
+        std::unique_ptr<runtime::SessionLock> host_lock;
+        if (request.shared_host) {
+            host_lock = std::make_unique<runtime::SessionLock>(session.session_mutex_name());
+            if (!host_lock->ok()) { fail_step = L"SessionLock"; return host_lock->error(); }
+            const DWORD add_err = request.shared_host->Add(request.app_id, job, reservations, true);
+            if (add_err != ERROR_SUCCESS) { fail_step = L"SessionHostAdd"; return add_err; }
+            added_to_host = true;
+        }
         for (auto& folder : folders) {
             if (!folder.approved) continue;
             const auto host = PathResolver::ResolveHostTokenPath(folder.token);
@@ -460,8 +477,18 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
             if (slash != std::wstring::npos && slash > 3) {
                 const auto host_parent = host.resolved_path.substr(0, slash);
                 if (::GetFileAttributesW(host_parent.c_str()) == INVALID_FILE_ATTRIBUTES) {
-                    if (::CreateDirectoryW(host_parent.c_str(), nullptr)) {
-                        created_host_parents.push_back(host_parent);
+                    runtime::ManifestOperation dir_op{};
+                    dir_op.type = OperationType::DeleteDir;
+                    dir_op.app_id = request.app_id;
+                    dir_op.target_host_path = host_parent;
+                    std::wstring op_id;
+                    if (session.manifest().RecordOperationIntent(dir_op, op_id).ok) {
+                        if (::CreateDirectoryW(host_parent.c_str(), nullptr)) {
+                            session.manifest().UpdateOperationState(op_id, runtime::OperationState::Applied);
+                            created_host_parents.push_back(host_parent);
+                        } else {
+                            session.manifest().UpdateOperationState(op_id, runtime::OperationState::Skipped);
+                        }
                     }
                 }
             }
@@ -481,33 +508,39 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
             fail_step = L"RegistryPrepare";
             return error;
         }
-        if (!job.Create(session, request.app_id, error)) { fail_step = L"JobCreate"; return error; }
-        const auto active = session.TransitionState(runtime::SessionState::Active);
-        if (!active.ok) { fail_step = L"TransitionActive"; return active.win32_error; }
+        if (!job->Create(session, request.app_id, error)) { fail_step = L"JobCreate"; return error; }
+        if (!request.shared_host) {
+            const auto active = session.TransitionState(runtime::SessionState::Active);
+            if (!active.ok) { fail_step = L"TransitionActive"; return active.win32_error; }
+        }
         PROCESS_INFORMATION process{};
         const auto cwd = executable.substr(0, executable.rfind(L'\\'));
-        if (!job.Launch(executable, request.arguments, cwd, process, error)) { fail_step = L"JobLaunch"; return error; }
+        if (!job->Launch(executable, request.arguments, cwd, process, error)) { fail_step = L"JobLaunch"; return error; }
+        host_lock.reset();
         Handle child(process.hProcess), thread(process.hThread);
         const ULONGLONG deadline = request.timeout_ms == INFINITE
             ? 0 : (::GetTickCount64() + request.timeout_ms);
-        auto waited = guard::WaitForReleaseOrOriginLoss(origin, child.get(), request.timeout_ms, error);
+        auto waited = guard::WaitForReleaseOrOriginLoss(
+            origin, child.get(), request.timeout_ms, error, request.stop_event);
         if (waited == guard::OriginWaitResult::OriginLost) return ERROR_DEVICE_NOT_CONNECTED;
         if (waited == guard::OriginWaitResult::TimedOut) return ERROR_TIMEOUT;
         if (waited != guard::OriginWaitResult::Released) return error;
         DWORD code = 0;
         if (!::GetExitCodeProcess(child.get(), &code)) return ::GetLastError();
-        while (!jobs::JobManager::IsEmpty(job.name())) {
+        while (!jobs::JobManager::IsEmpty(job->name())) {
             DWORD slice = 200;
             if (request.timeout_ms != INFINITE) {
                 const ULONGLONG now = ::GetTickCount64();
                 if (now >= deadline) return ERROR_TIMEOUT;
                 slice = static_cast<DWORD>(std::min<ULONGLONG>(200, deadline - now));
             }
-            waited = guard::WaitForReleaseOrOriginLoss(origin, nullptr, slice, error);
+            waited = guard::WaitForReleaseOrOriginLoss(origin, nullptr, slice, error, request.stop_event);
             if (waited == guard::OriginWaitResult::OriginLost) return ERROR_DEVICE_NOT_CONNECTED;
             if (waited == guard::OriginWaitResult::Failed) return error;
         }
-        if (!jobs::JobManager::TerminateAndWait(job.name(), error)) return error;
+        if (!request.shared_host) {
+            if (!jobs::JobManager::TerminateAndWait(job->name(), error)) return error;
+        }
         if (code) return ERROR_PROCESS_ABORTED;
         if (registry_approved) {
             for (const auto& op : session.manifest().operations()) {
@@ -523,15 +556,39 @@ LearningResult LearningEngine::Run(const PathResolver& resolver, const LearningR
     } catch (...) {
         result.error = ERROR_UNHANDLED_EXCEPTION;
     }
-    guard.StopMonitoring();
-    const auto restored = cleanup::CleanupEngine::Run(
-        session, result.error == ERROR_SUCCESS ? cleanup::Mode::Normal : cleanup::Mode::Critical,
-        cleanup::Artifacts::Remove, &guard.process());
+    if (request.shared_host) {
+        if (result.error == ERROR_DEVICE_NOT_CONNECTED) request.shared_host->BeginShutdown();
+        if (added_to_host) {
+            runtime::SessionLock lock(session.session_mutex_name());
+            if (!lock.ok()) {
+                result.host_restored = false;
+                result.rollback_error = lock.error();
+            } else if (!request.shared_host->closing()) {
+                const auto mode = result.error ? cleanup::Mode::Critical : cleanup::Mode::Normal;
+                const auto cleaned = cleanup::CleanupEngine::RunApplication(session, request.app_id, mode);
+                result.host_restored = cleaned.ok;
+                result.rollback_error = cleaned.error;
+                if (cleaned.ok) {
+                    job.reset();
+                    request.shared_host->Release(request.app_id);
+                }
+            } else {
+                result.host_restored = true;
+            }
+        } else {
+            result.host_restored = true;
+        }
+    } else {
+        owned_guard->StopMonitoring();
+        const auto restored = cleanup::CleanupEngine::Run(
+            session, result.error == ERROR_SUCCESS ? cleanup::Mode::Normal : cleanup::Mode::Critical,
+            cleanup::Artifacts::Remove, &owned_guard->process());
+        result.host_restored = restored.ok;
+        result.rollback_error = restored.error;
+    }
     for (auto it = created_host_parents.rbegin(); it != created_host_parents.rend(); ++it) {
         ::RemoveDirectoryW(it->c_str()); // removes only if empty
     }
-    result.host_restored = restored.ok;
-    result.rollback_error = restored.error;
     if (!result.host_restored || result.error != ERROR_SUCCESS) {
         LogLearningError(resolver, request.app_id, fail_step, result.error ? result.error : result.rollback_error);
         return result;

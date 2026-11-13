@@ -22,8 +22,13 @@ DWORD SessionHost::Add(const std::wstring& app, std::shared_ptr<jobs::JobManager
     return error;
 }
 
+void SessionHost::SetPreRollback(const std::wstring& app, std::function<DWORD()> fn) {
+    pre_rollback_[app] = std::move(fn);
+}
+
 void SessionHost::Release(const std::wstring& app) {
     jobs_.erase(app);
+    pre_rollback_.erase(app);
     guard_.Release(app);
 }
 
@@ -31,7 +36,22 @@ DWORD SessionHost::Close(cleanup::Mode mode) {
     BeginShutdown();
     guard_.StopMonitoring();
     if (session_.manifest_path().empty()) return ERROR_SUCCESS;
-    return cleanup::CleanupEngine::Run(session_, mode, cleanup::Artifacts::Remove, &guard_.process()).error;
+    DWORD pre_err = ERROR_SUCCESS;
+    if (mode != cleanup::Mode::Critical && !pre_rollback_.empty()) {
+        for (const auto& [id, job] : jobs_) {
+            if (!job) continue;
+            DWORD jerr = ERROR_SUCCESS;
+            jobs::JobManager::TerminateAndWait(job->name(), jerr);
+        }
+        for (const auto& [id, fn] : pre_rollback_) {
+            if (!fn) continue;
+            const DWORD err = fn();
+            if (err && !pre_err) pre_err = err;
+        }
+    }
+    const DWORD clean_err =
+        cleanup::CleanupEngine::Run(session_, mode, cleanup::Artifacts::Remove, &guard_.process()).error;
+    return clean_err ? clean_err : pre_err;
 }
 
 } // namespace pm::applications

@@ -3,6 +3,8 @@
 #include "guard/guard_supervisor.h"
 #include "jobs/job_manager.h"
 
+#include <functional>
+#include <map>
 #include <memory>
 
 namespace pm::applications {
@@ -20,6 +22,7 @@ public:
     // Called under the named session mutex from preparation and unit cleanup.
     DWORD Add(const std::wstring& app, std::shared_ptr<jobs::JobManager> job, std::span<const HANDLE> reservations,
               bool require_guard);
+    void SetPreRollback(const std::wstring& app, std::function<DWORD()> fn);
     void Release(const std::wstring& app);
     DWORD Close(cleanup::Mode mode);
 
@@ -28,6 +31,7 @@ private:
     runtime::SessionManager session_;
     guard::GuardSupervisor guard_;
     std::map<std::wstring, std::shared_ptr<jobs::JobManager>> jobs_;
+    std::map<std::wstring, std::function<DWORD()>> pre_rollback_;
     std::atomic<bool> closing_{false};
 };
 

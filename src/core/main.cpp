@@ -9,6 +9,7 @@
 #include "guard/guard_process.h"
 #include "jobs/job_manager.h"
 #include "runtime/runtime_module.h"
+#include "runtime/session_lock.h"
 
 #include <cstdio>
 #include <cwchar>
@@ -27,6 +28,13 @@ int DiscardOrphansList(const std::vector<std::wstring>& orphans) {
       L"PortableManager" / L"Session";
   int failures = 0;
   for (const auto& id : orphans) {
+    pm::runtime::SessionManager inspector;
+    inspector.OpenExistingSession(id);
+    pm::runtime::SessionLock lock(inspector.session_mutex_name());
+    if (!lock.ok() || pm::runtime::SessionManager::IsSessionLive(id)) {
+      ++failures;
+      continue;
+    }
     std::error_code ec;
     std::filesystem::remove_all(sessions_root / id, ec);
     if (ec) ++failures;

@@ -30,6 +30,7 @@ int RunGuardMode(std::wstring_view session_id, std::wstring_view pm_handle_arg,
     if (!parent_id || parent_id == ::GetCurrentProcessId()) return 2;
     pm::runtime::SessionManager session;
     if (!session.OpenExistingSession(session_id).ok) return 3;
+    session.AcquireLivePresence();
     const std::wstring temp = pm::runtime::SessionManager::QuerySystemTempDir();
     if (temp.empty() || !::SetCurrentDirectoryW(temp.c_str())) return 4;
     // The normal retirement event cannot start a cleanup. While PM is
@@ -37,32 +38,17 @@ int RunGuardMode(std::wstring_view session_id, std::wstring_view pm_handle_arg,
     if (!::SetEvent(ready)) return 5;
     ::CloseHandle(ready);
 
-    wchar_t origin_buf[32768]{};
-    DWORD origin_len = static_cast<DWORD>(std::size(origin_buf));
-    const bool has_origin = ::QueryFullProcessImageNameW(parent, 0, origin_buf, &origin_len) != FALSE && origin_len > 0;
-
+    // PMG is strictly PML's shadow: while PML is alive, PML handles OriginLost.
+    // PMG only recovers if PML terminates without signaling clean stop.
     bool should_recover = false;
     bool clean_stop = false;
     bool wait_failed = false;
 
-    if (has_origin) {
-        DWORD wait_err = ERROR_SUCCESS;
-        const auto res = WaitForReleaseOrOriginLoss(
-            std::wstring(origin_buf, origin_len), parent, INFINITE, wait_err, stop);
-        if (res == OriginWaitResult::Stopped) {
-            clean_stop = true;
-        } else if (res == OriginWaitResult::Released || res == OriginWaitResult::OriginLost) {
-            should_recover = true;
-        } else {
-            wait_failed = true;
-        }
-    } else {
-        const HANDLE waits[]{parent, stop};
-        const DWORD waited = ::WaitForMultipleObjects(stop ? 2 : 1, waits, FALSE, INFINITE);
-        if (stop && waited == WAIT_OBJECT_0 + 1) clean_stop = true;
-        else if (waited == WAIT_OBJECT_0) should_recover = true;
-        else wait_failed = true;
-    }
+    const HANDLE waits[]{parent, stop};
+    const DWORD waited = ::WaitForMultipleObjects(stop ? 2 : 1, waits, FALSE, INFINITE);
+    if (stop && waited == WAIT_OBJECT_0 + 1) clean_stop = true;
+    else if (waited == WAIT_OBJECT_0) should_recover = true;
+    else wait_failed = true;
 
     ::CloseHandle(parent);
     if (stop) ::CloseHandle(stop);
