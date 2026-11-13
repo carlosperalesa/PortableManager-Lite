@@ -98,10 +98,10 @@ int wmain(int argc, wchar_t* argv[]) {
     wchar_t temp_dir[MAX_PATH]{};
     ::GetTempPathW(MAX_PATH, temp_dir);
 
-    // 1. Arranque normal y salida normal desde directorio de trabajo distinto (%TEMP%)
+    // 1. Arranque CLI (--ready) desde directorio de trabajo distinto (%TEMP%)
     DWORD exit_code = 999;
     std::string out_normal;
-    if (!RunProcessCaptureOutput(L"\"" + pm_path + L"\"", temp_dir, exit_code, out_normal) ||
+    if (!RunProcessCaptureOutput(L"\"" + pm_path + L"\" --ready", temp_dir, exit_code, out_normal) ||
         exit_code != 0 ||
         out_normal.find("Ready.") == std::string::npos ||
         out_normal.find("Root=" + expected_root_utf8) == std::string::npos) {

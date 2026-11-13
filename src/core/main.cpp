@@ -93,6 +93,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
       return pm::guard::RunGuardMode(session_id, handle_arg, ready_arg, stop_arg);
     }
 
+    if (arg1 == L"--ready" && argc == 2) {
+      std::wprintf(L"%ls v%ls | Root=%ls | Ready.\n", pm::core::kProductName,
+                   pm::core::kVersionString, exe_dir.c_str());
+      return 0;
+    }
+
     if (arg1 == L"--desktop" && argc == 2) return pm::pmd::Run(resolver);
 
     if (arg1 == L"--version") {
@@ -279,7 +285,5 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     return pm::applications::RunCommand(resolver, arg1, argc, argv);
   }
 
-  std::wprintf(L"%ls v%ls | Root=%ls | Ready.\n", pm::core::kProductName,
-               pm::core::kVersionString, exe_dir.c_str());
-  return 0;
+  return pm::pmd::Run(resolver);
 }
